@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="color-scheme" content="light dark"/>
+  <meta name="supported-color-schemes" content="light dark"/>
+  <title>Welcome to GoOuts 🎉</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+    :root { color-scheme: light dark; }
+    * { margin:0; padding:0; box-sizing:border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f2f4f3;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    /* ── Wrapper ── */
+    .wrapper { background:#f2f4f3; padding:32px 16px; }
+    .card    { max-width:600px; margin:0 auto; background:#fff; border-radius:24px; overflow:hidden; box-shadow:0 4px 32px rgba(0,0,0,.10); }
+
+    /* ── Header ── */
+    .hdr { background:#0b1f0e; padding:28px 36px 0; position:relative; overflow:hidden; }
+    .hdr-orb1 { position:absolute; width:320px; height:320px; border-radius:50%; background:radial-gradient(circle,rgba(0,220,100,.18),transparent 65%); top:-120px; right:-80px; pointer-events:none; }
+    .hdr-orb2 { position:absolute; width:200px; height:200px; border-radius:50%; background:radial-gradient(circle,rgba(0,140,255,.12),transparent 65%); bottom:-60px; left:20px; pointer-events:none; }
+
+    /* Logo */
+    .logo { display:flex; align-items:center; gap:10px; margin-bottom:28px; position:relative; z-index:2; }
+    .logo-box { width:40px; height:40px; border-radius:11px; background:linear-gradient(135deg,#00E676,#00C853); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .logo-box svg { width:22px; height:22px; fill:#fff; }
+    .logo-name { font-size:20px; font-weight:900; color:#fff; letter-spacing:-.3px; }
+    .logo-tagline { font-size:11px; color:rgba(255,255,255,.4); font-weight:500; letter-spacing:.5px; margin-left:2px; margin-top:1px; }
+
+    /* Hero text */
+    .hdr-inner { position:relative; z-index:2; padding-bottom:28px; }
+    .hdr-badge { display:inline-flex; align-items:center; gap:6px; background:rgba(0,230,118,.12); border:1px solid rgba(0,230,118,.3); color:#00E676; font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; padding:5px 13px; border-radius:50px; margin-bottom:16px; }
+    .hdr-badge-dot { width:6px; height:6px; border-radius:50%; background:#00E676; animation:blink 1.6s ease-in-out infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+    .hdr-h1 { font-size:36px; font-weight:900; color:#fff; line-height:1.1; letter-spacing:-.5px; margin-bottom:12px; }
+    .hdr-h1 em { font-style:normal; color:#00E676; }
+    .hdr-p { font-size:15px; color:rgba(255,255,255,.55); line-height:1.6; max-width:420px; }
+
+    /* Hero image */
+    .hero-img { width:100%; height:210px; object-fit:cover; object-position:center 40%; display:block; }
+
+    /* ── Body ── */
+    .body { padding:36px; }
+
+    /* Greeting block */
+    .greet { font-size:16px; color:#1c1c1c; line-height:1.75; margin-bottom:32px; }
+    .greet strong { color:#00A84F; }
+
+    /* ── Uber-style 3 steps ── */
+    .steps-title { font-size:11px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:#b0b0b0; margin-bottom:18px; }
+    .steps { display:flex; flex-direction:column; gap:0; margin-bottom:32px; }
+    .step { display:flex; gap:18px; align-items:flex-start; }
+    .step-left { display:flex; flex-direction:column; align-items:center; }
+    .step-num { width:38px; height:38px; border-radius:50%; background:linear-gradient(135deg,#00E676,#00C853); color:#0b1f0e; font-size:14px; font-weight:900; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:0 4px 12px rgba(0,200,83,.3); }
+    .step-line { width:2px; flex:1; background:linear-gradient(to bottom,rgba(0,200,83,.3),rgba(0,200,83,.05)); min-height:24px; margin:4px 0; }
+    .step-content { padding-bottom:24px; }
+    .step-content h4 { font-size:15px; font-weight:700; color:#1c1c1c; margin-bottom:4px; }
+    .step-content p  { font-size:13px; color:#777; line-height:1.55; }
+    .step:last-child .step-line { display:none; }
+
+    /* Step images */
+    .step-imgs { display:flex; gap:8px; margin-bottom:32px; }
+    .step-img-wrap { flex:1; border-radius:12px; overflow:hidden; position:relative; }
+    .step-img-wrap img { width:100%; height:80px; object-fit:cover; display:block; }
+    .step-img-label { position:absolute; bottom:0; left:0; right:0; background:linear-gradient(to top,rgba(0,0,0,.7),transparent); padding:8px 10px; }
+    .step-img-label span { color:#fff; font-size:11px; font-weight:700; }
+    .step-img-label em { color:#00E676; font-style:normal; font-size:10px; display:block; margin-top:1px; }
+
+    /* Divider */
+    .div { height:1px; background:linear-gradient(90deg,transparent,#ebebeb,transparent); margin:28px 0; }
+
+    /* Services grid — Airbnb inspired card layout */
+    .services-label { font-size:11px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:#b0b0b0; margin-bottom:14px; }
+    .services { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:32px; }
+    .svc { border-radius:14px; overflow:hidden; position:relative; }
+    .svc img { width:100%; height:108px; object-fit:cover; display:block; transition:transform .3s ease; }
+    .svc-info { position:absolute; bottom:0; left:0; right:0; padding:10px 12px; background:linear-gradient(to top,rgba(0,0,0,.78) 0%,transparent 100%); }
+    .svc-name { color:#fff; font-size:13px; font-weight:700; }
+    .svc-pct  { color:#00E676; font-size:11px; font-weight:600; margin-top:1px; }
+
+    /* Stats row — Deliveroo style bold numbers */
+    .stats { display:flex; background:#0b1f0e; border-radius:18px; padding:22px 10px; margin-bottom:32px; }
+    .stat { flex:1; text-align:center; }
+    .stat-n { font-size:24px; font-weight:900; color:#00E676; letter-spacing:-.5px; }
+    .stat-l { font-size:11px; color:rgba(255,255,255,.45); margin-top:3px; }
+    .stat-div { width:1px; background:rgba(255,255,255,.08); margin:4px 0; }
+
+    /* CTA — Uber Eats: ONE button, huge, unmissable */
+    .cta-wrap { text-align:center; margin:28px 0; }
+    .cta { display:inline-block; background:linear-gradient(135deg,#00E676,#00C853); color:#0b1f0e; font-size:17px; font-weight:900; padding:18px 52px; border-radius:50px; text-decoration:none; letter-spacing:-.2px; box-shadow:0 8px 28px rgba(0,200,83,.38); min-height:56px; }
+    .cta-sub { font-size:12px; color:#b0b0b0; margin-top:10px; }
+
+    /* Testimonial — Airbnb warmth */
+    .quote { background:#f7fdf8; border-left:3px solid #00C853; border-radius:0 14px 14px 0; padding:18px 20px; margin-bottom:28px; }
+    .quote p { font-size:14px; color:#333; line-height:1.65; font-style:italic; margin-bottom:10px; }
+    .quote-author { display:flex; align-items:center; gap:10px; }
+    .q-avatar { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:900; color:#fff; flex-shrink:0; }
+    .q-name { font-size:12px; font-weight:700; color:#1c1c1c; }
+    .q-loc  { font-size:11px; color:#999; }
+    .stars  { color:#FFB300; font-size:12px; }
+
+    /* ── Footer ── */
+    .ftr { background:#0b1f0e; padding:28px 36px; }
+    .ftr-logo { display:flex; align-items:center; gap:8px; margin-bottom:16px; }
+    .ftr-logo-box { width:28px; height:28px; border-radius:8px; background:linear-gradient(135deg,#00E676,#00C853); display:flex; align-items:center; justify-content:center; }
+    .ftr-logo-box svg { width:16px; height:16px; fill:#fff; }
+    .ftr-logo-name { font-size:15px; font-weight:900; color:#fff; }
+    .ftr-links { margin-bottom:14px; }
+    .ftr-links a { color:rgba(255,255,255,.35); font-size:12px; text-decoration:none; margin-right:14px; }
+    .ftr-div { height:1px; background:rgba(255,255,255,.07); margin:14px 0; }
+    .ftr-legal { font-size:11px; color:rgba(255,255,255,.25); line-height:1.65; }
+    .ftr-legal a { color:rgba(0,230,118,.4); text-decoration:none; }
+
+    /* Mobile */
+    @media (max-width:480px) {
+      .body { padding:24px 20px; }
+      .hdr  { padding:22px 20px 0; }
+      .hdr-h1 { font-size:27px; }
+      .services { grid-template-columns:1fr 1fr; gap:8px; }
+      .svc img { height:86px; }
+      .stats { flex-direction:column; gap:16px; }
+      .stat-div { display:none; }
+      .step-imgs { flex-wrap:wrap; }
+      .step-img-wrap { min-width:calc(50% - 4px); }
+      .cta { padding:17px 36px; font-size:16px; }
+      .ftr { padding:22px 20px; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+<div class="card">
+
+  <!-- ══ HEADER ══ -->
+  <div class="hdr">
+    <div class="hdr-orb1"></div>
+    <div class="hdr-orb2"></div>
+
+    <!-- Logo — Deliveroo: always visible, always prominent -->
+    <div class="logo" style="margin-bottom:28px; position:relative; z-index:2;">
+      <img src="../assets/images/goouts_logo_white.webp" alt="GoOuts" style="height:44px; width:auto; display:block;" />
+    </div>
+
+    <div class="hdr-inner">
+      <div class="hdr-badge"><div class="hdr-badge-dot"></div> You're officially in</div>
+      <h1 class="hdr-h1">Welcome aboard.<br/>Every outing now<br/><em>earns you back.</em></h1>
+      <p class="hdr-p">No points. No tricks. Just real cashback every time you go out — to cafes, restaurants, pubs, clubs, and more.</p>
+    </div>
+  </div>
+
+  <!-- Hero image — full bleed like Airbnb -->
+  <img class="hero-img" src="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1200&q=85&fit=crop&crop=center" alt="GoOuts partner venues"/>
+
+  <!-- ══ BODY ══ -->
+  <div class="body">
+
+    <!-- Greeting — Airbnb: warm, personal, first name always -->
+    <p class="greet">
+      Hi <strong>[First Name]</strong> 👋<br/><br/>
+      We're thrilled you joined GoOuts. You now have access to cashback at thousands of venues near you — cafes, restaurants, fast food, pubs, clubs, live music, and comedy nights. Every visit earns you <strong>real money</strong>, credited to your wallet the moment you scan.
+    </p>
+
+    <!-- Stats — Deliveroo: bold brand numbers front and centre -->
+    <div class="stats">
+      <div class="stat"><div class="stat-n">$4.2M</div><div class="stat-l">Paid out</div></div>
+      <div class="stat-div"></div>
+      <div class="stat"><div class="stat-n">120K+</div><div class="stat-l">Happy users</div></div>
+      <div class="stat-div"></div>
+      <div class="stat"><div class="stat-n">15%</div><div class="stat-l">Max cashback</div></div>
+    </div>
+
+    <!-- 3 Steps — Uber Eats style: clarity, pictures, one action -->
+    <div class="steps-title">How to earn in 3 steps</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-left"><div class="step-num">1</div><div class="step-line"></div></div>
+        <div class="step-content">
+          <h4>Open GoOuts &amp; tap Nearby</h4>
+          <p>See every GoOuts partner venue around you right now — cafes, restaurants, pubs, clubs, and more.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-left"><div class="step-num">2</div><div class="step-line"></div></div>
+        <div class="step-content">
+          <h4>Visit &amp; enjoy as normal</h4>
+          <p>Order your coffee, your meal, your drinks. No special payment method needed.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-left"><div class="step-num">3</div></div>
+        <div class="step-content">
+          <h4>Scan the QR &amp; collect cashback</h4>
+          <p>Open GoOuts, tap Scan, and point at the venue QR. Money lands in your wallet instantly.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step venue photos — visual support like Uber Eats -->
+    <div class="step-imgs">
+      <div class="step-img-wrap">
+        <img src="https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=300&q=80&fit=crop" alt="Cafes"/>
+        <div class="step-img-label"><span>☕ Cafes</span><em>Up to 12% back</em></div>
+      </div>
+      <div class="step-img-wrap">
+        <img src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=300&q=80&fit=crop" alt="Restaurants"/>
+        <div class="step-img-label"><span>🍽️ Restaurants</span><em>Up to 10% back</em></div>
+      </div>
+      <div class="step-img-wrap">
+        <img src="https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=300&q=80&fit=crop" alt="Clubs"/>
+        <div class="step-img-label"><span>🎵 Clubs &amp; Music</span><em>Up to 15% back</em></div>
+      </div>
+    </div>
+
+    <!-- ONE CTA — Uber Eats rule: one job, one button -->
+    <div class="cta-wrap">
+      <a href="#" class="cta">Explore Places Near You →</a>
+      <p class="cta-sub">Tap to open GoOuts and find your nearest partner venues</p>
+    </div>
+
+    <div class="div"></div>
+
+    <!-- Services grid — Airbnb visual card layout -->
+    <div class="services-label">All the places you earn cashback</div>
+    <div class="services">
+      <div class="svc">
+        <img src="https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400&q=80&fit=crop" alt="Cafes"/>
+        <div class="svc-info"><div class="svc-name">☕ Cafes</div><div class="svc-pct">Up to 12% cashback</div></div>
+      </div>
+      <div class="svc">
+        <img src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&q=80&fit=crop" alt="Restaurants"/>
+        <div class="svc-info"><div class="svc-name">🍽️ Restaurants</div><div class="svc-pct">Up to 10% cashback</div></div>
+      </div>
+      <div class="svc">
+        <img src="https://images.unsplash.com/photo-1567696911980-2eed69a46042?w=400&q=80&fit=crop" alt="Pubs"/>
+        <div class="svc-info"><div class="svc-name">🍺 Pubs</div><div class="svc-pct">Up to 8% cashback</div></div>
+      </div>
+      <div class="svc">
+        <img src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&q=80&fit=crop" alt="Music &amp; Clubs"/>
+        <div class="svc-info"><div class="svc-name">🎵 Clubs &amp; Music</div><div class="svc-pct">Up to 15% cashback</div></div>
+      </div>
+    </div>
+
+    <div class="div"></div>
+
+    <!-- Testimonial — Airbnb: warmth + social proof -->
+    <div class="quote">
+      <p>"I earned $120 in my first month just from restaurants and coffee runs. This is legitimately the easiest money I've ever made."</p>
+      <div class="quote-author">
+        <div class="q-avatar" style="background:linear-gradient(135deg,#00C853,#00E676);">A</div>
+        <div>
+          <div class="q-name">Ayesha Rahman · Dubai</div>
+          <div class="q-loc"><span class="stars">★★★★★</span> &nbsp;8 months on GoOuts</div>
+        </div>
+      </div>
+    </div>
+
+    <p style="font-size:13px;color:#aaa;text-align:center;line-height:1.7;">
+      Got questions? We're always here.<br/>
+      Tap <strong style="color:#555">Help</strong> in the app or email <a href="mailto:support@goouts.app" style="color:#00A84F;text-decoration:none;">support@goouts.app</a>
+    </p>
+
+  </div>
+
+  <!-- ══ FOOTER ══ -->
+  <div class="ftr">
+    <div class="ftr-logo" style="margin-bottom:16px;">
+      <img src="../assets/images/goouts_logo_white.webp" alt="GoOuts" style="height:32px; width:auto; display:block;" />
+    </div>
+    <div class="ftr-links">
+      <a href="#">Unsubscribe</a>
+      <a href="#">Privacy Policy</a>
+      <a href="#">Terms of Service</a>
+      <a href="#">Help Centre</a>
+    </div>
+    <div class="ftr-div"></div>
+    <p class="ftr-legal">
+      © 2026 GoOuts Ltd. All rights reserved.<br/><br/>
+      You received this email because you created a GoOuts account using this email address. GoOuts is a cashback rewards platform enabling users to earn real monetary cashback at participating partner venues. Cashback percentages are determined by individual partner venues and may vary or change without notice. GoOuts does not guarantee specific cashback amounts. Cashback is subject to successful QR code verification at the time of visit and compliance with our Terms of Service.<br/><br/>
+      GoOuts Ltd · <a href="#">goouts.app</a> · support@goouts.app<br/><br/>
+      To stop receiving marketing emails from GoOuts, <a href="#">click here to unsubscribe</a>. Transactional emails related to your account activity cannot be unsubscribed. Please allow up to 5 business days for your unsubscribe request to take effect. GoOuts complies with applicable email marketing regulations including CAN-SPAM and GDPR.
+    </p>
+  </div>
+
+</div>
+</div>
+</body>
+</html>

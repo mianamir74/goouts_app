@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GoOuts App — Project Tracker</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #F2F4F7;
+    color: #0D1B3E;
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: linear-gradient(135deg, #0392CA 0%, #0268A0 100%);
+    color: white;
+    padding: 28px 32px 24px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 4px 20px rgba(3,146,202,0.3);
+  }
+  .header-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-dot { width: 44px; height: 44px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 900; border: 1.5px solid rgba(255,255,255,0.3); }
+  .brand-name { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
+  .brand-sub { font-size: 12px; opacity: 0.8; letter-spacing: 0.5px; }
+
+  /* Stats row */
+  .stats-row { display: flex; gap: 24px; margin-top: 20px; flex-wrap: wrap; }
+  .stat-pill {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 50px;
+    padding: 8px 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .stat-pill .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .dot-done { background: #4CAF50; }
+  .dot-progress { background: #FFC107; }
+  .dot-todo { background: rgba(255,255,255,0.5); }
+
+  /* Overall progress bar */
+  .progress-bar-wrap { margin-top: 16px; }
+  .progress-label { font-size: 12px; opacity: 0.85; margin-bottom: 6px; letter-spacing: 0.5px; }
+  .progress-track { height: 8px; background: rgba(255,255,255,0.2); border-radius: 10px; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, #4CAF50, #8BC34A); border-radius: 10px; transition: width 1s ease; }
+
+  /* ── Filters ── */
+  .filters {
+    padding: 20px 32px 0;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .filter-btn {
+    padding: 7px 18px;
+    border-radius: 50px;
+    border: 2px solid #dde3ec;
+    background: white;
+    color: #0D1B3E;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .filter-btn:hover { border-color: #0392CA; color: #0392CA; }
+  .filter-btn.active { background: #0392CA; border-color: #0392CA; color: white; }
+
+  /* ── Main content ── */
+  .content { padding: 20px 32px 60px; max-width: 1400px; margin: 0 auto; }
+
+  /* Section block */
+  .section { margin-bottom: 28px; }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    background: white;
+    border-radius: 14px 14px 0 0;
+    border-bottom: 2px solid #F2F4F7;
+    cursor: pointer;
+    user-select: none;
+  }
+  .section-header:hover { background: #f8fafc; }
+  .section-icon { font-size: 20px; }
+  .section-title { font-size: 16px; font-weight: 800; flex: 1; }
+  .section-badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 50px; }
+  .badge-done { background: #E8F5E9; color: #2E7D32; }
+  .badge-progress { background: #FFF8E1; color: #F57F17; }
+  .badge-mixed { background: #E3F2FD; color: #1565C0; }
+  .section-toggle { font-size: 18px; color: #999; transition: transform 0.2s; }
+  .section-toggle.open { transform: rotate(180deg); }
+
+  /* Table */
+  .table-wrap { background: white; border-radius: 0 0 14px 14px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    background: #F8FAFC;
+    padding: 10px 16px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    color: #888;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    border-bottom: 1px solid #EEF1F5;
+  }
+  td { padding: 12px 16px; border-bottom: 1px solid #F0F3F7; vertical-align: middle; font-size: 14px; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #FAFCFF; }
+  tr.hidden { display: none; }
+
+  /* Sub-section rows */
+  .sub-header td {
+    background: #F5F8FF;
+    font-weight: 700;
+    font-size: 12px;
+    color: #0392CA;
+    letter-spacing: 0.5px;
+    padding: 8px 16px;
+    border-bottom: 1px solid #E8F0FA;
+  }
+
+  /* Status badges */
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 12px;
+    border-radius: 50px;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .status-done { background: #E8F5E9; color: #2E7D32; }
+  .status-progress { background: #FFF8E1; color: #E65100; }
+  .status-todo { background: #F5F5F5; color: #757575; }
+  .status-blocked { background: #FDE8E8; color: #C62828; }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+  /* Priority */
+  .priority { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 50px; }
+  .p-high { background: #FDE8E8; color: #C62828; }
+  .p-med { background: #FFF3CD; color: #856404; }
+  .p-low { background: #E8F5E9; color: #2E7D32; }
+  .p-post { background: #F3E8FF; color: #6B21A8; }
+
+  /* Notes */
+  .note { font-size: 12px; color: #888; }
+
+  /* Mini progress inside cell */
+  .mini-bar { height: 4px; background: #EEF1F5; border-radius: 3px; width: 80px; overflow: hidden; margin-top: 4px; }
+  .mini-fill { height: 100%; border-radius: 3px; }
+  .fill-green { background: #4CAF50; }
+  .fill-yellow { background: #FFC107; }
+  .fill-grey { background: #E0E0E0; }
+
+  /* Legend */
+  .legend { display: flex; gap: 20px; padding: 16px 32px; flex-wrap: wrap; font-size: 12px; color: #888; }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+
+  /* Sprint day rows */
+  tr[data-sprint="true"] td:first-child { border-left: 4px solid #0392CA; }
+  tr[data-sprint="true"]:hover td { background: #F0F8FF; }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .header, .content, .filters, .legend { padding-left: 16px; padding-right: 16px; }
+    .stats-row { gap: 10px; }
+    th:nth-child(4), td:nth-child(4) { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════
+     HEADER
+════════════════════════════════════════════════════════════ -->
+<div class="header">
+  <div class="header-top">
+    <div class="brand">
+      <div class="brand-dot">G</div>
+      <div>
+        <div class="brand-name">GoOuts App</div>
+        <div class="brand-sub">PROJECT TRACKER — FLUTTER / FIREBASE</div>
+      </div>
+    </div>
+    <div style="font-size:12px;opacity:0.75;">Last updated: May 2026</div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-pill"><span class="dot dot-done"></span> <span id="count-done">0</span> Done</div>
+    <div class="stat-pill"><span class="dot dot-progress"></span> <span id="count-progress">0</span> In Progress</div>
+    <div class="stat-pill"><span class="dot dot-todo"></span> <span id="count-todo">0</span> To Do</div>
+  </div>
+
+  <div class="progress-bar-wrap">
+    <div class="progress-label">OVERALL COMPLETION</div>
+    <div class="progress-track">
+      <div class="progress-fill" id="overall-bar" style="width:0%"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Legend -->
+<div class="legend">
+  <div class="legend-item"><span class="status status-done">✓ Done</span> Completed & working</div>
+  <div class="legend-item"><span class="status status-progress">⟳ In Progress</span> Partially done</div>
+  <div class="legend-item"><span class="status status-todo">○ To Do</span> Not started</div>
+  <div class="legend-item"><span class="priority p-high">HIGH</span> Must before launch</div>
+  <div class="legend-item"><span class="priority p-post">POST</span> After prototype</div>
+</div>
+
+<!-- Filters -->
+<div class="filters">
+  <button class="filter-btn active" onclick="filterTable('all', this)">All Items</button>
+  <button class="filter-btn" onclick="filterTable('done', this)">✓ Done</button>
+  <button class="filter-btn" onclick="filterTable('progress', this)">⟳ In Progress</button>
+  <button class="filter-btn" onclick="filterTable('todo', this)">○ To Do</button>
+  <button class="filter-btn" onclick="filterTable('high', this)">🔴 High Priority</button>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     CONTENT
+════════════════════════════════════════════════════════════ -->
+<div class="content">
+
+  <!-- ── 1. AUTHENTICATION ── -->
+  <div class="section" id="sec-auth">
+    <div class="section-header" onclick="toggleSection('auth')">
+      <span class="section-icon">🔐</span>
+      <span class="section-title">Authentication & Onboarding</span>
+      <span class="section-badge badge-done" id="badge-auth"></span>
+      <span class="section-toggle open" id="toggle-auth">▾</span>
+    </div>
+    <div class="table-wrap" id="body-auth">
+      <table>
+        <thead><tr><th>Feature / Task</th><th>Status</th><th>Priority</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr class="sub-header"><td colspan="4">SPLASH & ONBOARDING</td></tr>
+          <tr data-status="done">
+            <td>Splash screen with animation &amp; branding</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-low">LOW</span></td>
+            <td class="note">Pulse animation, diagonal streaks, glass card</td>
+          </tr>
+          <tr data-status="done">
+            <td>Auth gate on splash (auto-route returning users)</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">Checks Firebase auth → home or create-profile</td>
+          </tr>
+          <tr data-status="done">
+            <td>Onboarding slides (Slide 1–4, Slide 2a)</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-low">LOW</span></td>
+            <td class="note">5 slide screens with smooth page indicator</td>
+          </tr>
+
+          <tr class="sub-header"><td colspan="4">SIGN UP</td></tr>
+          <tr data-status="done">
+            <td>Signup screen — phone number entry</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">UK +44, real Firebase OTP send</td>
+          </tr>
+          <tr data-status="done">
+            <td>OTP screen — 6-digit verification</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">Shake on error, paste, auto-submit, resend, mode-aware (login/signup)</td>
+          </tr>
+          <tr data-status="done">
+            <td>Firebase phone OTP — real SMS</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">Tested on real phone ✅</td>
+          </tr>
+
+          <tr class="sub-header"><td colspan="4">LOGIN</td></tr>
+          <tr data-status="done">
+            <td>Login screen — phone + PIN UI</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">Real Firebase OTP now wired</td>
+          </tr>
+          <tr data-status="done">
+            <td>Login → OTP → Home flow</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">Checks Firestore profile after OTP verify</td>
+          </tr>
+          <tr data-status="todo">
+            <td>PIN verification against Firestore on login</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-med">MED</span></td>
+            <td class="note">Currently PIN entered but not checked vs Firestore</td>
+          </tr>
+          <tr data-status="done">
+            <td>Forgot PIN flow</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-med">MED</span></td>
+            <td class="note">Bottom sheet → phone → OTP reset</td>
+          </tr>
+          <tr data-status="done">
+            <td>Sign out — real Firebase signOut()</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">Clears auth + navigates to splash</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Google Sign-In</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-post">POST</span></td>
+            <td class="note">After prototype/investor phase</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Apple Sign-In</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-post">POST</span></td>
+            <td class="note">Required on iOS if Google Sign-In is added</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── 2. USER PROFILE ── -->
+  <div class="section" id="sec-profile">
+    <div class="section-header" onclick="toggleSection('profile')">
+      <span class="section-icon">👤</span>
+      <span class="section-title">User Profile & Registration</span>
+      <span class="section-badge badge-mixed" id="badge-profile"></span>
+      <span class="section-toggle open" id="toggle-profile">▾</span>
+    </div>
+    <div class="table-wrap" id="body-profile">
+      <table>
+        <thead><tr><th>Feature / Task</th><th>Status</th><th>Priority</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr class="sub-header"><td colspan="4">PROFILE CREATION</td></tr>
+          <tr data-status="done">
+            <td>Create Profile Screen 1 — name, DOB, email, PIN</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">Prefix dropdown (Mr/Mrs/Dr etc), title case name</td>
+          </tr>
+          <tr data-status="done">
+            <td>Create Profile Screen 2 — address details</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">Postcode lookup via Ordnance Survey API</td>
+          </tr>
+          <tr data-status="done">
+            <td>DOB — manual typing + calendar picker</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-med">MED</span></td>
+            <td class="note">Auto DD/MM/YYYY format as user types</td>
+          </tr>
+          <tr data-status="done">
+            <td>Save user to Firestore (users collection)</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">uid, phone, prefix, fullName, email, dob, pin, address, etc.</td>
+          </tr>
+          <tr data-status="done">
+            <td>Registration success screen with user name + confetti</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-med">MED</span></td>
+            <td class="note">Shows "Congratulations, Mr Amir!" from Firestore args</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Restore full form validation (email, terms, PIN length)</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">Bypassed for prototype — restore before launch</td>
+          </tr>
+
+          <tr class="sub-header"><td colspan="4">PROFILE SCREEN</td></tr>
+          <tr data-status="done">
+            <td>Load real name, email, phone from Firestore</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">Replaced hardcoded "Alex Thompson"</td>
+          </tr>
+          <tr data-status="done">
+            <td>Profile photo picker (gallery)</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-med">MED</span></td>
+            <td class="note">Local only — not saved to Firebase Storage yet</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Upload profile photo to Firebase Storage</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-med">MED</span></td>
+            <td class="note">Needs firebase_storage package</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Edit name / email → save to Firestore</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-med">MED</span></td>
+            <td class="note">Edit dialog exists but doesn't write to Firestore</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Saved Addresses — load/save from Firestore</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-med">MED</span></td>
+            <td class="note">Currently static placeholder</td>
+          </tr>
+
+          <tr class="sub-header"><td colspan="4">SECURITY</td></tr>
+          <tr data-status="done">
+            <td>Change PIN — bottom sheet with current/new/confirm</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">UI done — needs Firestore write to update PIN</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Change PIN — save new PIN to Firestore</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">Must hash PIN before saving in production</td>
+          </tr>
+          <tr data-status="done">
+            <td>2FA setup screen</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-med">MED</span></td>
+            <td class="note">UI only — not connected to Firebase</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Restore PIN gate on profile actions</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">Bypassed for prototype — restore before launch</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Biometric login toggle</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-post">POST</span></td>
+            <td class="note">Needs local_auth package — toggle does nothing currently</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── 3. FIREBASE & BACKEND ── -->
+  <div class="section" id="sec-firebase">
+    <div class="section-header" onclick="toggleSection('firebase')">
+      <span class="section-icon">🔥</span>
+      <span class="section-title">Firebase & Backend</span>
+      <span class="section-badge badge-mixed" id="badge-firebase"></span>
+      <span class="section-toggle open" id="toggle-firebase">▾</span>
+    </div>
+    <div class="table-wrap" id="body-firebase">
+      <table>
+        <thead><tr><th>Feature / Task</th><th>Status</th><th>Priority</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr class="sub-header"><td colspan="4">FIREBASE SETUP</td></tr>
+          <tr data-status="done">
+            <td>Firebase project setup (goouts-f16db)</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">Shared with driver_app &amp; admin_panel</td>
+          </tr>
+          <tr data-status="done">
+            <td>FlutterFire CLI — firebase_options.dart generated</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">Android app ID: 1:289872853637:android:d68b6be5...</td>
+          </tr>
+          <tr data-status="done">
+            <td>Firebase Auth — phone OTP (sendOtp, verifyOtp, resendOtp)</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">lib/services/auth_service.dart</td>
+          </tr>
+          <tr data-status="done">
+            <td>Firestore — users collection (createUser, getCurrentUser)</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">lib/services/user_service.dart — UID as document ID</td>
+          </tr>
+
+          <tr class="sub-header"><td colspan="4">FIRESTORE DATA READS</td></tr>
+          <tr data-status="done">
+            <td>Home screen — load user name from Firestore</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">Shows "Good morning, Mr Amir"</td>
+          </tr>
+          <tr data-status="done">
+            <td>Profile screen — load name, email, phone from Firestore</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">Replaced all hardcoded placeholder data</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Wallet screen — load real balance from Firestore</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">walletBalance field exists in users doc — just needs wiring</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Wallet screen — load real transaction history</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">Needs transactions sub-collection in Firestore</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Activity screen — load real cashback activity from Firestore</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">Currently all static dummy data</td>
+          </tr>
+
+          <tr class="sub-header"><td colspan="4">KYC</td></tr>
+          <tr data-status="done">
+            <td>KYC screen — ID front/back + selfie capture flow</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">Camera, image quality inspector, biometric inspector</td>
+          </tr>
+          <tr data-status="todo">
+            <td>KYC result — save verified status to Firestore</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">kycStatus field in users doc — needs update on completion</td>
+          </tr>
+          <tr data-status="todo">
+            <td>KYC — real identity verification API (Stripe Identity / Onfido)</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-post">POST</span></td>
+            <td class="note">Current AI inspector is local — not legally compliant</td>
+          </tr>
+
+          <tr class="sub-header"><td colspan="4">PAYMENTS</td></tr>
+          <tr data-status="done">
+            <td>Link payment method screen (3 options UI)</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-med">MED</span></td>
+            <td class="note">Smart Pay, Wallet Top-up, Card</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Stripe card integration — real card linking</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-post">POST</span></td>
+            <td class="note">Stripe SDK needed</td>
+          </tr>
+          <tr data-status="todo">
+            <td>TrueLayer / Open Banking — JIT-VRP auto-pay</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-post">POST</span></td>
+            <td class="note">Backend phase — full Open Banking integration</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Wallet top-up — real payment flow</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-post">POST</span></td>
+            <td class="note">Add funds screen exists but is static</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── 4. HOME & EXPLORE ── -->
+  <div class="section" id="sec-home">
+    <div class="section-header" onclick="toggleSection('home')">
+      <span class="section-icon">🏠</span>
+      <span class="section-title">Home, Explore & Venues</span>
+      <span class="section-badge badge-mixed" id="badge-home"></span>
+      <span class="section-toggle open" id="toggle-home">▾</span>
+    </div>
+    <div class="table-wrap" id="body-home">
+      <table>
+        <thead><tr><th>Feature / Task</th><th>Status</th><th>Priority</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr class="sub-header"><td colspan="4">HOME SCREEN</td></tr>
+          <tr data-status="done">
+            <td>Home screen UI — virtual card, services, offers, trending</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">5-tab bottom nav, all sections UI complete</td>
+          </tr>
+          <tr data-status="done">
+            <td>Show real user name on home screen header</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">Loads from Firestore on screen open</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Real venues data from Firestore / API</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-post">POST</span></td>
+            <td class="note">Currently hardcoded London venues</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Special offers from Firestore</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-post">POST</span></td>
+            <td class="note">Offers carousel is static</td>
+          </tr>
+
+          <tr class="sub-header"><td colspan="4">EXPLORE / NEARBY</td></tr>
+          <tr data-status="done">
+            <td>Nearby venues screen UI</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-med">MED</span></td>
+            <td class="note">Search, filters, venue cards</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Location permission request</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">geolocator + permission_handler packages needed — MUST before launch</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Real GPS location for "Near You" sorting</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">Core feature of the app — static list currently</td>
+          </tr>
+          <tr data-status="done">
+            <td>Partner / venue detail screen</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-med">MED</span></td>
+            <td class="note">Full detail page with cashback%, rating, description</td>
+          </tr>
+          <tr data-status="done">
+            <td>Partner offer detail screen</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-med">MED</span></td>
+            <td class="note">Offer detail, redeem button UI</td>
+          </tr>
+          <tr data-status="done">
+            <td>Special offers screen</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-med">MED</span></td>
+            <td class="note">All offers list with imagery</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── 5. WALLET ── -->
+  <div class="section" id="sec-wallet">
+    <div class="section-header" onclick="toggleSection('wallet')">
+      <span class="section-icon">💳</span>
+      <span class="section-title">Wallet & Transactions</span>
+      <span class="section-badge badge-mixed" id="badge-wallet"></span>
+      <span class="section-toggle open" id="toggle-wallet">▾</span>
+    </div>
+    <div class="table-wrap" id="body-wallet">
+      <table>
+        <thead><tr><th>Feature / Task</th><th>Status</th><th>Priority</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr class="sub-header"><td colspan="4">WALLET SCREEN</td></tr>
+          <tr data-status="done">
+            <td>Wallet screen UI — balance, spending summary, transactions</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">Static data only currently</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Load real wallet balance from Firestore</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">walletBalance field exists in users doc</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Load real transaction history from Firestore</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">Needs transactions sub-collection</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Add Funds — real payment flow</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-post">POST</span></td>
+            <td class="note">Screen exists — needs Stripe/Open Banking</td>
+          </tr>
+          <tr data-status="done">
+            <td>Transfer screen UI</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-med">MED</span></td>
+            <td class="note">Transfer/share money UI, success screen</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Transfer — real Firestore balance update</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-post">POST</span></td>
+            <td class="note">Needs atomic Firestore transaction</td>
+          </tr>
+
+          <tr class="sub-header"><td colspan="4">CASHBACK SYSTEM</td></tr>
+          <tr data-status="done">
+            <td>Bonus added screen with confetti</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-med">MED</span></td>
+            <td class="note">Welcome bonus £2 animation</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Real cashback calculation engine</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-post">POST</span></td>
+            <td class="note">Backend logic for % cashback on transactions</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Cashback points display from Firestore</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">cashbackPoints field exists — not displayed yet</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Tier system UI (Tier 1/2/3 based on KYC + bank link)</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-med">MED</span></td>
+            <td class="note">£500/£1000/£2000 monthly limits designed — not built</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── 6. NOTIFICATIONS & SUPPORT ── -->
+  <div class="section" id="sec-support">
+    <div class="section-header" onclick="toggleSection('support')">
+      <span class="section-icon">🔔</span>
+      <span class="section-title">Notifications, Messages & Support</span>
+      <span class="section-badge badge-mixed" id="badge-support"></span>
+      <span class="section-toggle open" id="toggle-support">▾</span>
+    </div>
+    <div class="table-wrap" id="body-support">
+      <table>
+        <thead><tr><th>Feature / Task</th><th>Status</th><th>Priority</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr data-status="done">
+            <td>Notifications screen UI</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-med">MED</span></td>
+            <td class="note">List + detail screen, static data</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Push notifications — Firebase Cloud Messaging (FCM)</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-post">POST</span></td>
+            <td class="note">firebase_messaging package needed</td>
+          </tr>
+          <tr data-status="done">
+            <td>Message centre screen UI</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-low">LOW</span></td>
+            <td class="note">Static messages list</td>
+          </tr>
+          <tr data-status="done">
+            <td>Help &amp; FAQ screen UI</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-low">LOW</span></td>
+            <td class="note">Expandable FAQ list</td>
+          </tr>
+          <tr data-status="done">
+            <td>Support tickets screen UI</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-low">LOW</span></td>
+            <td class="note">Tickets list</td>
+          </tr>
+          <tr data-status="done">
+            <td>Contact support form UI</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-low">LOW</span></td>
+            <td class="note">Form screen</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Support tickets — save to Firestore</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-post">POST</span></td>
+            <td class="note">Needs support_tickets collection</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── 7. TECHNICAL / INFRASTRUCTURE ── -->
+  <div class="section" id="sec-tech">
+    <div class="section-header" onclick="toggleSection('tech')">
+      <span class="section-icon">⚙️</span>
+      <span class="section-title">Technical & Infrastructure</span>
+      <span class="section-badge badge-mixed" id="badge-tech"></span>
+      <span class="section-toggle open" id="toggle-tech">▾</span>
+    </div>
+    <div class="table-wrap" id="body-tech">
+      <table>
+        <thead><tr><th>Feature / Task</th><th>Status</th><th>Priority</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr class="sub-header"><td colspan="4">APP QUALITY</td></tr>
+          <tr data-status="done">
+            <td>Image sharpening (FilterQuality.high) all screens</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-med">MED</span></td>
+            <td class="note">Fixed pixelated backgrounds</td>
+          </tr>
+          <tr data-status="done">
+            <td>Back stack navigation (pushNamedAndRemoveUntil)</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">No more "back to signup" after registration</td>
+          </tr>
+          <tr data-status="done">
+            <td>Address lookup — Ordnance Survey API</td>
+            <td><span class="status status-done">✓ Done</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">lib/services/address_lookup_service.dart — Mapbox fallback for NI</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Location permission (geolocator + permission_handler)</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">iOS Info.plist + Android Manifest changes needed</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Error handling — global error boundary</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-med">MED</span></td>
+            <td class="note">No global error handling yet</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Loading states — shimmer placeholders</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-med">MED</span></td>
+            <td class="note">Currently blank/spinner only</td>
+          </tr>
+
+          <tr class="sub-header"><td colspan="4">PRE-LAUNCH</td></tr>
+          <tr data-status="todo">
+            <td>PIN hashing (bcrypt or SHA-256) before storing in Firestore</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">Currently stored plain text — security risk</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Firestore security rules</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-high">HIGH</span></td>
+            <td class="note">Currently open rules — must lock down before launch</td>
+          </tr>
+          <tr data-status="todo">
+            <td>iOS — App Store configuration &amp; provisioning</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-post">POST</span></td>
+            <td class="note">Firebase configured for iOS but not submitted</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Play Store — release APK / AAB signing &amp; submission</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-post">POST</span></td>
+            <td class="note">Need keystore + Play Console account</td>
+          </tr>
+          <tr data-status="todo">
+            <td>Analytics — Firebase Analytics integration</td>
+            <td><span class="status status-todo">○ To Do</span></td>
+            <td><span class="priority p-post">POST</span></td>
+            <td class="note">Track screen views, events, conversions</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── 8. 7-DAY SPRINT PLAN ── -->
+  <div class="section" id="sec-sprint">
+    <div class="section-header" onclick="toggleSection('sprint')">
+      <span class="section-icon">📅</span>
+      <span class="section-title">7-Day Sprint Plan &nbsp;<small style="font-weight:400;font-size:13px;color:#888;">3–4 hrs/day · ~25–28 hrs total</small></span>
+      <span class="section-badge badge-mixed" id="badge-sprint">Week Plan</span>
+      <span class="section-toggle open" id="toggle-sprint">▾</span>
+    </div>
+    <div class="table-wrap" id="body-sprint">
+      <table>
+        <thead><tr><th style="width:110px;">Day</th><th>Focus Area</th><th>Tasks</th><th>Status</th></tr></thead>
+        <tbody>
+
+          <!-- DAY 1 -->
+          <tr data-status="done" data-sprint="true">
+            <td>
+              <div style="font-weight:800;font-size:15px;color:#0392CA;">Day 1</div>
+              <div style="font-size:11px;color:#aaa;">Firebase Wiring</div>
+            </td>
+            <td><strong>Core Firebase Connections</strong></td>
+            <td class="note">
+              ✅ Wallet balance load from Firestore<br>
+              ✅ KYC status save to Firestore after completion<br>
+              ✅ PIN verification check against Firestore on login
+            </td>
+            <td><span class="status status-done">✓ In Session</span></td>
+          </tr>
+
+          <!-- DAY 2 -->
+          <tr data-status="todo" data-sprint="true">
+            <td>
+              <div style="font-weight:800;font-size:15px;color:#0392CA;">Day 2</div>
+              <div style="font-size:11px;color:#aaa;">Wallet & Activity</div>
+            </td>
+            <td><strong>Wallet & Activity Screens — Real Data</strong></td>
+            <td class="note">
+              ○ Create transactions sub-collection in Firestore<br>
+              ○ Load real transaction history on wallet screen<br>
+              ○ Display cashback points from Firestore<br>
+              ○ Wire activity screen to real Firestore data
+            </td>
+            <td><span class="status status-todo">○ To Do</span></td>
+          </tr>
+
+          <!-- DAY 3 -->
+          <tr data-status="todo" data-sprint="true">
+            <td>
+              <div style="font-weight:800;font-size:15px;color:#0392CA;">Day 3</div>
+              <div style="font-size:11px;color:#aaa;">Profile Completion</div>
+            </td>
+            <td><strong>Profile — Full Firestore Read/Write</strong></td>
+            <td class="note">
+              ○ Edit name / email → save to Firestore<br>
+              ○ Change PIN → save hashed PIN to Firestore<br>
+              ○ Saved addresses → load/save from Firestore<br>
+              ○ Restore form validation on registration (email, PIN length, terms)
+            </td>
+            <td><span class="status status-todo">○ To Do</span></td>
+          </tr>
+
+          <!-- DAY 4 -->
+          <tr data-status="todo" data-sprint="true">
+            <td>
+              <div style="font-weight:800;font-size:15px;color:#0392CA;">Day 4</div>
+              <div style="font-size:11px;color:#aaa;">Location & Explore</div>
+            </td>
+            <td><strong>Location Permission & Near You</strong></td>
+            <td class="note">
+              ○ Add geolocator + permission_handler to pubspec.yaml<br>
+              ○ Android Manifest — ACCESS_FINE_LOCATION permission<br>
+              ○ iOS Info.plist — NSLocationWhenInUseUsageDescription<br>
+              ○ Location permission dialog on Explore screen open<br>
+              ○ Sort "Near You" venues by real GPS distance
+            </td>
+            <td><span class="status status-todo">○ To Do</span></td>
+          </tr>
+
+          <!-- DAY 5 -->
+          <tr data-status="todo" data-sprint="true">
+            <td>
+              <div style="font-weight:800;font-size:15px;color:#0392CA;">Day 5</div>
+              <div style="font-size:11px;color:#aaa;">Security</div>
+            </td>
+            <td><strong>Security Hardening</strong></td>
+            <td class="note">
+              ○ Hash PIN (SHA-256) before saving to Firestore<br>
+              ○ Firestore security rules — lock down user documents<br>
+              ○ Restore PIN gate on profile sensitive actions<br>
+              ○ Remove or wire biometric login toggle (local_auth)
+            </td>
+            <td><span class="status status-todo">○ To Do</span></td>
+          </tr>
+
+          <!-- DAY 6 -->
+          <tr data-status="todo" data-sprint="true">
+            <td>
+              <div style="font-weight:800;font-size:15px;color:#0392CA;">Day 6</div>
+              <div style="font-size:11px;color:#aaa;">Polish & Testing</div>
+            </td>
+            <td><strong>End-to-End Testing & UI Polish</strong></td>
+            <td class="note">
+              ○ Full user journey: signup → profile → home → wallet → explore → logout → login<br>
+              ○ Fix any broken navigation or missing data<br>
+              ○ Loading shimmer states on data screens<br>
+              ○ Error messages for network failures<br>
+              ○ Check all screens on different screen sizes
+            </td>
+            <td><span class="status status-todo">○ To Do</span></td>
+          </tr>
+
+          <!-- DAY 7 -->
+          <tr data-status="todo" data-sprint="true">
+            <td>
+              <div style="font-weight:800;font-size:15px;color:#0392CA;">Day 7</div>
+              <div style="font-size:11px;color:#aaa;">Release Prep</div>
+            </td>
+            <td><strong>Buffer + Release APK</strong></td>
+            <td class="note">
+              ○ Fix anything that slipped from Days 1–6<br>
+              ○ Build release APK (flutter build apk --release)<br>
+              ○ Test release APK on a real device<br>
+              ○ Share APK with investors / testers via Firebase App Distribution
+            </td>
+            <td><span class="status status-todo">○ To Do</span></td>
+          </tr>
+
+          <!-- POST-SPRINT -->
+          <tr style="background:#fafafa;">
+            <td colspan="4" style="padding:10px 16px;">
+              <strong style="font-size:12px;color:#888;letter-spacing:0.5px;">POST-SPRINT (after investor meetings)</strong>
+              &nbsp;—&nbsp;
+              <span class="note">Stripe card payments · TrueLayer Open Banking · Google/Apple sign-in · KYC real API (Onfido/Stripe Identity) · Push notifications (FCM) · Play Store / App Store submission</span>
+            </td>
+          </tr>
+
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /content -->
+
+<!-- ══════════════════════════════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════════════════════════════════ -->
+<script>
+  // ── Toggle sections ──
+  function toggleSection(id) {
+    const body = document.getElementById('body-' + id);
+    const toggle = document.getElementById('toggle-' + id);
+    const isOpen = body.style.display !== 'none';
+    body.style.display = isOpen ? 'none' : '';
+    toggle.classList.toggle('open', !isOpen);
+  }
+
+  // ── Filter ──
+  let currentFilter = 'all';
+  function filterTable(filter, btn) {
+    currentFilter = filter;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('tbody tr').forEach(row => {
+      if (row.classList.contains('sub-header')) { row.classList.remove('hidden'); return; }
+      if (row.getAttribute('data-sprint') === 'true') { row.classList.remove('hidden'); return; } // always show sprint rows
+      if (!row.hasAttribute('colspan') && row.querySelector('td[colspan]')) { row.classList.remove('hidden'); return; }
+      const status = row.getAttribute('data-status') || '';
+      const priority = row.querySelector('.priority')?.className || '';
+      if (filter === 'all') { row.classList.remove('hidden'); return; }
+      if (filter === 'done' && status === 'done') { row.classList.remove('hidden'); return; }
+      if (filter === 'progress' && status === 'progress') { row.classList.remove('hidden'); return; }
+      if (filter === 'todo' && status === 'todo') { row.classList.remove('hidden'); return; }
+      if (filter === 'high' && priority.includes('p-high')) { row.classList.remove('hidden'); return; }
+      row.classList.add('hidden');
+    });
+    // Hide sub-headers with no visible rows
+    document.querySelectorAll('.sub-header').forEach(sh => {
+      let next = sh.nextElementSibling;
+      let hasVisible = false;
+      while (next && !next.classList.contains('sub-header')) {
+        if (!next.classList.contains('hidden')) { hasVisible = true; break; }
+        next = next.nextElementSibling;
+      }
+      sh.classList.toggle('hidden', !hasVisible);
+    });
+  }
+
+  // ── Compute stats & badges ──
+  function computeStats() {
+    const sections = ['auth', 'profile', 'firebase', 'home', 'wallet', 'support', 'tech']; // sprint excluded from counts
+    let totalDone = 0, totalProgress = 0, totalTodo = 0;
+
+    sections.forEach(sec => {
+      const rows = document.querySelectorAll('#body-' + sec + ' tr[data-status]');
+      let done = 0, progress = 0, todo = 0;
+      rows.forEach(r => {
+        const s = r.getAttribute('data-status');
+        if (s === 'done') done++;
+        else if (s === 'progress') progress++;
+        else todo++;
+      });
+      totalDone += done; totalProgress += progress; totalTodo += todo;
+      const total = done + progress + todo;
+      const badge = document.getElementById('badge-' + sec);
+      if (badge) {
+        badge.textContent = done + '/' + total + ' done';
+        badge.className = 'section-badge ' + (done === total ? 'badge-done' : done === 0 ? 'badge-progress' : 'badge-mixed');
+      }
+    });
+
+    document.getElementById('count-done').textContent = totalDone;
+    document.getElementById('count-progress').textContent = totalProgress;
+    document.getElementById('count-todo').textContent = totalTodo;
+
+    const total = totalDone + totalProgress + totalTodo;
+    const pct = Math.round((totalDone / total) * 100);
+    document.getElementById('overall-bar').style.width = pct + '%';
+  }
+
+  // Run on load
+  computeStats();
+</script>
+</body>
+</html>

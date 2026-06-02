@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="color-scheme" content="light dark"/>
+  <title>Earn your first cashback today — GoOuts</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:#f2f4f3; }
+    .wrapper { background:#f2f4f3; padding:32px 16px; }
+    .card { max-width:600px; margin:0 auto; background:#fff; border-radius:24px; overflow:hidden; box-shadow:0 4px 32px rgba(0,0,0,.10); }
+
+    /* Header */
+    .hdr { background:#0b1f0e; padding:26px 36px; position:relative; overflow:hidden; }
+    .hdr::after { content:''; position:absolute; top:-80px; right:-80px; width:260px; height:260px; border-radius:50%; background:radial-gradient(circle,rgba(255,179,0,.12),transparent 65%); }
+    .logo { display:flex; align-items:center; gap:10px; margin-bottom:22px; position:relative; z-index:2; }
+    .logo-box { width:38px; height:38px; border-radius:10px; background:linear-gradient(135deg,#00E676,#00C853); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .logo-box svg { width:21px; height:21px; fill:#fff; }
+    .logo-name { font-size:19px; font-weight:900; color:#fff; }
+    .hdr-badge { display:inline-block; background:rgba(255,179,0,.15); border:1px solid rgba(255,179,0,.35); color:#FFB300; font-size:10px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; padding:5px 12px; border-radius:50px; margin-bottom:13px; position:relative; z-index:2; }
+    .hdr-h1 { font-size:30px; font-weight:900; color:#fff; line-height:1.15; margin-bottom:10px; position:relative; z-index:2; }
+    .hdr-h1 em { font-style:normal; color:#00E676; }
+    .hdr-p { font-size:14px; color:rgba(255,255,255,.5); line-height:1.6; position:relative; z-index:2; }
+
+    /* Hero */
+    .hero-img { width:100%; height:200px; object-fit:cover; object-position:center 55%; display:block; }
+
+    /* Body */
+    .body { padding:36px; }
+    .greet { font-size:16px; color:#1c1c1c; line-height:1.75; margin-bottom:30px; }
+    .greet strong { color:#00A84F; }
+
+    /* Uber Eats single focus: 3 action cards */
+    .sec-label { font-size:11px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:#b0b0b0; margin-bottom:16px; }
+    .action-cards { display:flex; flex-direction:column; gap:10px; margin-bottom:30px; }
+    .ac { display:flex; align-items:center; gap:16px; background:#f7fdf8; border:1px solid #e3f5e6; border-radius:16px; padding:18px; }
+    .ac-icon { width:52px; height:52px; border-radius:14px; background:linear-gradient(135deg,#00E676,#00C853); display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; box-shadow:0 4px 14px rgba(0,200,83,.25); }
+    .ac-body h4 { font-size:15px; font-weight:700; color:#1c1c1c; margin-bottom:3px; }
+    .ac-body p  { font-size:13px; color:#777; line-height:1.5; }
+
+    /* Tip — Airbnb highlight box */
+    .tip { background:linear-gradient(135deg,#fff8e1,#fffde7); border:1px solid #ffe082; border-radius:16px; padding:18px 20px; margin-bottom:28px; }
+    .tip-row { display:flex; align-items:flex-start; gap:12px; }
+    .tip-icon { font-size:22px; flex-shrink:0; }
+    .tip h4 { font-size:14px; font-weight:700; color:#e65100; margin-bottom:5px; }
+    .tip p  { font-size:13px; color:#6d4c41; line-height:1.55; }
+
+    /* Venue photo strip */
+    .venues { display:flex; gap:8px; margin-bottom:30px; }
+    .v { flex:1; border-radius:12px; overflow:hidden; position:relative; }
+    .v img { width:100%; height:88px; object-fit:cover; display:block; }
+    .v-label { position:absolute; bottom:0; left:0; right:0; background:linear-gradient(to top,rgba(0,0,0,.75),transparent); padding:8px 9px; }
+    .v-name { color:#fff; font-size:11px; font-weight:700; }
+    .v-pct  { color:#00E676; font-size:10px; font-weight:600; }
+
+    /* Earnings proof — real dollars not % only */
+    .earn-box { background:#0b1f0e; border-radius:18px; padding:22px 24px; margin-bottom:30px; }
+    .earn-box h3 { font-size:14px; font-weight:700; color:#00E676; margin-bottom:16px; }
+    .earn-row { display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid rgba(255,255,255,.05); }
+    .earn-row:last-child { border-bottom:none; }
+    .earn-left { display:flex; align-items:center; gap:10px; }
+    .earn-emoji { font-size:17px; }
+    .earn-name  { font-size:13px; color:rgba(255,255,255,.65); }
+    .earn-amt   { font-size:15px; font-weight:800; color:#00E676; }
+
+    /* ONE CTA */
+    .div { height:1px; background:linear-gradient(90deg,transparent,#ebebeb,transparent); margin:26px 0; }
+    .cta-wrap { text-align:center; margin:24px 0; }
+    .cta { display:inline-block; background:linear-gradient(135deg,#00E676,#00C853); color:#0b1f0e; font-size:17px; font-weight:900; padding:18px 52px; border-radius:50px; text-decoration:none; box-shadow:0 8px 28px rgba(0,200,83,.38); min-height:56px; }
+    .cta-sub { font-size:12px; color:#b0b0b0; margin-top:10px; }
+
+    /* Footer */
+    .ftr { background:#0b1f0e; padding:26px 36px; }
+    .ftr-logo { display:flex; align-items:center; gap:8px; margin-bottom:14px; }
+    .ftr-logo-box { width:28px; height:28px; border-radius:8px; background:linear-gradient(135deg,#00E676,#00C853); display:flex; align-items:center; justify-content:center; }
+    .ftr-logo-box svg { width:16px; height:16px; fill:#fff; }
+    .ftr-logo-name { font-size:15px; font-weight:900; color:#fff; }
+    .ftr-links { margin-bottom:12px; }
+    .ftr-links a { color:rgba(255,255,255,.35); font-size:12px; text-decoration:none; margin-right:14px; }
+    .ftr-div { height:1px; background:rgba(255,255,255,.07); margin:12px 0; }
+    .ftr-legal { font-size:11px; color:rgba(255,255,255,.25); line-height:1.65; }
+    .ftr-legal a { color:rgba(0,230,118,.4); text-decoration:none; }
+
+    @media(max-width:480px){
+      .body{padding:24px 20px;}
+      .hdr{padding:22px 20px;}
+      .hdr-h1{font-size:24px;}
+      .venues{flex-wrap:wrap;}
+      .v{min-width:calc(50% - 4px);}
+      .cta{padding:17px 36px;font-size:15px;}
+      .ftr{padding:22px 20px;}
+    }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+<div class="card">
+
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="logo" style="margin-bottom:22px; position:relative; z-index:2;">
+      <img src="../assets/images/goouts_logo_white.webp" alt="GoOuts" style="height:44px; width:auto; display:block;" />
+    </div>
+    <div class="hdr-badge">⚡ Day 2 — Your first cashback</div>
+    <h1 class="hdr-h1">Earn <em>real money</em><br/>on your next outing.<br/>Here's exactly how.</h1>
+    <p class="hdr-p">Takes 30 seconds. No card needed. Just scan and collect.</p>
+  </div>
+
+  <img class="hero-img" src="https://images.unsplash.com/photo-1559329007-40df8a9345d8?w=1200&q=85&fit=crop" alt="GoOuts venues near you"/>
+
+  <!-- BODY -->
+  <div class="body">
+    <p class="greet">Hi <strong>[First Name]</strong> 👋<br/><br/>
+    Your GoOuts wallet is ready and waiting. Let's get your first cashback. It takes under a minute — here's all you need to do:
+    </p>
+
+    <!-- 3 action cards — Uber Eats: icon + headline + short desc -->
+    <div class="sec-label">3 steps to your first cashback</div>
+    <div class="action-cards">
+      <div class="ac">
+        <div class="ac-icon">📍</div>
+        <div class="ac-body">
+          <h4>Open GoOuts &amp; tap "Nearby"</h4>
+          <p>See every partner venue around you right now — cafes, restaurants, pubs, clubs, music &amp; comedy.</p>
+        </div>
+      </div>
+      <div class="ac">
+        <div class="ac-icon">🛍️</div>
+        <div class="ac-body">
+          <h4>Visit &amp; buy as normal</h4>
+          <p>Order your coffee, meal, or drinks. No special card or payment method needed — just enjoy.</p>
+        </div>
+      </div>
+      <div class="ac">
+        <div class="ac-icon">📲</div>
+        <div class="ac-body">
+          <h4>Scan the QR code &amp; cashback is yours</h4>
+          <p>Open GoOuts, tap Scan, point at the venue QR. Money hits your wallet instantly. Done.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tip — Airbnb: pack value, show real numbers -->
+    <div class="tip">
+      <div class="tip-row">
+        <div class="tip-icon">💡</div>
+        <div>
+          <h4>Quick maths: what you could earn this week</h4>
+          <p>3 coffee visits × $4 avg = <strong>$12</strong> &nbsp;·&nbsp; 2 restaurant visits × $8 avg = <strong>$16</strong> &nbsp;·&nbsp; 1 night out × $14 avg = <strong>$14</strong> &nbsp;= <strong style="color:#e65100;">$42 this week</strong></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Venue photos -->
+    <div class="sec-label">Places earning cashback near you</div>
+    <div class="venues">
+      <div class="v">
+        <img src="https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=200&q=80&fit=crop" alt="Cafes"/>
+        <div class="v-label"><div class="v-name">☕ Cafes</div><div class="v-pct">Up to 12%</div></div>
+      </div>
+      <div class="v">
+        <img src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=200&q=80&fit=crop" alt="Restaurants"/>
+        <div class="v-label"><div class="v-name">🍽️ Restaurants</div><div class="v-pct">Up to 10%</div></div>
+      </div>
+      <div class="v">
+        <img src="https://images.unsplash.com/photo-1567696911980-2eed69a46042?w=200&q=80&fit=crop" alt="Pubs"/>
+        <div class="v-label"><div class="v-name">🍺 Pubs</div><div class="v-pct">Up to 8%</div></div>
+      </div>
+      <div class="v">
+        <img src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=200&q=80&fit=crop" alt="Music"/>
+        <div class="v-label"><div class="v-name">🎵 Music</div><div class="v-pct">Up to 15%</div></div>
+      </div>
+    </div>
+
+    <!-- Earnings by category — real $ not just % (key learning) -->
+    <div class="earn-box">
+      <h3>💰 Average cashback earned per visit</h3>
+      <div class="earn-row"><div class="earn-left"><span class="earn-emoji">☕</span><span class="earn-name">Cafes</span></div><span class="earn-amt">$3 – $6</span></div>
+      <div class="earn-row"><div class="earn-left"><span class="earn-emoji">🍽️</span><span class="earn-name">Restaurants</span></div><span class="earn-amt">$5 – $12</span></div>
+      <div class="earn-row"><div class="earn-left"><span class="earn-emoji">🍺</span><span class="earn-name">Pubs</span></div><span class="earn-amt">$4 – $9</span></div>
+      <div class="earn-row"><div class="earn-left"><span class="earn-emoji">🎵</span><span class="earn-name">Clubs &amp; Music</span></div><span class="earn-amt">$8 – $18</span></div>
+      <div class="earn-row"><div class="earn-left"><span class="earn-emoji">🎭</span><span class="earn-name">Comedy Nights</span></div><span class="earn-amt">$6 – $15</span></div>
+    </div>
+
+    <!-- ONE CTA — Deliveroo: unmissable, 56px+ height -->
+    <div class="cta-wrap">
+      <a href="#" class="cta">Find Places Near Me →</a>
+      <p class="cta-sub">Opens GoOuts and shows venues near you right now</p>
+    </div>
+
+    <p style="font-size:13px;color:#aaa;text-align:center;">
+      Questions? <a href="mailto:support@goouts.app" style="color:#00A84F;text-decoration:none;">support@goouts.app</a> or tap Help in the app.
+    </p>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="ftr">
+    <div class="ftr-logo" style="margin-bottom:14px;">
+      <img src="../assets/images/goouts_logo_white.webp" alt="GoOuts" style="height:32px; width:auto; display:block;" />
+    </div>
+    <div class="ftr-links">
+      <a href="#">Unsubscribe</a><a href="#">Privacy Policy</a><a href="#">Terms of Service</a><a href="#">Help Centre</a>
+    </div>
+    <div class="ftr-div"></div>
+    <p class="ftr-legal">
+      © 2026 GoOuts Ltd. All rights reserved. You received this email because you registered a GoOuts account. Earnings figures are averages based on real user data and are not a guarantee of income. Cashback rates are set by individual partner venues and may change without notice. Cashback requires successful QR code verification at the time of visit.<br/><br/>
+      GoOuts Ltd · <a href="#">goouts.app</a> · support@goouts.app · <a href="#">Unsubscribe</a>
+    </p>
+  </div>
+
+</div>
+</div>
+</body>
+</html>
