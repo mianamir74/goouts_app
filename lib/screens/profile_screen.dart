@@ -1,10 +1,13 @@
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../services/user_service.dart';
+import '../services/support_ticket_service.dart';
+import '../services/message_service.dart';
 import '../utils/pin_hasher.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -18,19 +21,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
   static const Color _primary = Color(0xFF0392CA);
   static const Color _dark = Color(0xFF0D1B3E);
   static const Color _green = Color(0xFF0A7A3E);
-
   bool _kycSubmitted = false;
   bool _kycPending = false;
   File? _profileImage;
   String? _photoUrl;
   bool _uploadingPhoto = false;
   double _walletBalance = 0.0;
+  int    _reviewPoints  = 0;
+  int    _visitCount    = 0;
   bool _firstCashbackEarned = false;
 
   Future<void> _pickProfileImage() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(width: 40, height: 4,
+              decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 20),
+            const Text('Profile Photo', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _photoOption(Icons.camera_alt_rounded, 'Take Photo', ImageSource.camera),
+                _photoOption(Icons.photo_library_rounded, 'Choose from Gallery', ImageSource.gallery),
+              ],
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
     final picker = ImagePicker();
-    final picked = await picker.pickImage(
-        source: ImageSource.gallery, imageQuality: 80);
+    final picked = await picker.pickImage(source: source, imageQuality: 80);
     if (picked == null) return;
     final file = File(picked.path);
     setState(() { _profileImage = file; _uploadingPhoto = true; });
@@ -52,6 +85,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Widget _photoOption(IconData icon, String label, ImageSource source) =>
+    GestureDetector(
+      onTap: () => Navigator.pop(context, source),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 64, height: 64,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE1F5FE),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(icon, color: _primary, size: 30),
+          ),
+          const SizedBox(height: 8),
+          Text(label, textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+
   // Editable personal info
   String _fullName = '';
   String _email = '';
@@ -71,6 +125,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadProfile();
   }
 
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
   Future<void> _loadProfile() async {
     final data = await UserService().getCurrentUser();
     if (data != null && mounted) {
@@ -83,6 +142,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _kycSubmitted = kycStatus == 'verified';
         _kycPending = kycStatus == 'pending';
         _walletBalance = raw is num ? raw.toDouble() : 0.0;
+        _reviewPoints  = (data['reviewPoints'] as num?)?.toInt() ?? 0;
         _firstCashbackEarned = data['firstCashbackEarned'] as bool? ?? false;
         _photoUrl = data['photoUrl'] as String?;
         _address1 = data['address1'] as String? ?? '';
@@ -93,6 +153,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _hasAddress = _address1.isNotEmpty || _city.isNotEmpty;
       });
     }
+    // Count transactions as visits
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        final snap = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('transactions')
+            .count()
+            .get();
+        if (mounted) setState(() => _visitCount = snap.count ?? 0);
+      }
+    } catch (_) {}
   }
 
   @override
@@ -145,10 +218,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     fontWeight: FontWeight.w800,
                     color: _primary)),
             const Spacer(),
-            GestureDetector(
-              onTap: () => Navigator.pushNamed(context, '/messages'),
-              child: const Icon(Icons.notifications_outlined,
-                  color: _primary, size: 24),
+            StreamBuilder<int>(
+              stream: MessageService().unreadNotificationsStream(),
+              builder: (context, snap) {
+                final count = snap.data ?? 0;
+                return GestureDetector(
+                  onTap: () => Navigator.pushNamed(context, '/notifications'),
+                  child: Stack(
+                    children: [
+                      const Icon(Icons.notifications_outlined, color: _primary, size: 26),
+                      if (count > 0)
+                        Positioned(
+                          top: 0, right: 0,
+                          child: Container(
+                            width: 14, height: 14,
+                            decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                            child: Center(
+                              child: Text(count > 9 ? '9+' : '\$count',
+                                style: const TextStyle(fontSize: 8, fontWeight: FontWeight.w800, color: Colors.white)),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
             ),
           ],
         ),
@@ -249,15 +343,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     GoogleFonts.inter(fontSize: 13, color: Colors.grey[500])),
             const SizedBox(height: 14),
             // Member stats row
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _statItem('£${_walletBalance.toStringAsFixed(0)}', 'Balance'),
-                _divider(),
-                _statItem('60 pts', 'Points'),
-                _divider(),
-                _statItem('12', 'Visits'),
-              ],
+            SizedBox(
+              width: double.infinity,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _statItem('£${_walletBalance.toStringAsFixed(0)}', 'Balance'),
+                  _divider(),
+                  _statItem('$_reviewPoints pts', 'Points'),
+                  _divider(),
+                  _statItem('$_visitCount', 'Visits'),
+                ],
+              ),
             ),
           ],
         ),
@@ -692,13 +789,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onTap: () => Navigator.pushNamed(context, '/notifications'),
             ),
             Divider(height: 1, color: Colors.grey[100]),
-            _menuRow(
-              icon: Icons.message_outlined,
-              title: 'Messages',
-              subtitle: null,
-              trailing: const Icon(Icons.chevron_right_rounded,
-                  color: Colors.grey, size: 20),
-              onTap: () => Navigator.pushNamed(context, '/messages'),
+            StreamBuilder<int>(
+              stream: MessageService().unreadCountStream(),
+              builder: (context, snap) {
+                final unread = snap.data ?? 0;
+                return _menuRow(
+                  icon: Icons.message_outlined,
+                  title: 'Messages',
+                  subtitle: null,
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (unread > 0)
+                        Container(
+                          margin: const EdgeInsets.only(right: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            unread > 9 ? '9+' : '\$unread',
+                            style: const TextStyle(
+                                fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white),
+                          ),
+                        ),
+                      const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
+                    ],
+                  ),
+                  onTap: () => Navigator.pushNamed(context, '/messages'),
+                );
+              },
             ),
             // Family Plan — only visible after first cashback earned (Touch 2)
             if (_firstCashbackEarned) ...[
@@ -728,6 +849,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
             Divider(height: 1, color: Colors.grey[100]),
             _menuRow(
+              icon: Icons.card_giftcard_rounded,
+              title: 'Refer a Friend',
+              subtitle: 'Give £2, get £2 for every friend who joins',
+              trailing: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text('£2 Reward',
+                    style: GoogleFonts.inter(
+                        fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF10B981))),
+              ),
+              onTap: () => Navigator.pushNamed(context, '/refer-friend'),
+            ),
+            Divider(height: 1, color: Colors.grey[100]),
+            _menuRow(
               icon: Icons.help_outline_rounded,
               title: 'FAQ',
               subtitle: null,
@@ -736,13 +874,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onTap: () => Navigator.pushNamed(context, '/faq'),
             ),
             Divider(height: 1, color: Colors.grey[100]),
-            _menuRow(
-              icon: Icons.headset_mic_outlined,
-              title: 'Contact Support',
-              subtitle: null,
-              trailing: const Icon(Icons.chevron_right_rounded,
-                  color: Colors.grey, size: 20),
-              onTap: () => Navigator.pushNamed(context, '/contact-support'),
+            StreamBuilder<int>(
+              stream: SupportTicketService().unreadCountStream(),
+              builder: (context, snap) {
+                final unread = snap.data ?? 0;
+                return _menuRow(
+                  icon: Icons.headset_mic_outlined,
+                  title: 'Contact Support',
+                  subtitle: null,
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (unread > 0)
+                        Container(
+                          margin: const EdgeInsets.only(right: 6),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            unread > 9 ? '9+' : '$unread',
+                            style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white),
+                          ),
+                        ),
+                      const Icon(Icons.chevron_right_rounded,
+                          color: Colors.grey, size: 20),
+                    ],
+                  ),
+                  onTap: () => Navigator.pushNamed(
+                      context,
+                      unread > 0 ? '/support-tickets' : '/contact-support'),
+                );
+              },
             ),
           ],
         ),
@@ -1336,11 +1504,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(title,
-                          style: GoogleFonts.inter(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: _dark)),
+                      if (title != null)
+                        Text(title,
+                            style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: _dark)),
                       if (subtitle != null) ...[
                         const SizedBox(height: 2),
                         Text(subtitle,
@@ -1358,72 +1527,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Bottom nav
+  // Bottom navigation bar
   // ─────────────────────────────────────────────────────────────────────────
-  Widget _buildBottomNav(BuildContext context) => Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 10,
-                offset: const Offset(0, -2))
-          ],
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _navItem(context, Icons.home_rounded, 'Home', '/home'),
-                _navItem(context, Icons.explore_rounded, 'Explore', '/explore'),
-                _navItem(context,
-                    Icons.account_balance_wallet_rounded, 'Wallet', '/wallet'),
-                _navItem(context, Icons.receipt_long_rounded, 'Activity',
-                    '/activity'),
-                _navItemActive(),
-              ],
-            ),
+  Widget _buildBottomNav(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 12,
+              offset: const Offset(0, -2))
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _navItem(context, Icons.home_rounded, 'Home', '/home'),
+              _navItem(context, Icons.storefront_rounded, 'Explore', '/nearby'),
+              _navItem(context, Icons.account_balance_wallet_rounded, 'Wallet', '/wallet'),
+              _navItem(context, Icons.person_rounded, 'Profile', '/profile', active: true),
+            ],
           ),
         ),
-      );
+      ),
+    );
+  }
 
-  Widget _navItem(BuildContext context, IconData icon, String label,
-          String route) =>
-      GestureDetector(
-        onTap: () => Navigator.pushNamed(context, route),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: Colors.grey[400], size: 24),
-            const SizedBox(height: 3),
-            Text(label,
-                style: GoogleFonts.inter(
-                    fontSize: 11, color: Colors.grey[400])),
-          ],
-        ),
-      );
-
-  Widget _navItemActive() => Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xFFE0F3FB),
-          borderRadius: BorderRadius.circular(24),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.person_rounded, color: _primary, size: 22),
-            const SizedBox(width: 6),
-            Text('Profile',
-                style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: _primary)),
-          ],
-        ),
-      );
+  Widget _navItem(BuildContext context, IconData icon, String label, String route, {bool active = false}) {
+    return GestureDetector(
+      onTap: active ? null : () => Navigator.pushReplacementNamed(context, route),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: active ? _primary : Colors.grey[400], size: 24),
+          const SizedBox(height: 3),
+          Text(label,
+              style: GoogleFonts.inter(
+                  fontSize: 10,
+                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                  color: active ? _primary : Colors.grey[400])),
+        ],
+      ),
+    );
+  }
 }
+

@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/user_service.dart';
+import '../services/biometric_service.dart';
 import '../utils/pin_hasher.dart';
 
 class ProfileSecurityScreen extends StatefulWidget {
@@ -20,10 +21,52 @@ class _ProfileSecurityScreenState extends State<ProfileSecurityScreen> {
   String _phone = '';
   String? _photoUrl;
 
+  bool _biometricEnabled = false;
+  bool _biometricSupported = false;
+
   @override
   void initState() {
     super.initState();
     _loadProfile();
+    _loadBiometric();
+  }
+
+  Future<void> _loadBiometric() async {
+    final supported = await BiometricService.instance.isSupported();
+    final enabled = await BiometricService.instance.isEnabled();
+    if (mounted) {
+      setState(() {
+        _biometricSupported = supported;
+        _biometricEnabled = enabled;
+      });
+    }
+  }
+
+  Future<void> _toggleBiometric(bool value) async {
+    if (!_biometricSupported) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Biometrics not available on this device.')),
+      );
+      return;
+    }
+    if (value) {
+      // Ask user to confirm with biometrics before enabling
+      final ok = await BiometricService.instance.authenticate(
+        reason: 'Confirm your identity to enable biometric login',
+      );
+      if (!ok) return;
+    }
+    await BiometricService.instance.setEnabled(value);
+    if (mounted) setState(() => _biometricEnabled = value);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(value
+              ? 'Biometric login enabled.'
+              : 'Biometric login disabled.'),
+        ),
+      );
+    }
   }
 
   Future<void> _loadProfile() async {
@@ -403,13 +446,15 @@ class _ProfileSecurityScreenState extends State<ProfileSecurityScreen> {
                   _menuRow(
                     icon: Icons.fingerprint_rounded,
                     title: 'Biometric Login',
-                    subtitle: 'Use Face ID or fingerprint',
+                    subtitle: _biometricSupported
+                        ? 'Use Face ID or fingerprint'
+                        : 'Not available on this device',
                     trailing: Switch(
-                      value: true,
-                      onChanged: (_) {},
+                      value: _biometricEnabled,
+                      onChanged: _biometricSupported ? _toggleBiometric : null,
                       activeColor: _primary,
                     ),
-                    onTap: () {},
+                    onTap: () => _toggleBiometric(!_biometricEnabled),
                   ),
                 ],
               ),

@@ -2,7 +2,9 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
+import '../widgets/pre_auth_support_sheet.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -15,8 +17,28 @@ class _SignupScreenState extends State<SignupScreen> {
   final _phoneController = TextEditingController();
   final _authService = AuthService();
   bool _isLoading = false;
+  String? _termsFromDb;
 
   static const Color _primary = Color(0xFF0392CA);
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTerms();
+  }
+
+  Future<void> _loadTerms() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('content_pages')
+          .doc('terms_conditions')
+          .get();
+      final content = doc.data()?['content'] as String?;
+      if (content != null && content.trim().isNotEmpty && mounted) {
+        setState(() => _termsFromDb = content);
+      }
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -100,27 +122,27 @@ class _SignupScreenState extends State<SignupScreen> {
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(20),
                 child: Text(
-                  '''Last updated: January 2025
+                  _termsFromDb ?? '''Last updated: June 2026
 
 Welcome to GoOuts. By accessing or using the GoOuts application and services, you agree to be bound by these Terms of Service. Please read them carefully before proceeding.
 
 1. ACCEPTANCE OF TERMS
-By creating an account or using the GoOuts platform, you confirm that you are at least 18 years of age, a UK resident, and that you accept these Terms of Service in full.
+By creating an account or using the GoOuts platform, you confirm that you are at least 16 years of age (18 for financial features), a UK resident, and that you accept these Terms of Service in full.
 
 2. DESCRIPTION OF SERVICE
-GoOuts is a cashback rewards and social finance platform that allows users to earn, collect, and redeem cashback points at participating partner merchants across the United Kingdom. GoOuts operates a virtual debit card linked to your GoOuts wallet.
+GoOuts is a cashback rewards and social finance platform that allows users to earn, collect, and redeem cashback at participating partner merchants across the United Kingdom. GoOuts operates a virtual debit card linked to your GoOuts wallet.
 
 3. ACCOUNT REGISTRATION
 You must provide accurate and complete information when registering. You are responsible for maintaining the confidentiality of your account credentials. You must notify GoOuts immediately of any unauthorised access to your account.
 
 4. CASHBACK REWARDS
-Cashback points are awarded at the discretion of GoOuts and participating merchants. Points have no cash equivalent unless redeemed through the GoOuts platform.
+Cashback is awarded at the discretion of GoOuts and participating merchants and is subject to transaction verification via GPS proximity and QR code authentication.
 
 5. VIRTUAL DEBIT CARD
 The GoOuts Virtual Debit Card is issued subject to eligibility and identity verification (KYC). Card usage is subject to applicable spending limits and UK financial regulations.
 
-6. SHARES & PAYMENTS
-Peer-to-peer shares within the GoOuts platform are processed in real time. International transactions are subject to exchange rates and applicable fees.
+6. PAYMENT SERVICES & TECHNICAL SERVICE PROVIDER STATUS
+GoOuts Limited is a technology platform provider and does not hold, process, store, or control any user funds at any time. Your GoOuts Wallet is powered by Stripe. Funds you add are held in a Stripe account in your name. GoOuts does not hold your money. Stripe Payments Europe Ltd (FCA ref: 900461) is the authorised payment institution. All payment processing, card issuance, and fund management services are provided exclusively by our regulated third-party financial services partner(s), who are authorised and regulated by the Financial Conduct Authority (FCA) as Electronic Money Institutions under the UK Electronic Money Regulations 2011. Your funds are held by our regulated partner(s) and subject to their safeguarding obligations. Payment providers may be updated from time to time; any change will be notified to you in advance. GoOuts Limited accepts no liability for any act, omission, or failure of our regulated payment partner(s). GoOuts Limited operates solely as a technical service provider under Schedule 1, Part 2(j) of the UK Payment Services Regulations 2017.
 
 7. USER CONDUCT
 You agree not to use GoOuts for any unlawful purpose. Misuse of the platform will result in immediate account suspension.
@@ -129,7 +151,7 @@ You agree not to use GoOuts for any unlawful purpose. Misuse of the platform wil
 GoOuts collects and processes your personal data in accordance with our Privacy Policy and the UK GDPR. We do not sell your personal data to third parties.
 
 9. LIMITATION OF LIABILITY
-GoOuts shall not be liable for any indirect, incidental, or consequential damages arising from the use of our services.
+GoOuts shall not be liable for any indirect, incidental, or consequential damages arising from the use of our services. Our total aggregate liability shall not exceed the total Cashback credited to your account in the twelve months preceding any claim.
 
 10. GOVERNING LAW
 These Terms of Service are governed by the laws of England and Wales.
@@ -149,7 +171,9 @@ For questions: legal@goouts.co.uk''',
   @override
   Widget build(BuildContext context) {
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
-    return Scaffold(
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Scaffold(
       backgroundColor: _primary,
       body: SafeArea(
         child: SingleChildScrollView(
@@ -378,12 +402,29 @@ For questions: legal@goouts.co.uk''',
                   ),
                 ),
 
+                const SizedBox(height: 16),
+                // Pre-auth support link
+                Center(
+                  child: GestureDetector(
+                    onTap: () => showPreAuthSupportSheet(context),
+                    child: Text(
+                      'Having trouble? Get help',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: Colors.white70,
+                        decoration: TextDecoration.underline,
+                        decorationColor: Colors.white54,
+                      ),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 20),
               ],
             ),
           ),
         ),
       ),
+    ),
     );
   }
 }

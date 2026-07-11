@@ -1,12 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
 import '../services/user_service.dart';
 import '../services/transaction_service.dart';
 import '../services/visit_verifier.dart';
 
 enum _StepState { passed, failed, loading, waiting }
+
+/// Counter-service (QR required) vs table-service (GPS only).
+/// Mirrors the same logic in partner_details_screen.dart.
+bool _isCounterService(String category) {
+  final c = category.toLowerCase();
+  const counterKeywords = [
+    'café', 'cafe', 'coffee', 'fast food', 'fastfood', 'takeaway',
+    'take away', 'bakery', 'street food', 'retail', 'shop', 'store',
+    'pharmacy', 'supermarket', 'grocery', 'deli', 'sandwich', 'juice',
+    'smoothie', 'bubble tea', 'ice cream', 'dessert', 'food court',
+  ];
+  return counterKeywords.any((kw) => c.contains(kw));
+}
 
 class PartnerOfferScreen extends StatelessWidget {
   const PartnerOfferScreen({super.key});
@@ -30,6 +42,12 @@ class PartnerOfferScreen extends StatelessWidget {
     final offerTitle = args?['offerTitle'] as String? ?? 'Total Bill Reward';
     final cashback = args?['cashback'] as String? ?? '15% Cashback';
     final category = args?['category'] as String? ?? '\$\$ • Coffee';
+
+    // Determine if QR scan is required (counter service) or GPS-only (table service)
+    final partnerType = args?['partnerType'] as String?;
+    // partnerType kept for future use; verification is GPS-first → code fallback
+    // ignore: unused_local_variable
+    final String? partnerTypeVal = partnerType;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9FC),
@@ -365,25 +383,26 @@ class PartnerOfferScreen extends StatelessWidget {
     );
   }
 
-  // ── Step 1: Verify Visit (GPS + QR) before opening payment ───────────────
+  // ── Verify Visit: GPS first → if fails, show partner code fallback ────────
   void _showVerifyVisit(BuildContext context, String merchant, String tag,
       String cashback, String promoCode) {
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    final partnerLat = (args?['lat'] as num?)?.toDouble() ?? 0.0;
-    final partnerLng = (args?['lng'] as num?)?.toDouble() ?? 0.0;
-    final merchantId = VisitVerifier.merchantIdFromName(merchant);
+    final partnerLat   = (args?['lat'] as num?)?.toDouble() ?? 0.0;
+    final partnerLng   = (args?['lng'] as num?)?.toDouble() ?? 0.0;
+    final verifyCode   = (args?['verificationCode'] as String? ?? '').toUpperCase().trim();
 
-    bool gpsChecked = false;
-    bool gpsPassed = false;
+    // ── state ──
+    bool gpsChecked   = false;
+    bool gpsPassed    = false;
+    bool gpsRunning   = true;
     String gpsMessage = 'Checking your location…';
-    // ignore: unused_local_variable
-    double? gpsDistance;
 
-    bool qrScanned = false;
-    bool qrPassed = false;
-    String qrMessage = 'Scan the GoOuts QR code at the counter.';
-    bool showingScanner = false;
+    bool showCodeEntry = false;   // flip to true when GPS fails
+    bool codePassed    = false;
+    bool codeChecking  = false;
+    String codeError   = '';
+    final codeCtrl     = TextEditingController();
 
     showModalBottomSheet(
       context: context,
@@ -393,34 +412,34 @@ class PartnerOfferScreen extends StatelessWidget {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheet) {
 
-          // Auto-run GPS check when sheet opens
+          // ── Auto-run GPS when sheet opens ──────────────────────────────
           if (!gpsChecked) {
             gpsChecked = true;
             VisitVerifier.checkGps(partnerLat, partnerLng).then((result) {
               if (!ctx.mounted) return;
               setSheet(() {
-                gpsPassed = result.withinRange;
-                gpsDistance = result.distanceMetres;
+                gpsRunning = false;
+                gpsPassed  = result.withinRange;
                 if (result.error != null) {
                   gpsMessage = result.error!;
                 } else if (result.withinRange) {
                   final dist = result.distanceMetres != null
-                      ? ' (${result.distanceMetres!.toStringAsFixed(0)}m away)'
+                      ? ' (${result.distanceMetres!.toStringAsFixed(0)}m)'
                       : '';
                   gpsMessage = 'You\'re at $merchant$dist ✓';
                 } else {
                   final dist = result.distanceMetres != null
-                      ? '${result.distanceMetres!.toStringAsFixed(0)}m'
-                      : 'too far';
-                  gpsMessage =
-                      'You appear to be $dist from $merchant. Are you at this location?';
+                      ? '${result.distanceMetres!.toStringAsFixed(0)}m away'
+                      : 'location not confirmed';
+                  gpsMessage = 'GPS shows you\'re $dist.';
+                  showCodeEntry = true;   // GPS failed → show code fallback
                 }
               });
             });
           }
 
-          // Auto-proceed when both verified
-          if (gpsPassed && qrPassed) {
+          // ── Auto-proceed when GPS passes ───────────────────────────────
+          if (gpsPassed) {
             Future.microtask(() {
               if (ctx.mounted) {
                 Navigator.pop(ctx);
@@ -429,207 +448,216 @@ class PartnerOfferScreen extends StatelessWidget {
             });
           }
 
-          return Container(
-            height: showingScanner
-                ? MediaQuery.of(ctx).size.height * 0.75
-                : MediaQuery.of(ctx).size.height * 0.6,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-            ),
-            child: Column(
-              children: [
-                // Handle
-                const SizedBox(height: 12),
-                Container(
-                  width: 40, height: 4,
-                  decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2)),
-                ),
-                const SizedBox(height: 20),
+          // ── Verify partner code ────────────────────────────────────────
+          Future<void> checkCode() async {
+            final entered = codeCtrl.text.trim().toUpperCase();
+            if (entered.isEmpty) {
+              setSheet(() => codeError = 'Please enter the partner code.');
+              return;
+            }
+            setSheet(() { codeChecking = true; codeError = ''; });
+            await Future.delayed(const Duration(milliseconds: 600));
+            if (!ctx.mounted) return;
+            if (verifyCode.isNotEmpty && entered == verifyCode) {
+              setSheet(() { codeChecking = false; codePassed = true; });
+              await Future.delayed(const Duration(milliseconds: 500));
+              if (ctx.mounted) {
+                Navigator.pop(ctx);
+                _showPayConfirmation(context, merchant, tag, cashback, promoCode);
+              }
+            } else {
+              setSheet(() {
+                codeChecking = false;
+                codeError = 'Incorrect code. Please ask staff for the partner code.';
+              });
+            }
+          }
 
-                // Title
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 42, height: 42,
-                        decoration: BoxDecoration(
-                          color: _primary.withOpacity(0.1),
-                          shape: BoxShape.circle,
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Handle
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 40, height: 4,
+                    decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2)),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Title
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 42, height: 42,
+                          decoration: BoxDecoration(
+                            color: _primary.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.verified_user_rounded,
+                              color: _primary, size: 22),
                         ),
-                        child: const Icon(Icons.verified_user_rounded,
-                            color: _primary, size: 22),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Verify Your Visit',
-                                style: GoogleFonts.inter(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800,
-                                    color: _dark)),
-                            Text('Both steps required to unlock payment',
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Verify Your Visit',
+                                  style: GoogleFonts.inter(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                      color: _dark)),
+                              Text(
+                                showCodeEntry
+                                    ? 'Enter partner code to unlock payment'
+                                    : 'Checking your location…',
                                 style: GoogleFonts.inter(
                                     fontSize: 12, color: Colors.grey[500])),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-                const Divider(height: 1),
-                const SizedBox(height: 20),
-
-                if (showingScanner) ...[
-                  // ── QR Scanner ──────────────────────────────────────────
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
-                      child: Column(
-                        children: [
-                          Text(
-                            'Point camera at the GoOuts QR code\ndisplayed at ${merchant}\'s counter',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.inter(
-                                fontSize: 13, color: Colors.grey[600], height: 1.4),
-                          ),
-                          const SizedBox(height: 12),
-                          Expanded(
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(16),
-                              child: MobileScanner(
-                                onDetect: (capture) {
-                                  final raw = capture.barcodes.firstOrNull?.rawValue;
-                                  if (raw == null) return;
-                                  final result = VisitVerifier.verifyQr(raw, merchantId);
-                                  setSheet(() {
-                                    showingScanner = false;
-                                    qrScanned = true;
-                                    qrPassed = result.valid;
-                                    qrMessage = result.valid
-                                        ? 'QR verified — you\'re at $merchant ✓'
-                                        : result.reason ?? 'Invalid QR code.';
-                                  });
-                                },
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          TextButton(
-                            onPressed: () => setSheet(() => showingScanner = false),
-                            child: Text('Cancel scan',
-                                style: GoogleFonts.inter(
-                                    fontSize: 13, color: Colors.grey[500])),
-                          ),
-                        ],
-                      ),
+                      ],
                     ),
                   ),
-                ] else ...[
-                  // ── Step cards ──────────────────────────────────────────
+
+                  const SizedBox(height: 20),
+                  const Divider(height: 1),
+                  const SizedBox(height: 20),
+
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: Column(
                       children: [
-                        // Step 1 — GPS
+                        // ── Step 1: GPS ──────────────────────────────────
                         _verifyStep(
                           step: '1',
                           icon: Icons.location_on_rounded,
                           title: 'GPS Location Check',
                           message: gpsMessage,
-                          state: !gpsChecked
+                          state: gpsRunning
                               ? _StepState.loading
                               : gpsPassed
                                   ? _StepState.passed
                                   : _StepState.failed,
                         ),
 
-                        const SizedBox(height: 12),
+                        // ── Step 2: Partner code — only if GPS failed ────
+                        if (showCodeEntry) ...[
+                          const SizedBox(height: 12),
+                          _verifyStep(
+                            step: '2',
+                            icon: Icons.pin_rounded,
+                            title: 'Partner Code',
+                            message: codePassed
+                                ? 'Code verified ✓'
+                                : 'GPS couldn\'t confirm your location. Enter the code from staff.',
+                            state: codePassed
+                                ? _StepState.passed
+                                : _StepState.waiting,
+                          ),
+                          const SizedBox(height: 16),
 
-                        // Step 2 — QR
-                        _verifyStep(
-                          step: '2',
-                          icon: Icons.qr_code_scanner_rounded,
-                          title: 'Scan Partner QR Code',
-                          message: qrScanned
-                              ? qrMessage
-                              : 'Tap below to scan the QR code at ${merchant}\'s counter.',
-                          state: qrScanned
-                              ? (qrPassed ? _StepState.passed : _StepState.failed)
-                              : _StepState.waiting,
-                        ),
+                          // Code input field
+                          TextFormField(
+                            controller: codeCtrl,
+                            textCapitalization: TextCapitalization.characters,
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.inter(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 6,
+                                color: _dark),
+                            decoration: InputDecoration(
+                              hintText: 'ENTER CODE',
+                              hintStyle: GoogleFonts.inter(
+                                  fontSize: 16,
+                                  letterSpacing: 4,
+                                  color: Colors.grey[350]),
+                              errorText: codeError.isNotEmpty ? codeError : null,
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 14),
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                              enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                              focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: const BorderSide(color: _primary, width: 2)),
+                            ),
+                            onFieldSubmitted: (_) => checkCode(),
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Verify button
+                          SizedBox(
+                            width: double.infinity,
+                            height: 50,
+                            child: ElevatedButton(
+                              onPressed: codeChecking || codePassed ? null : checkCode,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _primary,
+                                foregroundColor: Colors.white,
+                                disabledBackgroundColor: Colors.grey[300],
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14)),
+                                elevation: 0,
+                              ),
+                              child: codeChecking
+                                  ? const SizedBox(
+                                      width: 20, height: 20,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2, color: Colors.white))
+                                  : Text('Verify Code',
+                                      style: GoogleFonts.inter(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w700)),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
 
-                  const SizedBox(height: 24),
-
-                  // Scan QR button (only shown until QR verified)
-                  if (!qrPassed)
-                    Padding(
+                  // Demo bypass (long-press)
+                  const SizedBox(height: 16),
+                  GestureDetector(
+                    onLongPress: () {
+                      setSheet(() {
+                        gpsRunning = false;
+                        gpsPassed  = true;
+                        gpsMessage = 'Demo: location verified ✓';
+                      });
+                    },
+                    child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton.icon(
-                          onPressed: () => setSheet(() => showingScanner = true),
-                          icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
-                          label: Text(
-                            'Scan QR Code',
-                            style: GoogleFonts.inter(
-                                fontSize: 15, fontWeight: FontWeight.w700),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _primary,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14)),
-                            elevation: 0,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                  const SizedBox(height: 12),
-
-                  // Demo mode bypass — for investor demos without a printed QR
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: GestureDetector(
-                      onLongPress: () {
-                        // Long-press to simulate both checks passing (demo only)
-                        setSheet(() {
-                          gpsPassed = true;
-                          gpsMessage = 'Demo: location verified ✓';
-                          qrScanned = true;
-                          qrPassed = true;
-                          qrMessage = 'Demo: QR verified ✓';
-                        });
-                      },
                       child: Text(
-                        'Demo mode: long-press here to simulate verification',
+                        'Demo mode: long-press here to simulate GPS pass',
                         textAlign: TextAlign.center,
                         style: GoogleFonts.inter(
                             fontSize: 11, color: Colors.grey[400]),
                       ),
                     ),
                   ),
+                  const SizedBox(height: 28),
                 ],
-
-                const SizedBox(height: 24),
-              ],
+              ),
             ),
           );
         },
       ),
-    );
+    ).whenComplete(() => codeCtrl.dispose());
   }
 
   // ── Verify step card ───────────────────────────────────────────────────────

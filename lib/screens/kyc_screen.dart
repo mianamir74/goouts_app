@@ -2,8 +2,14 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:camera/camera.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
 import '../services/id_quality_inspector.dart';
 import '../services/biometric_selfie_inspector.dart';
+import '../services/document_quality_inspector.dart';
 import '../services/user_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -53,12 +59,15 @@ class _KycScreenState extends State<KycScreen> {
   String _feedbackMsg = '';
 
   // ── Inspectors ────────────────────────────────────────────────────────────
-  final _idInspector = IdQualityInspector();
-  final _selfieInspector = BiometricSelfieInspector();
+  final _idInspector       = IdQualityInspector();
+  final _selfieInspector   = BiometricSelfieInspector();
+  final _documentInspector = DocumentQualityInspector();
 
   // ── Submit state ───────────────────────────────────────────────────────────
-  bool _submitting = false;
-  bool _submitted = false;
+  bool   _submitting       = false;
+  bool   _submitted        = false;
+  // GREEN | AMBER | RED — set by kycAutoDecision CF response
+  String _kycDecisionTier  = 'GREEN';
 
   @override
   void initState() {
@@ -117,7 +126,7 @@ class _KycScreenState extends State<KycScreen> {
   // ─────────────────────────────────────────────────────────────────────────
   // Step navigation
   // ─────────────────────────────────────────────────────────────────────────
-  void _goTo(int step) async {
+  Future<void> _goTo(int step) async {
     // Stop camera when leaving camera steps
     if (_step == 1 || _step == 2) await _stopCamera();
 
@@ -153,7 +162,7 @@ class _KycScreenState extends State<KycScreen> {
           _feedbackMsg = '';
           _checking = false;
         });
-        _goTo(2);
+        await _goTo(2);
       } else {
         setState(() {
           _feedbackMsg = result['errorMessage'] ?? 'Please retake.';
@@ -164,6 +173,45 @@ class _KycScreenState extends State<KycScreen> {
       setState(() {
         _feedbackMsg = 'Capture failed. Please try again.';
         _checking = false;
+      });
+    }
+  }
+
+  // Gallery fallback — only for the ID document step (selfie must be live)
+  Future<void> _pickIdFromGallery() async {
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 90,
+      );
+      if (picked == null) return;
+
+      setState(() {
+        _checking    = true;
+        _feedbackMsg = 'Analysing document…';
+      });
+
+      final result = await _idInspector.inspectDocument(picked.path);
+
+      if (result['isValid'] == true) {
+        setState(() {
+          _idImagePath = picked.path;
+          _idValid     = true;
+          _feedbackMsg = '';
+          _checking    = false;
+        });
+        await _goTo(2);
+      } else {
+        setState(() {
+          _feedbackMsg = result['errorMessage'] ??
+              'Could not verify this image. Please ensure all text on your ID is clearly visible and try again.';
+          _checking = false;
+        });
+      }
+    } catch (_) {
+      setState(() {
+        _feedbackMsg = 'Could not open gallery. Please try again.';
+        _checking    = false;
       });
     }
   }
@@ -186,7 +234,7 @@ class _KycScreenState extends State<KycScreen> {
           _feedbackMsg = '';
           _checking = false;
         });
-        _goTo(3);
+        await _goTo(3);
       } else {
         setState(() {
           _feedbackMsg = result['errorMessage'] ?? 'Please retake.';
@@ -205,17 +253,97 @@ class _KycScreenState extends State<KycScreen> {
     if (!_idValid || !_selfieValid) return;
     setState(() => _submitting = true);
 
-    // Save kycStatus as 'pending' immediately when user submits
-    await UserService().updateUser({'kycStatus': 'pending'});
+    try {
+      // ── 1. Collect document scores ────────────────────────────────────────
+      Map<String, dynamic> documentScores = {'overall': 0.75};
+      if (_idImagePath != null) {
+        final docResult = await _documentInspector.inspectDocument(_idImagePath!);
+        if (docResult['isValid'] == true) {
+          documentScores = Map<String, dynamic>.from(
+              docResult['scores'] as Map? ?? {'overall': 0.75});
+        }
+      }
 
-    // Simulate remote verification delay (replace with real Sumsub/KYC API call later)
-    await Future.delayed(const Duration(seconds: 2));
+      // ── 2. Collect selfie scores ──────────────────────────────────────────
+      Map<String, dynamic> selfieScores = {'overall': 0.75};
+      if (_selfieImagePath != null) {
+        final selfieResult = await _selfieInspector.inspectSelfie(_selfieImagePath!);
+        if (selfieResult['isValid'] == true) {
+          selfieScores = Map<String, dynamic>.from(
+              selfieResult['scores'] as Map? ?? {'overall': 0.75});
+        }
+      }
 
-    // For prototype: mark as verified after simulated check
-    await UserService().updateUser({'kycStatus': 'verified'});
+      // ── 3. Profile completeness score ─────────────────────────────────────
+      // Checks: firstName, lastName, dob all filled (each worth 1/3)
+      double profileCompleteness = 0.0;
+      if (_firstNameCtrl.text.trim().isNotEmpty) profileCompleteness += 0.34;
+      if (_lastNameCtrl.text.trim().isNotEmpty)  profileCompleteness += 0.33;
+      if (_dobCtrl.text.trim().isNotEmpty)       profileCompleteness += 0.33;
 
-    if (mounted) setState(() => _submitting = false);
-    if (mounted) setState(() => _submitted = true);
+      // ── 4. Upload images to Firebase Storage and save URLs ───────────────
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      String idFrontUrl  = '';
+      String selfieUrl   = '';
+
+      if (uid != null) {
+        try {
+          if (_idImagePath != null) {
+            final idRef = FirebaseStorage.instance
+                .ref('kyc/$uid/id_front.jpg');
+            await idRef.putFile(File(_idImagePath!));
+            idFrontUrl = await idRef.getDownloadURL();
+          }
+          if (_selfieImagePath != null) {
+            final selfieRef = FirebaseStorage.instance
+                .ref('kyc/$uid/selfie.jpg');
+            await selfieRef.putFile(File(_selfieImagePath!));
+            selfieUrl = await selfieRef.getDownloadURL();
+          }
+          // Save URLs to Firestore immediately so admin can see them
+          await UserService().updateUser({
+            if (idFrontUrl.isNotEmpty) 'kycIdFrontUrl': idFrontUrl,
+            if (selfieUrl.isNotEmpty)  'kycSelfieUrl': selfieUrl,
+            'kycStatus': 'pending',
+          });
+        } catch (_) {
+          // Upload failed — continue anyway, CF will still run
+        }
+      }
+
+      // ── 5. Call kycAutoDecision Cloud Function ────────────────────────────
+      final callable = FirebaseFunctions.instanceFor(region: 'europe-west1')
+          .httpsCallable('kycAutoDecision');
+
+      final response = await callable.call(<String, dynamic>{
+        'selfieScores':        selfieScores,
+        'documentScores':      documentScores,
+        'profileCompleteness': profileCompleteness,
+      });
+
+      final data = response.data as Map<String, dynamic>? ?? {};
+      final tier = (data['tier'] as String?) ?? 'GREEN';
+
+      if (mounted) {
+        setState(() {
+          _kycDecisionTier = tier;
+          _submitting      = false;
+          _submitted       = true;
+        });
+      }
+    } catch (e) {
+      // Fallback: set pending and show success UI — admin reviews manually
+      try {
+        await UserService().updateUser({'kycStatus': 'pending'});
+      } catch (_) {}
+      if (mounted) {
+        setState(() {
+          _kycDecisionTier = 'AMBER';
+          _submitting      = false;
+          _submitted       = true;
+        });
+      }
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -338,8 +466,40 @@ class _KycScreenState extends State<KycScreen> {
                     return null;
                   }),
               const SizedBox(height: 32),
-              _primaryButton('Continue to ID Scan', onPressed: () {
-                if (_formKey.currentState!.validate()) _goTo(1);
+              _primaryButton('Continue to ID Scan', onPressed: () async {
+                if (!_formKey.currentState!.validate()) return;
+                final status = await Permission.camera.request();
+                if (status.isGranted) {
+                  await _goTo(1);
+                } else if (status.isPermanentlyDenied) {
+                  if (!mounted) return;
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Camera Access Required'),
+                      content: const Text(
+                          'Camera permission is required for ID verification. '
+                          'Please enable it in your device settings.'),
+                      actions: [
+                        TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: const Text('Cancel')),
+                        TextButton(
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              openAppSettings();
+                            },
+                            child: const Text('Open Settings')),
+                      ],
+                    ),
+                  );
+                } else {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Camera permission is required for KYC.')),
+                  );
+                }
               }),
               const SizedBox(height: 16),
               _infoCard(
@@ -439,18 +599,50 @@ class _KycScreenState extends State<KycScreen> {
             ),
           ),
 
-          // Capture button
+          // Capture button + gallery option (ID only)
           SafeArea(
             top: false,
             child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
               child: _checking
-                  ? const CircularProgressIndicator()
-                  : _primaryButton(
-                      isId ? 'Capture Document' : 'Take Selfie',
-                      onPressed:
-                          isId ? _captureId : _captureSelfie,
+                  ? const Center(child: CircularProgressIndicator())
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _primaryButton(
+                          isId ? 'Capture Document' : 'Take Selfie',
+                          onPressed: isId ? _captureId : _captureSelfie,
+                        ),
+                        if (isId) ...[
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: OutlinedButton.icon(
+                              onPressed: _pickIdFromGallery,
+                              icon: const Icon(Icons.photo_library_rounded, size: 18),
+                              label: Text(
+                                'Choose from Gallery',
+                                style: GoogleFonts.inter(
+                                    fontSize: 14, fontWeight: FontWeight.w600),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: _primary,
+                                side: const BorderSide(color: _primary),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Use gallery if you have a digital copy of your ID',
+                            style: GoogleFonts.inter(
+                                fontSize: 11, color: Colors.grey[500]),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ],
                     ),
             ),
           ),
@@ -699,46 +891,132 @@ class _KycScreenState extends State<KycScreen> {
   // ─────────────────────────────────────────────────────────────────────────
   // Success screen
   // ─────────────────────────────────────────────────────────────────────────
-  Widget _buildSuccess() => Center(
+  Widget _buildSuccess() {
+    // ── GREEN: auto-approved ──────────────────────────────────────────────
+    if (_kycDecisionTier == 'GREEN') {
+      return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 90,
-                height: 90,
+                width: 90, height: 90,
                 decoration: BoxDecoration(
-                    color: _green.withOpacity(0.12),
-                    shape: BoxShape.circle),
-                child: const Icon(Icons.verified_rounded,
-                    color: _green, size: 48),
+                    color: _green.withOpacity(0.12), shape: BoxShape.circle),
+                child: const Icon(Icons.verified_rounded, color: _green, size: 48),
               ),
               const SizedBox(height: 28),
-              Text('Verification Submitted',
+              Text('Identity Verified!',
                   style: GoogleFonts.inter(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                      color: _dark),
+                      fontSize: 24, fontWeight: FontWeight.w800, color: _dark),
                   textAlign: TextAlign.center),
               const SizedBox(height: 12),
               Text(
-                'Your documents passed all on-device checks and have been securely submitted for review. You\'ll receive a notification once verified.',
+                'Your identity has been automatically verified. You can now use all GoOuts features.',
                 style: GoogleFonts.inter(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                    height: 1.6),
+                    fontSize: 14, color: Colors.grey[600], height: 1.6),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 36),
-              _primaryButton('Back to Home', onPressed: () {
-                Navigator.pushNamedAndRemoveUntil(
-                    context, '/home', (_) => false);
+              _primaryButton('Go to Home', onPressed: () {
+                Navigator.pushNamedAndRemoveUntil(context, '/home', (_) => false);
               }),
             ],
           ),
         ),
       );
+    }
+
+    // ── RED: rejected — resubmit ──────────────────────────────────────────
+    if (_kycDecisionTier == 'RED') {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 90, height: 90,
+                decoration: BoxDecoration(
+                    color: const Color(0xFFFEE2E2), shape: BoxShape.circle),
+                child: const Icon(Icons.cancel_rounded,
+                    color: Color(0xFFDC2626), size: 48),
+              ),
+              const SizedBox(height: 28),
+              Text('Verification Unsuccessful',
+                  style: GoogleFonts.inter(
+                      fontSize: 24, fontWeight: FontWeight.w800, color: _dark),
+                  textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              Text(
+                'We couldn\'t verify your identity from the images provided. Please ensure good lighting, all text is visible, and retake both your ID and selfie.',
+                style: GoogleFonts.inter(
+                    fontSize: 14, color: Colors.grey[600], height: 1.6),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 36),
+              _primaryButton('Try Again', onPressed: () {
+                setState(() {
+                  _step            = 0;
+                  _idValid         = false;
+                  _selfieValid     = false;
+                  _submitted       = false;
+                  _idImagePath     = null;
+                  _selfieImagePath = null;
+                  _feedbackMsg     = '';
+                  _kycDecisionTier = 'GREEN';
+                });
+              }),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () =>
+                    Navigator.pushNamedAndRemoveUntil(context, '/home', (_) => false),
+                child: Text('Back to Home',
+                    style: GoogleFonts.inter(
+                        fontSize: 14, color: Colors.grey[600])),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // ── AMBER: manual review pending (default fallback) ───────────────────
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 90, height: 90,
+              decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7), shape: BoxShape.circle),
+              child: const Icon(Icons.hourglass_top_rounded,
+                  color: Color(0xFFD97706), size: 48),
+            ),
+            const SizedBox(height: 28),
+            Text('Under Review',
+                style: GoogleFonts.inter(
+                    fontSize: 24, fontWeight: FontWeight.w800, color: _dark),
+                textAlign: TextAlign.center),
+            const SizedBox(height: 12),
+            Text(
+              'Your documents have been submitted and are being reviewed by our team. This usually takes up to 24 hours. We\'ll notify you once complete.',
+              style: GoogleFonts.inter(
+                  fontSize: 14, color: Colors.grey[600], height: 1.6),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 36),
+            _primaryButton('Back to Home', onPressed: () {
+              Navigator.pushNamedAndRemoveUntil(context, '/home', (_) => false);
+            }),
+          ],
+        ),
+      ),
+    );
+  }
 
   // ─────────────────────────────────────────────────────────────────────────
   // Reusable widgets

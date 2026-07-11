@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
 import '../services/user_service.dart';
+import '../services/message_service.dart';
+import '../services/user_fcm_service.dart';
+import '../widgets/promo_overlay.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -13,24 +16,44 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   String _displayName = '';
+  String? _photoUrl;
   bool _loadingUser = true;
-  int _notifCount = 2; // matches unread:true count in notifications_screen
+
+  String get _greeting {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning,';
+    if (hour < 17) return 'Good afternoon,';
+    return 'Good evening,';
+  }
+  final _msgService = MessageService();
 
   @override
   void initState() {
     super.initState();
     _loadUserName();
+    _markOnboardingComplete();
+    // Ask for notification permission on first launch (shows branded dialog first)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        UserFcmService.instance.askPermissionWithRationale(context);
+      }
+    });
+  }
+
+  Future<void> _markOnboardingComplete() async {
+    try {
+      await UserService().updateUser({'onboardingComplete': true});
+    } catch (_) {}
   }
 
   Future<void> _loadUserName() async {
     try {
       final data = await UserService().getCurrentUser();
       if (data != null && mounted) {
-        final prefix = data['prefix'] as String? ?? '';
-        final fullName = data['fullName'] as String? ?? '';
-        final firstName = fullName.split(' ').first;
+        final fullName = (data['fullName'] as String? ?? '').trim();
         setState(() {
-          _displayName = [prefix, firstName].where((s) => s.isNotEmpty).join(' ');
+          _displayName = fullName.isNotEmpty ? fullName : '';
+          _photoUrl = data['photoUrl'] as String?;
           _loadingUser = false;
         });
       } else {
@@ -136,22 +159,24 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF2F4F7),
-      body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(child: _buildHeader()),
-            SliverToBoxAdapter(child: _buildGreeting()),
-            SliverToBoxAdapter(child: _buildVirtualCard()),
-            SliverToBoxAdapter(child: _buildServices()),
-            SliverToBoxAdapter(child: _buildSpecialOffers()),
-            SliverToBoxAdapter(child: _buildTrending()),
-            const SliverToBoxAdapter(child: SizedBox(height: 24)),
-          ],
+    return PromoOverlayWrapper(
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF2F4F7),
+        body: SafeArea(
+          child: CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(child: _buildHeader()),
+              SliverToBoxAdapter(child: _buildGreeting()),
+              SliverToBoxAdapter(child: _buildVirtualCard()),
+              SliverToBoxAdapter(child: _buildServices()),
+              SliverToBoxAdapter(child: _buildSpecialOffers()),
+              SliverToBoxAdapter(child: _buildTrending()),
+              const SliverToBoxAdapter(child: SizedBox(height: 24)),
+            ],
+          ),
         ),
+        bottomNavigationBar: _buildBottomNav(),
       ),
-      bottomNavigationBar: _buildBottomNav(),
     );
   }
 
@@ -164,7 +189,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('Good morning,',
+                Text(_greeting,
                     style: GoogleFonts.inter(
                         fontSize: 13, color: const Color(0xFF0392CA))),
                 _loadingUser
@@ -188,7 +213,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             color: const Color(0xFF0D1B3E))),
               ],
             ),
-            // Profile pic left + Bell right
+            // Profile pic left + icons right
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -196,63 +221,75 @@ class _HomeScreenState extends State<HomeScreen> {
                   radius: 30,
                   backgroundColor: Colors.grey[300],
                   child: ClipOval(
-                    child: Image.asset(
-                      'assets/images/profie_picture.webp',
-                      width: 60,
-                      height: 60,
-                      fit: BoxFit.cover,
-                      filterQuality: FilterQuality.high,
-                      errorBuilder: (_, __, ___) => const Icon(
-                        Icons.person_rounded,
-                        color: Colors.white,
-                        size: 30,
-                      ),
-                    ),
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () async {
-                    await Navigator.pushNamed(context, '/notifications');
-                    if (mounted) setState(() => _notifCount = 0);
-                  },
-                  child: Stack(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                                color: Colors.black.withOpacity(0.06),
-                                blurRadius: 6)
-                          ],
-                        ),
-                        child: const Icon(Icons.notifications_outlined,
-                            color: Colors.black87, size: 22),
-                      ),
-                      if (_notifCount > 0)
-                        Positioned(
-                          top: 0,
-                          right: 0,
-                          child: Container(
-                            width: 18,
-                            height: 18,
-                            decoration: const BoxDecoration(
-                                color: Colors.red, shape: BoxShape.circle),
-                            child: Center(
-                              child: Text('$_notifCount',
-                                  style: GoogleFonts.inter(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.white)),
+                    child: _photoUrl != null && _photoUrl!.isNotEmpty
+                        ? Image.network(
+                            _photoUrl!,
+                            width: 60,
+                            height: 60,
+                            fit: BoxFit.cover,
+                            filterQuality: FilterQuality.high,
+                            errorBuilder: (_, __, ___) => const Icon(
+                              Icons.person_rounded,
+                              color: Colors.white,
+                              size: 30,
                             ),
+                          )
+                        : const Icon(
+                            Icons.person_rounded,
+                            color: Colors.white,
+                            size: 30,
                           ),
-                        ),
-                    ],
                   ),
                 ),
+                // Bell icon (notifications)
+                StreamBuilder<int>(
+                      stream: _msgService.unreadNotificationsStream(),
+                      builder: (context, snap) {
+                        final count = snap.data ?? 0;
+                        return GestureDetector(
+                          onTap: () => Navigator.pushNamed(context, '/notifications'),
+                          child: Stack(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                        color: Colors.black.withOpacity(0.06),
+                                        blurRadius: 6)
+                                  ],
+                                ),
+                                child: const Icon(Icons.notifications_outlined,
+                                    color: Colors.black87, size: 22),
+                              ),
+                              if (count > 0)
+                                Positioned(
+                                  top: 0,
+                                  right: 0,
+                                  child: Container(
+                                    width: 18,
+                                    height: 18,
+                                    decoration: const BoxDecoration(
+                                        color: Colors.red, shape: BoxShape.circle),
+                                    child: Center(
+                                      child: Text(
+                                        count > 9 ? '9+' : '$count',
+                                        style: GoogleFonts.inter(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.white),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
               ],
             ),
           ],
@@ -325,31 +362,45 @@ class _HomeScreenState extends State<HomeScreen> {
                 Text('CARD NUMBER',
                     style: GoogleFonts.inter(
                         fontSize: 10,
-                        color: Colors.white.withOpacity(0.7),
-                        letterSpacing: 1.2)),
+                        color: Colors.white,
+                        letterSpacing: 1.2,
+                        fontWeight: FontWeight.w600,
+                        shadows: [
+                          Shadow(color: Colors.black.withOpacity(0.5), blurRadius: 4, offset: const Offset(0, 1)),
+                        ])),
                 const SizedBox(height: 4),
                 Text('4821  5567  8901  2345',
                     style: GoogleFonts.inter(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
-                        letterSpacing: 1.5)),
+                        letterSpacing: 1.5,
+                        shadows: [
+                          Shadow(color: Colors.black.withOpacity(0.4), blurRadius: 6, offset: const Offset(0, 1)),
+                        ])),
                 const SizedBox(height: 12),
                 Row(
                   children: [
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('ALEX STERLING',
+                        Text(_displayName.isNotEmpty ? _displayName.toUpperCase() : 'CARD HOLDER',
                             style: GoogleFonts.inter(
                                 fontSize: 11,
-                                color: Colors.white.withOpacity(0.8),
-                                letterSpacing: 0.8)),
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                letterSpacing: 0.8,
+                                shadows: [
+                                  Shadow(color: Colors.black.withOpacity(0.5), blurRadius: 4, offset: const Offset(0, 1)),
+                                ])),
                         Text('12/26',
                             style: GoogleFonts.inter(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.white)),
+                                color: Colors.white,
+                                shadows: [
+                                  Shadow(color: Colors.black.withOpacity(0.4), blurRadius: 4, offset: const Offset(0, 1)),
+                                ])),
                       ],
                     ),
                     const Spacer(),

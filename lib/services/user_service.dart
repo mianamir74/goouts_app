@@ -1,10 +1,34 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../utils/pin_hasher.dart';
+import 'transaction_service.dart';
+import 'referral_service.dart';
 
 class UserService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  /// Delete all documents in a sub-collection for the current user.
+  /// Firestore .set() on a parent doc does NOT clear sub-collections,
+  /// so we must do this manually before re-registering a phone number.
+  Future<void> _clearSubCollection(String uid, String subCollection) async {
+    const int batchSize = 400;
+    QuerySnapshot snap;
+    do {
+      snap = await _db
+          .collection('users')
+          .doc(uid)
+          .collection(subCollection)
+          .limit(batchSize)
+          .get();
+      if (snap.docs.isEmpty) break;
+      final batch = _db.batch();
+      for (final doc in snap.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    } while (snap.docs.length == batchSize);
+  }
 
   /// Save a new GoOuts user to the `users` collection.
   /// Document ID = Firebase Auth UID (no overlap with drivers/businesses).
@@ -15,13 +39,20 @@ class UserService {
     required String dob,
     required String pin,
     required String postcode,
-    required String address1,
-    required String address2,
+    required String houseNo,
+    required String streetName,
+    required String town,
     required String city,
     required String country,
   }) async {
     final User? user = _auth.currentUser;
     if (user == null) throw Exception('No authenticated user found.');
+
+    // Clear any leftover sub-collections from a previous registration
+    // on this phone number (same UID reused by Firebase phone auth).
+    await _clearSubCollection(user.uid, 'transactions');
+    await _clearSubCollection(user.uid, 'reviews');
+    await _clearSubCollection(user.uid, 'messages');
 
     final hashedPin = PinHasher.hash(pin, user.uid);
 
@@ -34,13 +65,14 @@ class UserService {
       'dob': dob,
       'pin': hashedPin, // SHA-256 hashed with uid as salt
       'postcode': postcode,
-      'address1': address1,
-      'address2': address2,
+      'houseNo': houseNo,
+      'streetName': streetName,
+      'town': town,
       'city': city,
       'country': country,
       'role': 'customer',
       'kycStatus': 'pending',
-      'walletBalance': 0.0,
+      'walletBalance': 2.0,   // £2 welcome bonus credited on registration
       'cashbackBalance': 0.0,
       'cashbackPoints': 0,
       // ── Family & GoOuts Plus fields ──
@@ -52,8 +84,23 @@ class UserService {
       'gooutsPlusActivatedAt': null,
       'gooutsPlusRenewalDate': null,
       'firstYearEnd': DateTime.now().add(const Duration(days: 365)),
+      'onboardingComplete': false,
+      'inviteCode': ReferralService.generateInviteCode(), // unique invite code
+      'referredByUid': null,
+      'referralRewarded': false,
       'createdAt': FieldValue.serverTimestamp(),
     });
+
+    // Credit £2 welcome bonus transaction to history
+    await TransactionService().addTransaction(
+      title: '£2 Welcome Bonus',
+      amount: 2.0,
+      amountFormatted: '+£2.00',
+      type: 'Welcome Bonus',
+      iconKey: 'gift',
+      positive: true,
+      status: 'Completed',
+    );
   }
 
   /// Fetch current user's Firestore data
@@ -166,7 +213,7 @@ class UserService {
     });
   }
 
-  /// Charge £5 for GoOuts Plus activation.
+  /// Charge £10 for GoOuts Plus activation.
   /// Deducts from wallet first. If wallet is insufficient,
   /// the remainder is flagged for Open Banking charge (backend phase).
   /// Records the transaction in Activity screen.
@@ -192,7 +239,7 @@ class UserService {
       double chargedFromBank = 0.0;
 
       if (walletBalance >= fee) {
-        // Full £5 from wallet
+        // Full £10 from wallet
         chargedFromWallet = fee;
         await _db.collection('users').doc(user.uid).update({
           'walletBalance': walletBalance - fee,

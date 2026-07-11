@@ -2,22 +2,174 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Users collection ─────────────────────────────────────────────────────
-    // Each user can only read and write their own document.
-    // No other user or unauthenticated request can access it.
+    // ── Helper: check if requester is a registered admin ─────────────────────
+    function isAdmin() {
+      return request.auth != null &&
+        exists(/databases/$(database)/documents/admin_users/$(request.auth.uid));
+    }
+
+    // ── GoOuts User App ───────────────────────────────────────────────────────
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-
-      // ── Transactions sub-collection ───────────────────────────────────────
-      // Only the owning user can read/write their transactions.
-      match /transactions/{txId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
+      allow read:  if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    match /users/{userId}/{document=**} {
+      allow read:  if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // ── Everything else — deny all ────────────────────────────────────────────
-    match /{document=**} {
-      allow read, write: if false;
+    // ── Admin Panel ───────────────────────────────────────────────────────────
+    match /admin_users/{adminId} {
+      allow read, write: if request.auth != null && request.auth.uid == adminId;
     }
+    match /admin_activity_logs/{logId} {
+      allow read, create: if request.auth != null;
+    }
+    match /admin_broadcast_requests/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /admin_invite_requests/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /admin_driver_message_jobs/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /admin_user_message_jobs/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /admin_promo_campaigns/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // ── Support Tickets ───────────────────────────────────────────────────────
+    match /support_requests/{ticketId} {
+      allow create:       if request.auth != null;
+      allow read, update: if request.auth != null;
+    }
+    match /support_requests/{ticketId}/messages/{messageId} {
+      allow read, create: if request.auth != null;
+      allow update:       if request.auth != null;
+    }
+
+    // ── Driver App ────────────────────────────────────────────────────────────
+    // Write is open to all authenticated users so the referral dev tester
+    // can batch-create/delete test driver documents across different UIDs.
+    match /drivers/{driverId} {
+      allow read, write: if request.auth != null;
+    }
+    match /drivers/{driverId}/{document=**} {
+      allow read, write: if request.auth != null;
+    }
+    match /cab_drivers/{driverId} {
+      allow read, write: if request.auth != null;
+    }
+    match /cab_drivers/{driverId}/{document=**} {
+      allow read, write: if request.auth != null;
+    }
+    match /businesses/{bizId} {
+      allow read, write: if request.auth != null;
+    }
+    match /businesses/{bizId}/{document=**} {
+      allow read, write: if request.auth != null;
+    }
+
+    // ── Referral / invite collections ─────────────────────────────────────────
+    match /invites/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /sentinvites/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /sent_invites/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // ── FAQ ───────────────────────────────────────────────────────────────────
+    match /faq/{docId} {
+      allow read: if request.auth != null;
+    }
+    match /faqs/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // -- Driver FAQs (residual income Q&As, managed from admin panel) ---------
+    match /driver_faqs/{docId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // ── Food Image Library ────────────────────────────────────────────────────
+    // Admin panel writes category/dish image metadata; consumer app reads freely
+    match /food_images/{docId} {
+      allow read:  if true;
+      allow write: if request.auth != null;
+    }
+
+    // ── Merchants (food delivery) ─────────────────────────────────────────────
+    match /merchants/{merchantId} {
+      allow read, write: if request.auth != null;
+    }
+    // Menu categories and items — merchant can manage their own
+    match /merchants/{merchantId}/menu_categories/{catId} {
+      allow read:  if true;          // consumer app reads menus without auth
+      allow write: if request.auth != null;
+    }
+    match /merchants/{merchantId}/menu_items/{itemId} {
+      allow read:  if true;          // consumer app reads items without auth
+      allow write: if request.auth != null;
+    }
+
+    // ── Content Pages ─────────────────────────────────────────────────────────
+    match /content_pages/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // ── Shared ────────────────────────────────────────────────────────────────
+    match /familyGroups/{groupId} {
+      allow read, write: if request.auth != null;
+    }
+    match /familyLinkRequests/{requestId} {
+      allow read, write: if request.auth != null;
+    }
+    // ── Partners (venue cards shown in app) ──────────────────────────────────
+    match /partners/{partnerId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // ── Partner Config (categories list, global settings) ────────────────────
+    match /partner_config/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+    match /messages/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // ── Platform Config (VAT number, settings) ────────────────────────────────
+    // Admin panel reads/writes; Cloud Functions write via Admin SDK (bypasses rules)
+    match /platform_config/{docId} {
+      allow read:  if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // ── VAT Records ───────────────────────────────────────────────────────────
+    // Written only by Cloud Functions (Admin SDK — bypasses rules).
+    // Admin panel reads for VAT Management screen.
+    match /vat_records/{docId} {
+      allow read:  if request.auth != null;
+      allow write: if false; // Cloud Functions only
+    }
+
+    // ── Food Orders ───────────────────────────────────────────────────────────
+    match /food_orders/{orderId} {
+      allow read:   if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+    }
+
   }
 }
+

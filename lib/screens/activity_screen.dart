@@ -923,6 +923,17 @@ class _ActivityScreenState extends State<ActivityScreen> {
       return v > prev ? v : prev;
     });
 
+    // Dynamic month label and real cashback total
+    final now = DateTime.now();
+    const months = ['','Jan','Feb','Mar','Apr','May','Jun',
+                    'Jul','Aug','Sep','Oct','Nov','Dec'];
+    final monthLabel = '${months[now.month]} ${now.year}';
+    final monthTotal = _chartWeeks.fold(
+        0.0, (sum, w) => sum + (w['cashback'] as double));
+    final monthTotalStr = monthTotal > 0
+        ? '£${monthTotal.toStringAsFixed(2)} earned'
+        : 'No cashback yet';
+
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
@@ -949,7 +960,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'May 2026 — Cashback Trend',
+                  '$monthLabel — Cashback Trend',
                   style: GoogleFonts.inter(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
@@ -964,7 +975,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    '£17.40 earned',
+                    monthTotalStr,
                     style: GoogleFonts.inter(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,

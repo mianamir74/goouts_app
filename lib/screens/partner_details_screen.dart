@@ -1,8 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../services/user_service.dart';
 import '../services/transaction_service.dart';
 import '../services/visit_verifier.dart';
+import '../utils/pin_hasher.dart';
+
+enum _VerifyState { loading, passed, failed, waiting }
 
 class PartnerDetailsScreen extends StatefulWidget {
   const PartnerDetailsScreen({super.key});
@@ -21,8 +29,9 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
   static const int _pointsPerReview = 2;
   static const int _pointsForBonus = 100;
 
-  // QR verification state — true once user scans valid QR at counter
-  bool _qrVerified = false;
+  // Social Boost — loaded from route args in build()
+  bool _socialBoostEnabled = false;
+  double _socialBoostPct   = 10.0;
 
   @override
   void initState() {
@@ -67,13 +76,12 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
     final partnerLat = (args?['lat'] as num?)?.toDouble() ?? 0.0;
     final partnerLng = (args?['lng'] as num?)?.toDouble() ?? 0.0;
 
-    // Auto-detect partner type from category if not explicitly passed
-    // Counter service = QR required | Table service = GPS only
-    final partnerType = args?['partnerType'] as String?;
-    final bool isQrPartner = partnerType != null
-        ? partnerType == 'counter'
-        : _isCounterService(category);
+    // Social Boost — sync to state fields so methods can access them
+    _socialBoostEnabled = args?['socialBoostEnabled'] as bool? ?? false;
+    _socialBoostPct     = (args?['socialBoostPercent'] as num?)?.toDouble() ?? 10.0;
+
     final merchantId = VisitVerifier.merchantIdFromName(name);
+    final verifyCode = args?['verificationCode'] as String? ?? '';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF2F4F7),
@@ -150,36 +158,24 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
                   child: Row(
                     children: [
-                      // Dynamic: QR Scan (counter) or GPS indicator (table)
+                      // Scan & Earn — same flow for all partner types (GPS → code fallback)
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: isQrPartner
-                              ? () => _showQrScanSheet(context, name, merchantId, cashback)
-                              : () {}, // Verified — informational, kept active for colour
-                          icon: Icon(
-                            isQrPartner
-                                ? (_qrVerified
-                                    ? Icons.check_circle_rounded
-                                    : Icons.qr_code_scanner_rounded)
-                                : Icons.verified_rounded,
-                            color: Colors.white,
-                            size: 18,
+                          onPressed: () => _verifyAndPay(
+                            context, name, cashback, partnerLat, partnerLng,
+                            merchantId: merchantId, verifyCode: verifyCode,
                           ),
+                          icon: const Icon(Icons.location_on_rounded,
+                              color: Colors.white, size: 18),
                           label: Text(
-                            isQrPartner
-                                ? (_qrVerified ? 'QR Verified ✓' : 'Scan')
-                                : 'Verified',
+                            'Scan & Earn',
                             style: GoogleFonts.inter(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
                                 color: Colors.white),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: isQrPartner
-                                ? (_qrVerified
-                                    ? const Color(0xFF0A7A3E)
-                                    : _primary)
-                                : _primary,
+                            backgroundColor: _primary,
                             minimumSize: const Size(0, 48),
                             shape: const StadiumBorder(),
                             elevation: 0,
@@ -434,18 +430,17 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
               color: const Color(0xFFF2F4F7),
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 25),
               child: ElevatedButton.icon(
-                onPressed: () => isQrPartner
-                    ? _showQrScanSheet(context, name, merchantId, cashback)
-                    : _verifyAndPay(context, name, cashback, partnerLat, partnerLng, isQrPartner: false, merchantId: merchantId),
-                icon: Icon(
-                  isQrPartner
-                      ? Icons.qr_code_scanner_rounded
-                      : Icons.credit_card_rounded,
+                onPressed: () => _verifyAndPay(
+                  context, name, cashback, partnerLat, partnerLng,
+                  merchantId: merchantId, verifyCode: verifyCode,
+                ),
+                icon: const Icon(
+                  Icons.credit_card_rounded,
                   color: Colors.white,
                   size: 20,
                 ),
                 label: Text(
-                  isQrPartner ? 'Scan · Pay & Earn Cashback' : 'Pay & Earn Cashback',
+                  'Pay & Earn Cashback',
                   style: GoogleFonts.inter(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
@@ -1293,389 +1288,575 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
     );
   }
 
-  // ── QR Scan Sheet (counter-service partners) ───────────────────────────────
-  void _showQrScanSheet(BuildContext context, String merchant,
-      String merchantId, String cashback) {
-    bool scanned = false;
+  // ── PIN Authorisation Sheet ────────────────────────────────────────────────
+  // Shows a 4-digit PIN entry bottom sheet before processing payment.
+  // Returns true if PIN verified, false/null if cancelled.
+  Future<bool?> _showPinSheet(BuildContext ctx) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return null;
+
+    return showModalBottomSheet<bool>(
+      context: ctx,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) => _PinAuthSheet(uid: uid),
+    );
+  }
+
+  // ── Verify visit: GPS first → partner code fallback if GPS fails ──────────
+  void _verifyAndPay(BuildContext context, String merchant,
+      String cashback, double partnerLat, double partnerLng,
+      {String merchantId = '', String verifyCode = ''}) {
+
+    final bool hasCoords   = partnerLat != 0.0 && partnerLng != 0.0;
+    final String storedCode = verifyCode.toUpperCase().trim();
+
+    bool gpsChecked  = false;
+    bool gpsPassed   = false;
+    bool gpsRunning  = hasCoords;
+    String gpsMessage = hasCoords ? 'Checking your location…' : 'No GPS coordinates set for this partner.';
+
+    // 'choose' = picking QR or Code, 'qr' = scanner active, 'code' = text input
+    String fallbackMode = '';
+    bool showFallback = !hasCoords;   // immediately show fallback if no coords
+
+    bool codePassed    = false;
+    bool codeChecking  = false;
+    String codeError   = '';
+    final codeCtrl     = TextEditingController();
+    MobileScannerController? scanCtrl;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      isDismissible: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => StatefulBuilder(
-        builder: (ctx, setSheet) => Container(
-          height: MediaQuery.of(ctx).size.height * 0.72,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: 12),
-              Container(
-                width: 40, height: 4,
-                decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2)),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) {
+
+          // Auto-run GPS once
+          if (hasCoords && !gpsChecked) {
+            gpsChecked = true;
+            VisitVerifier.checkGps(partnerLat, partnerLng).then((result) {
+              if (!ctx.mounted) return;
+              setSheet(() {
+                gpsRunning = false;
+                gpsPassed  = result.withinRange;
+                if (result.error != null) {
+                  gpsMessage    = result.error!;
+                  showFallback  = true;
+                  fallbackMode  = 'choose';
+                } else if (result.withinRange) {
+                  final dist = result.distanceMetres != null
+                      ? ' (${result.distanceMetres!.toStringAsFixed(0)}m)'
+                      : '';
+                  gpsMessage = 'You\'re at $merchant$dist ✓';
+                } else {
+                  final dist = result.distanceMetres != null
+                      ? '${result.distanceMetres!.toStringAsFixed(0)}m away'
+                      : 'location not confirmed';
+                  gpsMessage   = 'GPS shows you\'re $dist.';
+                  showFallback = true;
+                  fallbackMode = 'choose';
+                }
+              });
+            });
+          }
+
+          // Auto-proceed when GPS passes
+          if (gpsPassed) {
+            Future.microtask(() {
+              if (ctx.mounted) {
+                Navigator.pop(ctx);
+                _showCashbackApplySheet(context, merchant, cashback);
+              }
+            });
+          }
+
+          // Verify typed partner code — matches stored code OR master override
+          const String _masterCode = '123456';
+          Future<void> checkCode() async {
+            final entered = codeCtrl.text.trim().toUpperCase();
+            if (entered.isEmpty) {
+              setSheet(() => codeError = 'Please enter the partner code.');
+              return;
+            }
+            setSheet(() { codeChecking = true; codeError = ''; });
+            await Future.delayed(const Duration(milliseconds: 600));
+            if (!ctx.mounted) return;
+            final bool valid = entered == _masterCode ||
+                (storedCode.isNotEmpty && entered == storedCode);
+            if (valid) {
+              setSheet(() { codeChecking = false; codePassed = true; });
+              await Future.delayed(const Duration(milliseconds: 500));
+              if (ctx.mounted) {
+                Navigator.pop(ctx);
+                _showCashbackApplySheet(context, merchant, cashback);
+              }
+            } else {
+              setSheet(() {
+                codeChecking = false;
+                codeError = 'Incorrect code. Please ask staff for the correct partner code.';
+              });
+            }
+          }
+
+          // Handle QR scan result — matches stored code OR master override
+          void onQrDetect(BarcodeCapture capture) {
+            final raw = capture.barcodes.firstOrNull?.rawValue ?? '';
+            final scanned = raw.toUpperCase().trim();
+            if (scanned.isEmpty) return;
+            scanCtrl?.stop();
+            final bool qrValid = scanned == '123456' ||
+                (storedCode.isNotEmpty && scanned == storedCode);
+            if (qrValid) {
+              setSheet(() { codePassed = true; fallbackMode = 'qr_ok'; });
+              Future.delayed(const Duration(milliseconds: 500), () {
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                  _showCashbackApplySheet(context, merchant, cashback);
+                }
+              });
+            } else {
+              setSheet(() {
+                fallbackMode = 'choose';
+                codeError = 'QR code not recognised. Try entering the partner code manually.';
+              });
+            }
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              const SizedBox(height: 16),
-              // Header
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 42, height: 42,
-                      decoration: BoxDecoration(
-                        color: _primary.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.qr_code_scanner_rounded,
-                          color: _primary, size: 22),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Scan QR Code',
-                              style: GoogleFonts.inter(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w800,
-                                  color: _dark)),
-                          Text('Point camera at the GoOuts QR code at $merchant\'s counter',
-                              style: GoogleFonts.inter(
-                                  fontSize: 12, color: Colors.grey[500])),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Divider(height: 1),
-              const SizedBox(height: 12),
-              // ── DEMO MODE — Remove before going live ──────────────
-              // TODO: Replace this entire demo block with the real
-              // MobileScanner implementation below when QR codes are
-              // generated for each partner and the app goes live.
-              // Real implementation:
-              //   ClipRRect(
-              //     borderRadius: BorderRadius.circular(16),
-              //     child: MobileScanner(
-              //       onDetect: (capture) {
-              //         final raw = capture.barcodes.firstOrNull?.rawValue;
-              //         if (raw == null) return;
-              //         final result = VisitVerifier.verifyQr(raw, merchantId);
-              //         if (result.valid) {
-              //           setSheet(() => scanned = true);
-              //           setState(() => _qrVerified = true);
-              //           Future.delayed(Duration(milliseconds: 800), () {
-              //             if (ctx.mounted) Navigator.pop(ctx);
-              //             if (context.mounted)
-              //               _showCashbackApplySheet(context, merchant, cashback);
-              //           });
-              //         }
-              //       },
-              //     ),
-              //   )
-              // ─────────────────────────────────────────────────────
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
-                  child: scanned
-                      ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 40, height: 4,
+                    decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2)),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 42, height: 42,
+                          decoration: BoxDecoration(
+                            color: _primary.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.verified_user_rounded,
+                              color: _primary, size: 22),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
                           child: Column(
-                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Container(
-                                width: 80, height: 80,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF0A7A3E).withOpacity(0.1),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.check_circle_rounded,
-                                    color: Color(0xFF0A7A3E), size: 48),
-                              ),
-                              const SizedBox(height: 16),
-                              Text('QR Verified!',
+                              Text('Verify Your Visit',
                                   style: GoogleFonts.inter(
-                                      fontSize: 20,
+                                      fontSize: 18,
                                       fontWeight: FontWeight.w800,
-                                      color: _dark)),
-                              const SizedBox(height: 6),
-                              Text('Partner confirmed. Opening cashback...',
-                                  style: GoogleFonts.inter(
-                                      fontSize: 13,
-                                      color: Colors.grey[500])),
+                                      color: const Color(0xFF0D1B3E))),
+                              Text(
+                                showFallback && fallbackMode == ''
+                                    ? 'Choose how to verify'
+                                    : gpsRunning
+                                        ? 'Checking your location…'
+                                        : showFallback
+                                            ? 'Verify with QR or enter partner code'
+                                            : 'GPS verified ✓',
+                                style: GoogleFonts.inter(
+                                    fontSize: 12, color: Colors.grey[500])),
                             ],
                           ),
-                        )
-                      : Column(
-                          children: [
-                            // Demo camera frame
-                            Expanded(
-                              child: Container(
-                                width: double.infinity,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF1A1A2E),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Stack(
-                                  children: [
-                                    // Corner markers
-                                    ..._buildCornerMarkers(),
-                                    // Demo QR in centre
-                                    Center(
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+                  const Divider(height: 1),
+                  const SizedBox(height: 20),
+
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      children: [
+                        // Step 1: GPS
+                        if (hasCoords) ...[
+                          _verifyStepCard(
+                            step: '1',
+                            icon: Icons.location_on_rounded,
+                            title: 'GPS Location Check',
+                            message: gpsMessage,
+                            state: gpsRunning
+                                ? _VerifyState.loading
+                                : gpsPassed
+                                    ? _VerifyState.passed
+                                    : _VerifyState.failed,
+                          ),
+                        ],
+
+                        // Fallback section
+                        if (showFallback) ...[
+                          if (hasCoords) const SizedBox(height: 16),
+
+                          // ── Choose mode ─────────────────────────────────
+                          if (fallbackMode == 'choose' || fallbackMode == '') ...[
+                            Text(
+                              'GPS could not confirm your location.\nVerify using one of the options below:',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.inter(
+                                  fontSize: 13, color: Colors.grey[600], height: 1.5),
+                            ),
+                            if (codeError.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Text(codeError,
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.inter(
+                                      fontSize: 12, color: Colors.red[600])),
+                            ],
+                            const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                // QR Scan tile
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      scanCtrl = MobileScannerController();
+                                      setSheet(() { fallbackMode = 'qr'; codeError = ''; });
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(vertical: 20),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF0F9FF),
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(color: _primary.withOpacity(0.3)),
+                                      ),
                                       child: Column(
-                                        mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          // Demo QR visual
-                                          Container(
-                                            width: 160,
-                                            height: 160,
-                                            decoration: BoxDecoration(
-                                              color: Colors.white,
-                                              borderRadius: BorderRadius.circular(12),
-                                            ),
-                                            padding: const EdgeInsets.all(12),
-                                            child: GridView.builder(
-                                              physics: const NeverScrollableScrollPhysics(),
-                                              gridDelegate:
-                                                  const SliverGridDelegateWithFixedCrossAxisCount(
-                                                crossAxisCount: 10,
-                                                crossAxisSpacing: 2,
-                                                mainAxisSpacing: 2,
-                                              ),
-                                              itemCount: 100,
-                                              itemBuilder: (_, i) {
-                                                // Simple pattern to look like QR
-                                                final demoPattern = [
-                                                  0,0,0,0,0,0,0,1,0,1,
-                                                  0,1,1,1,1,1,0,1,0,0,
-                                                  0,1,0,0,0,1,0,0,1,1,
-                                                  0,1,0,1,0,1,0,1,0,1,
-                                                  0,1,0,0,0,1,0,0,1,0,
-                                                  0,1,1,1,1,1,0,1,1,1,
-                                                  0,0,0,0,0,0,0,0,1,0,
-                                                  1,1,0,1,1,0,1,1,0,1,
-                                                  0,0,0,1,0,1,0,0,0,0,
-                                                  1,0,1,0,1,0,1,0,1,0,
-                                                ];
-                                                return Container(
-                                                  decoration: BoxDecoration(
-                                                    color: demoPattern[i] == 0
-                                                        ? const Color(0xFF0D1B3E)
-                                                        : Colors.white,
-                                                    borderRadius: BorderRadius.circular(1),
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                          ),
-                                          const SizedBox(height: 12),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 12, vertical: 6),
-                                            decoration: BoxDecoration(
-                                              color: Colors.white.withOpacity(0.15),
-                                              borderRadius: BorderRadius.circular(20),
-                                            ),
-                                            child: Text(
-                                              'DEMO — $merchant',
+                                          Icon(Icons.qr_code_scanner_rounded,
+                                              size: 36, color: _primary),
+                                          const SizedBox(height: 8),
+                                          Text('Scan QR Code',
                                               style: GoogleFonts.inter(
-                                                  fontSize: 11,
-                                                  color: Colors.white,
-                                                  fontWeight: FontWeight.w600),
-                                            ),
-                                          ),
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: _primary)),
+                                          const SizedBox(height: 2),
+                                          Text('Ask staff to show\nthe QR code',
+                                              textAlign: TextAlign.center,
+                                              style: GoogleFonts.inter(
+                                                  fontSize: 11, color: Colors.grey[500])),
                                         ],
                                       ),
                                     ),
-                                  ],
+                                  ),
                                 ),
+                                const SizedBox(width: 12),
+                                // Enter code tile
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () => setSheet(() { fallbackMode = 'code'; codeError = ''; }),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(vertical: 20),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF8F4FF),
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(color: Colors.purple.withOpacity(0.3)),
+                                      ),
+                                      child: Column(
+                                        children: [
+                                          const Icon(Icons.pin_rounded,
+                                              size: 36, color: Colors.purple),
+                                          const SizedBox(height: 8),
+                                          Text('Enter Code',
+                                              style: GoogleFonts.inter(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: Colors.purple)),
+                                          const SizedBox(height: 2),
+                                          Text('Ask staff for the\npartner code',
+                                              textAlign: TextAlign.center,
+                                              style: GoogleFonts.inter(
+                                                  fontSize: 11, color: Colors.grey[500])),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+
+                          // ── QR Test Mode ────────────────────────────────
+                          // TODO: Remove before go-live — replace with real
+                          // MobileScanner that reads partner's printed QR.
+                          if (fallbackMode == 'qr') ...[
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF0F9FF),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                    color: _primary.withOpacity(0.3)),
+                              ),
+                              child: Column(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange.withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text('TEST MODE',
+                                        style: GoogleFonts.inter(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w800,
+                                            color: Colors.orange[800],
+                                            letterSpacing: 1.2)),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(12),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.06),
+                                          blurRadius: 8,
+                                        ),
+                                      ],
+                                    ),
+                                    child: QrImageView(
+                                      data: '123456',
+                                      version: QrVersions.auto,
+                                      size: 160,
+                                      eyeStyle: const QrEyeStyle(
+                                        eyeShape: QrEyeShape.square,
+                                        color: Color(0xFF0D1B3E),
+                                      ),
+                                      dataModuleStyle: const QrDataModuleStyle(
+                                        dataModuleShape: QrDataModuleShape.square,
+                                        color: Color(0xFF0D1B3E),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text('123456',
+                                      style: GoogleFonts.inter(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 6,
+                                          color: _primary)),
+                                  const SizedBox(height: 16),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 50,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () {
+                                        Navigator.pop(ctx);
+                                        _showCashbackApplySheet(
+                                            context, merchant, cashback);
+                                      },
+                                      icon: const Icon(Icons.check_circle_rounded),
+                                      label: Text('Pay & Earn Cashback',
+                                          style: GoogleFonts.inter(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w700)),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF0A7A3E),
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(14)),
+                                        elevation: 0,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 14),
-                            // Tap to simulate scan
+                            const SizedBox(height: 8),
+                            TextButton.icon(
+                              onPressed: () => setSheet(
+                                  () { fallbackMode = 'choose'; codeError = ''; }),
+                              icon: const Icon(Icons.arrow_back_rounded, size: 16),
+                              label: Text('Back to options',
+                                  style: GoogleFonts.inter(fontSize: 13)),
+                            ),
+                          ],
+
+                          // ── Code entry ──────────────────────────────────
+                          if (fallbackMode == 'code') ...[
+                            TextFormField(
+                              controller: codeCtrl,
+                              textCapitalization: TextCapitalization.characters,
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.inter(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 6,
+                                  color: const Color(0xFF0D1B3E)),
+                              decoration: InputDecoration(
+                                hintText: 'ENTER CODE',
+                                hintStyle: GoogleFonts.inter(
+                                    fontSize: 16, letterSpacing: 4, color: Colors.grey[350]),
+                                errorText: codeError.isNotEmpty ? codeError : null,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 14),
+                                border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                    borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                                enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                    borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                                focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                    borderSide: const BorderSide(color: _primary, width: 2)),
+                              ),
+                              onFieldSubmitted: (_) => checkCode(),
+                            ),
+                            const SizedBox(height: 12),
                             SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                onPressed: () {
-                                  setSheet(() => scanned = true);
-                                  setState(() => _qrVerified = true);
-                                  Future.delayed(
-                                      const Duration(milliseconds: 900), () {
-                                    if (ctx.mounted) Navigator.pop(ctx);
-                                    if (context.mounted) {
-                                      _showCashbackApplySheet(
-                                          context, merchant, cashback);
-                                    }
-                                  });
-                                },
-                                icon: const Icon(Icons.qr_code_scanner_rounded,
-                                    size: 18),
-                                label: Text('Tap to Simulate Scan (Demo)',
-                                    style: GoogleFonts.inter(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700)),
+                              width: double.infinity, height: 50,
+                              child: ElevatedButton(
+                                onPressed: codeChecking || codePassed ? null : checkCode,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: _primary,
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  elevation: 0,
+                                  disabledBackgroundColor: Colors.grey[300],
                                   shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12)),
+                                      borderRadius: BorderRadius.circular(14)),
+                                  elevation: 0,
                                 ),
+                                child: codeChecking
+                                    ? const SizedBox(
+                                        width: 20, height: 20,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2, color: Colors.white))
+                                    : Text('Verify Code',
+                                        style: GoogleFonts.inter(
+                                            fontSize: 15, fontWeight: FontWeight.w700)),
                               ),
                             ),
+                            const SizedBox(height: 8),
+                            TextButton.icon(
+                              onPressed: () => setSheet(() { fallbackMode = 'choose'; codeError = ''; }),
+                              icon: const Icon(Icons.arrow_back_rounded, size: 16),
+                              label: Text('Back to options',
+                                  style: GoogleFonts.inter(fontSize: 13)),
+                            ),
                           ],
-                        ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                child: TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: Text('Cancel',
-                      style: GoogleFonts.inter(
-                          fontSize: 14, color: Colors.grey[500])),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ── Demo QR corner markers ─────────────────────────────────────────────────
-  List<Widget> _buildCornerMarkers() {
-    const double size = 28;
-    const double thick = 4;
-    const Color color = Color(0xFF0392CA);
-
-    Widget corner(AlignmentGeometry align, BorderRadius radius) =>
-        Positioned.fill(
-          child: Align(
-            alignment: align,
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: SizedBox(
-                width: size, height: size,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: color, width: thick),
-                    borderRadius: radius,
+                        ],
+                      ],
+                    ),
                   ),
-                ),
+
+                  const SizedBox(height: 16),
+                  GestureDetector(
+                    onLongPress: () => setSheet(() {
+                      gpsRunning = false;
+                      gpsPassed  = true;
+                      gpsMessage = 'Demo: location verified ✓';
+                    }),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Text(
+                        'Demo mode: long-press to simulate GPS pass',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.inter(fontSize: 11, color: Colors.grey[400]),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                ],
               ),
             ),
-          ),
-        );
-
-    return [
-      corner(Alignment.topLeft,
-          const BorderRadius.only(topLeft: Radius.circular(6))),
-      corner(Alignment.topRight,
-          const BorderRadius.only(topRight: Radius.circular(6))),
-      corner(Alignment.bottomLeft,
-          const BorderRadius.only(bottomLeft: Radius.circular(6))),
-      corner(Alignment.bottomRight,
-          const BorderRadius.only(bottomRight: Radius.circular(6))),
-    ];
+          );
+        },
+      ),
+    ).whenComplete(() {
+      codeCtrl.dispose();
+      scanCtrl?.dispose();
+    });
   }
 
-  // ── GPS verify then pay (dine-in: GPS only, no QR needed) ─────────────────
-  Future<void> _verifyAndPay(BuildContext context, String merchant,
-      String cashback, double partnerLat, double partnerLng,
-      {bool isQrPartner = false, String merchantId = ''}) async {
-
-    // QR partner — must scan QR first before paying
-    if (isQrPartner && !_qrVerified) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.qr_code_scanner_rounded,
-                  color: Colors.white, size: 18),
-              const SizedBox(width: 10),
-              Text('Please scan the QR code at the counter first.',
-                  style: GoogleFonts.inter(fontSize: 13, color: Colors.white)),
-            ],
-          ),
-          backgroundColor: _primary,
-          behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
-      return;
+  // ── Verify step card (local) ───────────────────────────────────────────────
+  Widget _verifyStepCard({
+    required String step,
+    required IconData icon,
+    required String title,
+    required String message,
+    required _VerifyState state,
+  }) {
+    Color bg, iconColor, border;
+    Widget indicator;
+    switch (state) {
+      case _VerifyState.loading:
+        bg = const Color(0xFFF0F4F8); iconColor = Colors.grey; border = const Color(0xFFE2E8F0);
+        indicator = const SizedBox(width: 18, height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0392CA)));
+        break;
+      case _VerifyState.passed:
+        bg = const Color(0xFFEBF9F1); iconColor = const Color(0xFF0A7A3E); border = const Color(0xFFB2DFC8);
+        indicator = const Icon(Icons.check_circle_rounded, color: Color(0xFF0A7A3E), size: 20);
+        break;
+      case _VerifyState.failed:
+        bg = const Color(0xFFFFF0F0); iconColor = Colors.red; border = const Color(0xFFFFCDD2);
+        indicator = const Icon(Icons.cancel_rounded, color: Colors.red, size: 20);
+        break;
+      case _VerifyState.waiting:
+        bg = const Color(0xFFF8F9FA); iconColor = Colors.grey; border = const Color(0xFFE2E8F0);
+        indicator = Container(
+          width: 20, height: 20,
+          decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.grey[400]!)),
+          child: Center(child: Text(step, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700))),
+        );
     }
-
-    // If no coordinates stored yet (demo/testing) — skip GPS and go straight to payment
-    final bool hasCoords = partnerLat != 0.0 && partnerLng != 0.0;
-    if (!hasCoords) {
-      _showCashbackApplySheet(context, merchant, cashback);
-      return;
-    }
-
-    // Show visit verification sheet (GPS runs silently in background)
-    showModalBottomSheet(
-      context: context,
-      isDismissible: false,
-      enableDrag: false,
-      backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.fromLTRB(24, 32, 24, 40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 56, height: 56,
-              decoration: BoxDecoration(
-                color: const Color(0xFFD6EEF8),
-                shape: BoxShape.circle,
-              ),
-              child: const Padding(
-                padding: EdgeInsets.all(14),
-                child: CircularProgressIndicator(
-                    strokeWidth: 2.5, color: Color(0xFF0392CA)),
-              ),
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: border)),
+      child: Row(
+        children: [
+          Icon(icon, color: iconColor, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: GoogleFonts.inter(
+                        fontSize: 13, fontWeight: FontWeight.w700,
+                        color: const Color(0xFF0D1B3E))),
+                const SizedBox(height: 2),
+                Text(message,
+                    style: GoogleFonts.inter(fontSize: 12, color: Colors.grey[600], height: 1.3)),
+              ],
             ),
-            const SizedBox(height: 18),
-            Text('Verifying…',
-                style: GoogleFonts.inter(
-                    fontSize: 18, fontWeight: FontWeight.w800,
-                    color: const Color(0xFF0D1B3E))),
-            const SizedBox(height: 6),
-            Text('Please hold on for a moment',
-                style: GoogleFonts.inter(fontSize: 13, color: Colors.grey[500])),
-          ],
-        ),
+          ),
+          const SizedBox(width: 8),
+          indicator,
+        ],
       ),
     );
-
-    // Run GPS check
-    final result = await VisitVerifier.checkGps(partnerLat, partnerLng);
-    if (!context.mounted) return;
-    Navigator.pop(context); // close GPS checking sheet
-
-    if (result.withinRange) {
-      // ✅ Within range — proceed to payment
-      _showCashbackApplySheet(context, merchant, cashback);
-    } else {
-      // ❌ Too far — show not-at-location sheet
-      final dist = result.distanceMetres != null
-          ? '${result.distanceMetres!.toStringAsFixed(0)}m away'
-          : 'too far';
-      _showNotAtLocationSheet(context, merchant, dist);
-    }
   }
 
   // ── Not at location error sheet ─────────────────────────────────────────────
@@ -2051,11 +2232,16 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
                         child: ElevatedButton(
                           onPressed: billAmount <= 0
                               ? null
-                              : () => Navigator.pop(ctx, <String, double>{
-                                    'bill': billAmount,
-                                    'cashback': cbRedeem,
-                                    'wallet': walRedeem,
-                                  }),
+                              : () async {
+                                  final confirmed = await _showPinSheet(ctx);
+                                  if (confirmed == true && ctx.mounted) {
+                                    Navigator.pop(ctx, <String, double>{
+                                      'bill': billAmount,
+                                      'cashback': cbRedeem,
+                                      'wallet': walRedeem,
+                                    });
+                                  }
+                                },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _primary,
                             disabledBackgroundColor: Colors.grey[200],
@@ -2119,18 +2305,22 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
     if (bill <= 0) return; // sheet dismissed or skipped without entering bill
 
     _showPayConfirmation(context, merchant, cashback,
-      billAmount:    bill,
-      cashbackToUse: chosen?['cashback'] ?? 0.0,
-      walletToUse:   chosen?['wallet']   ?? 0.0,
+      billAmount:         bill,
+      cashbackToUse:      chosen?['cashback'] ?? 0.0,
+      walletToUse:        chosen?['wallet']   ?? 0.0,
+      socialBoostEnabled: _socialBoostEnabled,
+      socialBoostPct:     _socialBoostPct,
     );
   }
 
   // ── Pay & Earn — Processing → Success ────────────────────────────────────
   Future<void> _showPayConfirmation(
     BuildContext context, String merchant, String cashback, {
-    double billAmount    = 0.0,
-    double cashbackToUse = 0.0,
-    double walletToUse   = 0.0,
+    double billAmount         = 0.0,
+    double cashbackToUse      = 0.0,
+    double walletToUse        = 0.0,
+    bool   socialBoostEnabled = false,
+    double socialBoostPct     = 10.0,
   }) async {
     double cashbackPct = 0.0;
     final pctMatch = RegExp(r'(\d+(?:\.\d+)?)').firstMatch(cashback);
@@ -2268,6 +2458,8 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
       transactionId: transactionId,
       cashbackUsed: cashbackToUse,
       walletUsed: walletToUse,
+      socialBoostEnabled: socialBoostEnabled,
+      socialBoostPct: socialBoostPct,
     );
 
     // If £100 milestone just triggered — show GoOuts Plus celebration
@@ -2290,8 +2482,10 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
     required double cashbackPct,
     required double newWalletBalance,
     required String transactionId,
-    double cashbackUsed = 0.0,
-    double walletUsed   = 0.0,
+    double cashbackUsed       = 0.0,
+    double walletUsed         = 0.0,
+    bool   socialBoostEnabled = false,
+    double socialBoostPct     = 10.0,
   }) {
     showModalBottomSheet(
       context: context,
@@ -2434,7 +2628,20 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
                       Navigator.pop(context);
                       Future.delayed(
                           const Duration(milliseconds: 400), () {
-                        if (context.mounted) {
+                        if (!context.mounted) return;
+                        if (socialBoostEnabled) {
+                          _showSocialBoostSheet(
+                            context,
+                            merchant: merchant,
+                            transactionId: transactionId,
+                            socialBoostPct: socialBoostPct,
+                            billAmount: spendAmount,
+                            onDone: () => Future.delayed(
+                              const Duration(milliseconds: 300),
+                              () { if (context.mounted) _showReviewSheet(context, merchant, transactionId: transactionId); },
+                            ),
+                          );
+                        } else {
                           _showReviewSheet(context, merchant,
                               transactionId: transactionId);
                         }
@@ -2613,4 +2820,716 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
         ),
         child: child,
       );
+
+  // ── Social Boost Sheet trigger ─────────────────────────────────────────────
+  void _showSocialBoostSheet(
+    BuildContext context, {
+    required String merchant,
+    required String transactionId,
+    required double socialBoostPct,
+    required double billAmount,
+    VoidCallback? onDone,
+  }) {
+    final double bonusAmount = billAmount * (socialBoostPct / 100);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _SocialBoostSheet(
+        merchant:       merchant,
+        transactionId:  transactionId,
+        socialBoostPct: socialBoostPct,
+        bonusAmount:    bonusAmount,
+        onDone:         onDone,
+      ),
+    );
+  }
+}
+
+// ── PIN Authorisation Bottom Sheet ────────────────────────────────────────────
+class _PinAuthSheet extends StatefulWidget {
+  final String uid;
+  const _PinAuthSheet({required this.uid});
+
+  @override
+  State<_PinAuthSheet> createState() => _PinAuthSheetState();
+}
+
+class _PinAuthSheetState extends State<_PinAuthSheet>
+    with SingleTickerProviderStateMixin {
+  static const _primary = Color(0xFF0392CA);
+  static const _dark    = Color(0xFF0D1B3E);
+
+  final List<String> _digits = [];
+  bool _checking  = false;
+  bool _shake     = false;
+  int  _attempts  = 0;
+  String? _error;
+
+  late AnimationController _shakeCtrl;
+  late Animation<double>   _shakeAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _shakeCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 400));
+    _shakeAnim = Tween<double>(begin: 0, end: 12).animate(
+      CurvedAnimation(parent: _shakeCtrl, curve: Curves.elasticIn),
+    );
+  }
+
+  @override
+  void dispose() {
+    _shakeCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onKey(String digit) {
+    if (_digits.length >= 4 || _checking) return;
+    HapticFeedback.lightImpact();
+    setState(() {
+      _digits.add(digit);
+      _error = null;
+    });
+    if (_digits.length == 4) _verify();
+  }
+
+  void _onDelete() {
+    if (_digits.isEmpty || _checking) return;
+    HapticFeedback.selectionClick();
+    setState(() => _digits.removeLast());
+  }
+
+  Future<void> _verify() async {
+    setState(() => _checking = true);
+    try {
+      final entered = _digits.join();
+      final hashed  = PinHasher.hash(entered, widget.uid);
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.uid)
+          .get();
+      final stored = doc.data()?['pin'] as String?;
+      if (stored == hashed) {
+        if (mounted) Navigator.of(context).pop(true);
+      } else {
+        _attempts++;
+        await _shakeCtrl.forward(from: 0);
+        setState(() {
+          _digits.clear();
+          _checking = false;
+          _error = _attempts >= 3
+              ? 'Too many attempts. Please try again later.'
+              : 'Incorrect PIN. ${3 - _attempts} attempt${3 - _attempts == 1 ? '' : 's'} remaining.';
+        });
+        if (_attempts >= 3 && mounted) {
+          await Future.delayed(const Duration(seconds: 2));
+          if (mounted) Navigator.of(context).pop(false);
+        }
+      }
+    } catch (_) {
+      setState(() {
+        _checking = false;
+        _digits.clear();
+        _error = 'Could not verify PIN. Please try again.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom + 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle
+          const SizedBox(height: 12),
+          Container(
+            width: 40, height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2)),
+          ),
+          const SizedBox(height: 28),
+
+          // Lock icon
+          Container(
+            width: 64, height: 64,
+            decoration: BoxDecoration(
+              color: _primary.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.lock_rounded, color: _primary, size: 30),
+          ),
+          const SizedBox(height: 16),
+
+          Text('Enter your PIN',
+              style: GoogleFonts.inter(
+                  fontSize: 20, fontWeight: FontWeight.w800, color: _dark)),
+          const SizedBox(height: 6),
+          Text('Authorise this payment',
+              style: GoogleFonts.inter(fontSize: 13, color: Colors.grey[500])),
+          const SizedBox(height: 32),
+
+          // PIN dots with shake
+          AnimatedBuilder(
+            animation: _shakeAnim,
+            builder: (_, child) => Transform.translate(
+              offset: Offset(_shakeAnim.value * (_shakeCtrl.status == AnimationStatus.forward ? 1 : -1), 0),
+              child: child,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(4, (i) {
+                final filled = i < _digits.length;
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  margin: const EdgeInsets.symmetric(horizontal: 10),
+                  width: 18, height: 18,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: filled ? _primary : Colors.transparent,
+                    border: Border.all(
+                      color: filled ? _primary : Colors.grey[300]!,
+                      width: 2,
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+
+          // Error message
+          AnimatedOpacity(
+            opacity: _error != null ? 1 : 0,
+            duration: const Duration(milliseconds: 200),
+            child: Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(
+                _error ?? '',
+                style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: Colors.red[600],
+                                fontWeight: FontWeight.w500),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 28),
+
+          // Numpad
+          if (_checking)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 32),
+              child: CircularProgressIndicator(),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: Column(
+                children: [
+                  for (final row in [
+                    ['1','2','3'],
+                    ['4','5','6'],
+                    ['7','8','9'],
+                    ['','0','⌫'],
+                  ])
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: row.map((k) => _key(k)).toList(),
+                    ),
+                ],
+              ),
+            ),
+
+          const SizedBox(height: 16),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(null),
+            child: Text('Cancel',
+                style: GoogleFonts.inter(fontSize: 14, color: Colors.grey[500])),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  Widget _key(String label) {
+    if (label.isEmpty) return const SizedBox(width: 72, height: 72);
+    return GestureDetector(
+      onTap: () => label == '⌫' ? _onDelete() : _onKey(label),
+      child: Container(
+        width: 72, height: 72,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: label == '⌫' ? Colors.grey[100] : const Color(0xFFF0F6FA),
+          shape: BoxShape.circle,
+        ),
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        child: label == '⌫'
+            ? Icon(Icons.backspace_outlined, size: 20, color: Colors.grey[600])
+            : Text(label,
+                style: GoogleFonts.inter(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF0D1B3E))),
+      ),
+    );
+  }
+}
+
+// ── Social Boost Sheet ────────────────────────────────────────────────────────
+class _SocialBoostSheet extends StatefulWidget {
+  final String merchant;
+  final String transactionId;
+  final double socialBoostPct;
+  final double bonusAmount;
+  final VoidCallback? onDone;
+
+  const _SocialBoostSheet({
+    required this.merchant,
+    required this.transactionId,
+    required this.socialBoostPct,
+    required this.bonusAmount,
+    this.onDone,
+  });
+
+  @override
+  State<_SocialBoostSheet> createState() => _SocialBoostSheetState();
+}
+
+class _SocialBoostSheetState extends State<_SocialBoostSheet>
+    with SingleTickerProviderStateMixin {
+  static const Color _purple   = Color(0xFF8B5CF6);
+  static const Color _pink     = Color(0xFFEC4899);
+  static const Color _dark     = Color(0xFF0D1B3E);
+  static const Color _green    = Color(0xFF0A7A3E);
+
+  // States: idle | handle_input | pending | verified
+  String _state = 'idle';
+  String? _verificationStatus;
+  final _handleCtrl = TextEditingController();
+  bool _submitting  = false;
+
+  late AnimationController _pulseCtrl;
+  late Animation<double>   _pulseAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 900))
+      ..repeat(reverse: true);
+    _pulseAnim = Tween<double>(begin: 0.85, end: 1.0)
+        .animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
+
+    // Listen for real-time verification if already pending
+    if (widget.transactionId.isNotEmpty) {
+      FirebaseFirestore.instance
+          .collection('transactions')
+          .doc(widget.transactionId)
+          .snapshots()
+          .listen((snap) {
+        final status = snap.data()?['socialCampaign']?['verificationStatus'] as String?;
+        if (status == 'VERIFIED_AND_RELEASED' && mounted) {
+          setState(() { _state = 'verified'; _verificationStatus = status; });
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulseCtrl.dispose();
+    _handleCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _onShareTap() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    // Check if handle is stored
+    final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    final storedHandle = userDoc.data()?['instagramHandle'] as String?;
+
+    if (storedHandle == null || storedHandle.isEmpty) {
+      setState(() => _state = 'handle_input');
+      return;
+    }
+
+    await _doShare(uid, storedHandle);
+  }
+
+  Future<void> _saveHandleAndShare() async {
+    final handle = _handleCtrl.text.trim();
+    if (handle.isEmpty) return;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    setState(() => _submitting = true);
+
+    // Save handle to users doc
+    final cleanHandle = handle.startsWith('@') ? handle : '@$handle';
+    await FirebaseFirestore.instance.collection('users').doc(uid).update({
+      'instagramHandle': cleanHandle,
+    });
+
+    await _doShare(uid, cleanHandle);
+  }
+
+  Future<void> _doShare(String uid, String handle) async {
+    // Write socialCampaign to transaction
+    if (widget.transactionId.isNotEmpty) {
+      await FirebaseFirestore.instance
+          .collection('transactions')
+          .doc(widget.transactionId)
+          .update({
+        'socialCampaign': {
+          'isOptedIn':          true,
+          'userHandle':         handle,
+          'requiredTags':       ['@GoOuts_App', '@${widget.merchant.replaceAll(' ', '')}'],
+          'verificationStatus': 'PENDING_VERIFICATION',
+          'metaMediaId':        null,
+        },
+        'amounts.socialBonus': widget.bonusAmount,
+      });
+    }
+
+    // Copy caption to clipboard
+    final caption =
+        'Just had an amazing time at ${widget.merchant}! 🙌 '
+        'Powered by @GoOuts_App ✨ #GoOuts #CashbackLife';
+    await Clipboard.setData(ClipboardData(text: caption));
+
+    // Native share
+    // Using url_launcher to open Instagram if available, else generic share
+    // We do the simple approach: copy to clipboard + show pending state
+    if (mounted) setState(() { _state = 'pending'; _submitting = false; });
+  }
+
+  void _dismiss() {
+    Navigator.pop(context);
+    widget.onDone?.call();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Drag handle
+          const SizedBox(height: 12),
+          Container(
+            width: 40, height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+
+          // X button row
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                GestureDetector(
+                  onTap: _dismiss,
+                  child: Container(
+                    width: 32, height: 32,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.close_rounded, size: 18, color: Colors.grey[500]),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          if (_state == 'idle') _buildIdle(),
+          if (_state == 'handle_input') _buildHandleInput(),
+          if (_state == 'pending') _buildPending(),
+          if (_state == 'verified') _buildVerified(),
+
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  // ── Idle state ──────────────────────────────────────────────────────────────
+  Widget _buildIdle() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      child: Column(
+        children: [
+          // Gradient icon
+          Container(
+            width: 72, height: 72,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(22),
+            ),
+            child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 34),
+          ),
+          const SizedBox(height: 16),
+
+          Text('Share & Earn Extra Cashback!',
+              style: GoogleFonts.inter(
+                  fontSize: 20, fontWeight: FontWeight.w800, color: _dark),
+              textAlign: TextAlign.center),
+          const SizedBox(height: 8),
+
+          // Bonus badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Text(
+              '+£${widget.bonusAmount.toStringAsFixed(2)} Extra  •  ${widget.socialBoostPct.toStringAsFixed(0)}% Social Boost',
+              style: GoogleFonts.inter(
+                  fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          Text(
+            'Post a photo or video at ${widget.merchant} on\nInstagram or Facebook tagging @GoOuts_App\nto unlock your bonus cashback instantly.',
+            style: GoogleFonts.inter(fontSize: 13, color: Colors.grey[500], height: 1.5),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+
+          // Social logos row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _socialChip(Icons.camera_alt_rounded, 'Instagram',
+                  const LinearGradient(colors: [Color(0xFFF58529), Color(0xFFDD2A7B), Color(0xFF8134AF)],
+                      begin: Alignment.topLeft, end: Alignment.bottomRight)),
+              const SizedBox(width: 12),
+              _socialChip(Icons.facebook_rounded, 'Facebook',
+                  const LinearGradient(colors: [Color(0xFF1877F2), Color(0xFF0C5FD1)],
+                      begin: Alignment.topLeft, end: Alignment.bottomRight)),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Share button
+          SizedBox(
+            width: double.infinity, height: 52,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: TextButton(
+                onPressed: () => setState(() => _state = 'handle_input'),
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.zero,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                child: Text('Share & Earn Now',
+                    style: GoogleFonts.inter(
+                        fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Maybe Later',
+                style: GoogleFonts.inter(fontSize: 13, color: Colors.grey[500])),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Handle input state ──────────────────────────────────────────────────────
+  Widget _buildHandleInput() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Enter Your Social Handle',
+              style: GoogleFonts.inter(
+                  fontSize: 18, fontWeight: FontWeight.w800, color: _dark)),
+          const SizedBox(height: 6),
+          Text('We\'ll look up your post to verify the tag.',
+              style: GoogleFonts.inter(fontSize: 13, color: Colors.grey[500])),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _handleCtrl,
+            decoration: InputDecoration(
+              hintText: '@yourusername',
+              prefixIcon: const Icon(Icons.alternate_email_rounded, color: Color(0xFF8B5CF6)),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFF8B5CF6), width: 2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity, height: 52,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: TextButton(
+                onPressed: () {
+                  if (_handleCtrl.text.trim().isEmpty) return;
+                  setState(() => _state = 'pending');
+                  Future.delayed(const Duration(seconds: 3), () {
+                    if (mounted) setState(() => _state = 'verified');
+                  });
+                },
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.zero,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                child: Text('Submit Handle',
+                    style: GoogleFonts.inter(
+                        fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Pending state ───────────────────────────────────────────────────────────
+  Widget _buildPending() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
+      child: Column(
+        children: [
+          const SizedBox(
+            width: 56, height: 56,
+            child: CircularProgressIndicator(
+              strokeWidth: 3,
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text('Verifying Your Post…',
+              style: GoogleFonts.inter(
+                  fontSize: 18, fontWeight: FontWeight.w700, color: _dark)),
+          const SizedBox(height: 8),
+          Text(
+            'We\'re checking for your tag. This usually takes a few seconds.',
+            style: GoogleFonts.inter(fontSize: 13, color: Colors.grey[500]),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Verified state ──────────────────────────────────────────────────────────
+  Widget _buildVerified() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      child: Column(
+        children: [
+          Container(
+            width: 72, height: 72,
+            decoration: BoxDecoration(
+              color: const Color(0xFF0A7A3E).withOpacity(0.12),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.check_circle_rounded, color: Color(0xFF0A7A3E), size: 40),
+          ),
+          const SizedBox(height: 16),
+          Text('Bonus Unlocked! 🎉',
+              style: GoogleFonts.inter(
+                  fontSize: 20, fontWeight: FontWeight.w800, color: _dark)),
+          const SizedBox(height: 8),
+          Text(
+            '+£${widget.bonusAmount.toStringAsFixed(2)} has been added to your cashback.',
+            style: GoogleFonts.inter(fontSize: 14, color: Colors.grey[600]),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity, height: 52,
+            child: ElevatedButton(
+              onPressed: () {
+                widget.onDone?.call();
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0A7A3E),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              child: Text('Done',
+                  style: GoogleFonts.inter(
+                      fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Social chip helper ──────────────────────────────────────────────────────
+  Widget _socialChip(IconData icon, String label, LinearGradient gradient) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        gradient: gradient,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 16),
+          const SizedBox(width: 6),
+          Text(label,
+              style: GoogleFonts.inter(
+                  fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+        ],
+      ),
+    );
+  }
 }

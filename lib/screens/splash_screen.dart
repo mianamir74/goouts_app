@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/user_service.dart';
+import '../services/biometric_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -44,7 +45,25 @@ class _SplashScreenState extends State<SplashScreen>
         final exists = await UserService().userProfileExists();
         if (!mounted) return;
         if (exists) {
-          Navigator.pushReplacementNamed(context, '/home');
+          // Check if user completed onboarding (link card, bonus screen, etc.)
+          final profile = await UserService().getCurrentUser();
+          if (!mounted) return;
+          // null = existing user before this flag was added → treat as done
+          // false = explicitly mid-onboarding (new registrations only)
+          final onboardingComplete = profile?['onboardingComplete'];
+          if (onboardingComplete == false) {
+            // Crashed or closed mid-onboarding — resume from safe point
+            Navigator.pushReplacementNamed(context, '/registration-success');
+          } else {
+            // Check biometric lock
+            final biometricEnabled = await BiometricService.instance.isEnabled();
+            if (!mounted) return;
+            if (biometricEnabled) {
+              Navigator.pushReplacementNamed(context, '/biometric-lock');
+            } else {
+              Navigator.pushReplacementNamed(context, '/home');
+            }
+          }
         } else {
           Navigator.pushReplacementNamed(context, '/create-profile');
         }

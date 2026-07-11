@@ -88,69 +88,17 @@ class MessageService {
 
       final samples = [
         {
-          'title': 'Security Alert',
+          'title': 'Welcome to GoOuts! 🎉',
           'body':
-              'A new login was detected on your GoOuts account from a new device. If this was not you, please change your PIN immediately from Profile → Security.',
-          'category': 'security',
-          'urgent': true,
-          'isRead': false,
-          'read': false,
-          'seen': false,
-          'imageUrl': null,
-          'createdAt': Timestamp.fromDate(now.subtract(const Duration(hours: 1))),
-          'updatedAt': Timestamp.fromDate(now.subtract(const Duration(hours: 1))),
-        },
-        {
-          'title': 'Weekend Cashback Special',
-          'body':
-              'Earn double cashback at all partner restaurants this weekend only. Valid Saturday and Sunday — visit any GoOuts partner and scan to earn!',
-          'category': 'offers',
-          'urgent': false,
-          'isRead': false,
-          'read': false,
-          'seen': false,
-          'imageUrl': null,
-          'createdAt': Timestamp.fromDate(now.subtract(const Duration(hours: 4))),
-          'updatedAt': Timestamp.fromDate(now.subtract(const Duration(hours: 4))),
-        },
-        {
-          'title': 'Exclusive Partner Offer',
-          'body':
-              'Burger Palace is offering 20% extra cashback today only. Visit in-store and scan your GoOuts QR code to redeem. Offer expires midnight tonight.',
-          'category': 'offers',
-          'urgent': false,
-          'isRead': false,
-          'read': false,
-          'seen': false,
-          'imageUrl': null,
-          'createdAt': Timestamp.fromDate(now.subtract(const Duration(days: 1))),
-          'updatedAt': Timestamp.fromDate(now.subtract(const Duration(days: 1))),
-        },
-        {
-          'title': 'New Feature: Pending Reviews',
-          'body':
-              'You can now leave reviews directly from your Transaction History screen. Earn 2 reward points for every review you submit — check the Reviews tab.',
+              'Your account is set up and ready to go. Start earning cashback at participating partners near you — just scan, tap, and earn. Enjoy GoOuts!',
           'category': 'updates',
           'urgent': false,
           'isRead': false,
           'read': false,
           'seen': false,
           'imageUrl': null,
-          'createdAt': Timestamp.fromDate(now.subtract(const Duration(days: 2))),
-          'updatedAt': Timestamp.fromDate(now.subtract(const Duration(days: 2))),
-        },
-        {
-          'title': 'Scheduled Maintenance',
-          'body':
-              'GoOuts services will undergo scheduled maintenance this Sunday between 2 AM and 4 AM. Some features may be briefly unavailable during this window.',
-          'category': 'updates',
-          'urgent': false,
-          'isRead': false,
-          'read': false,
-          'seen': false,
-          'imageUrl': null,
-          'createdAt': Timestamp.fromDate(now.subtract(const Duration(days: 3))),
-          'updatedAt': Timestamp.fromDate(now.subtract(const Duration(days: 3))),
+          'createdAt': Timestamp.fromDate(now),
+          'updatedAt': Timestamp.fromDate(now),
         },
       ];
 
@@ -159,6 +107,28 @@ class MessageService {
       }
       await batch.commit();
     } catch (_) {}
+  }
+
+  /// Live stream of unread message count from users/{uid}/messages.
+  Stream<int> unreadCountStream() {
+    final inbox = _inbox;
+    if (inbox == null) return Stream.value(0);
+    return inbox.snapshots().map(
+          (s) => s.docs.where((d) => isUnread(d.data())).length,
+        );
+  }
+
+  /// Live stream of unread notification count from users/{uid}/notifications.
+  Stream<int> unreadNotificationsStream() {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return Stream.value(0);
+    return _db
+        .collection('users')
+        .doc(uid)
+        .collection('notifications')
+        .where('isRead', isEqualTo: false)
+        .snapshots()
+        .map((s) => s.docs.length);
   }
 
   /// Check if a message map is unread

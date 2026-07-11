@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/user_service.dart';
 import '../services/address_lookup_service.dart';
+import '../services/referral_service.dart';
 
 class CreateProfileExpandedScreen extends StatefulWidget {
   const CreateProfileExpandedScreen({super.key});
@@ -23,8 +25,9 @@ class _CreateProfileExpandedScreenState
   final _dobController = TextEditingController();
   final _pinController = TextEditingController();
   final _postcodeController = TextEditingController();
-  final _address1Controller = TextEditingController();
-  final _address2Controller = TextEditingController();
+  final _houseNoController = TextEditingController();
+  final _streetNameController = TextEditingController();
+  final _townController = TextEditingController();
   final _cityController = TextEditingController();
 
   // ── State ──────────────────────────────────────────────────────────────────
@@ -34,9 +37,7 @@ class _CreateProfileExpandedScreenState
   bool _termsAccepted = false;
   bool _isSubmitting = false;
   bool _isLookingUp = false;
-  // ignore: unused_field
-  bool _addressVerified = false;
-  bool _addressFieldsLocked = false;
+  bool _isPostcodeVerified = false;
   bool _showManualEntryHint = false;
   String _selectedCountry = 'United Kingdom';
   String _selectedPrefix = 'Mr';
@@ -44,8 +45,16 @@ class _CreateProfileExpandedScreenState
   static const List<String> _prefixOptions = [
     'Mr', 'Mrs', 'Miss', 'Ms', 'Dr', 'Prof', 'Sir', 'Rev', 'Other',
   ];
-  final _userService = UserService();
-  final _addressService = AddressLookupService();
+  final _userService      = UserService();
+  final _addressService   = AddressLookupService();
+  final _referralService  = ReferralService();
+  final _inviteCodeController = TextEditingController();
+  String? _referrerUid;
+  bool   _checkingCode = false;
+  bool   _codeValid    = false;
+
+  String? _termsFromDb;
+  String? _privacyFromDb;
 
   static const Color _primary = Color(0xFF0392CA);
   static const Color _dark = Color(0xFF0D1B3E);
@@ -77,15 +86,40 @@ class _CreateProfileExpandedScreenState
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _loadLegalContent();
+  }
+
+  Future<void> _loadLegalContent() async {
+    try {
+      final results = await Future.wait([
+        FirebaseFirestore.instance.collection('content_pages').doc('terms_conditions').get(),
+        FirebaseFirestore.instance.collection('content_pages').doc('privacy_policy').get(),
+      ]);
+      final terms = results[0].data()?['content'] as String?;
+      final privacy = results[1].data()?['content'] as String?;
+      if (mounted) {
+        setState(() {
+          if (terms != null && terms.trim().isNotEmpty) _termsFromDb = terms;
+          if (privacy != null && privacy.trim().isNotEmpty) _privacyFromDb = privacy;
+        });
+      }
+    } catch (_) {}
+  }
+
+  @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
     _dobController.dispose();
     _pinController.dispose();
     _postcodeController.dispose();
-    _address1Controller.dispose();
-    _address2Controller.dispose();
+    _houseNoController.dispose();
+    _streetNameController.dispose();
+    _townController.dispose();
     _cityController.dispose();
+    _inviteCodeController.dispose();
     super.dispose();
   }
 
@@ -186,150 +220,70 @@ class _CreateProfileExpandedScreenState
     }
     setState(() => _isLookingUp = true);
 
-    final results = await _addressService.findAddressesAtPostcode(postcode);
+    final result = await _addressService.validatePostcode(postcode);
     setState(() => _isLookingUp = false);
 
     if (!mounted) return;
 
-    if (results.isEmpty) {
+    if (result == null) {
       setState(() {
+        _isPostcodeVerified = false;
         _showManualEntryHint = true;
-        _addressFieldsLocked = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No addresses found. Please enter your address manually below.'),
+          content: Text('Postcode not found. Please check and try again, or enter your address manually.'),
           duration: Duration(seconds: 3),
         ),
       );
       return;
     }
 
-    // Show bottom sheet with address list
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.7,
-        ),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Handle
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Container(
-                width: 40, height: 4,
-                decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2)),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-              child: Row(
-                children: [
-                  const Icon(Icons.location_on_rounded,
-                      color: _primary, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${results.length} addresses found',
-                    style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: _dark),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            Flexible(
-              child: ListView.separated(
-                shrinkWrap: true,
-                itemCount: results.length,
-                separatorBuilder: (_, __) =>
-                    Divider(height: 1, color: Colors.grey[100]),
-                itemBuilder: (_, i) {
-                  final addr = results[i];
-                  return ListTile(
-                    leading: const Icon(Icons.home_outlined,
-                        color: Colors.grey, size: 20),
-                    title: Text(
-                      addr.fullAddress,
-                      style: GoogleFonts.inter(
-                          fontSize: 14, color: _dark),
-                    ),
-                    onTap: () {
-                      Navigator.pop(context);
-                      setState(() {
-                        final building = addr.subBuildingName.isNotEmpty
-                            ? '${addr.subBuildingName}, ${addr.resolvedBuildingRef}'
-                            : addr.resolvedBuildingRef;
-                        _address1Controller.text =
-                            '$building ${addr.thoroughfareName}'.trim();
-                        _address2Controller.text = addr.dependentLocality;
-                        _cityController.text = addr.postTown;
-                        _postcodeController.text = addr.postcode;
-                        _selectedCountry = 'United Kingdom';
-                        _addressVerified = true;
-                        _addressFieldsLocked = true;
-                        _showManualEntryHint = false;
-                      });
-                    },
-                  );
-                },
-              ),
-            ),
-            // "My address is not in this list" button
-            const Divider(height: 1),
-            TextButton.icon(
-              onPressed: () {
-                Navigator.pop(context);
-                setState(() {
-                  _addressFieldsLocked = false;
-                  _showManualEntryHint = true;
-                  _addressVerified = false;
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please enter your address manually below.'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.edit_outlined, size: 16, color: _primary),
-              label: Text(
-                'My address is not in this list',
-                style: GoogleFonts.inter(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: _primary,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-          ],
-        ),
-      ),
-    );
+    // Auto-fill town, city and country from Mapbox result
+    final String inferredCity =
+        AddressLookupService.inferCityFromPostcode(postcode) ?? result.city;
+    final String country = AddressLookupService.isNorthernIrelandPostcode(postcode)
+        ? 'Northern Ireland'
+        : 'United Kingdom';
+
+    setState(() {
+      _postcodeController.text = result.postcode;
+      _townController.text = result.city.toUpperCase();
+      _cityController.text = inferredCity;
+      _selectedCountry = _countries.contains(country) ? country : 'United Kingdom';
+      _isPostcodeVerified = true;
+      _showManualEntryHint = false;
+    });
   }
 
-  // ── Handle manual entry ────────────────────────────────────────────────────
-  void _handleEditManually() {
+  // ── Manual entry ──────────────────────────────────────────────────────────
+  void _activateManualMode() {
     setState(() {
-      _addressFieldsLocked = false;
-      _addressVerified = false;
+      _isPostcodeVerified = false;
       _showManualEntryHint = true;
-      _address1Controller.clear();
-      _address2Controller.clear();
+      _houseNoController.clear();
+      _streetNameController.clear();
+      _townController.clear();
       _cityController.clear();
     });
+  }
+
+  // ── Validate invite code ──────────────────────────────────────────────────
+  Future<void> _checkInviteCode() async {
+    final code = _inviteCodeController.text.trim();
+    if (code.isEmpty) {
+      setState(() { _referrerUid = null; _codeValid = false; });
+      return;
+    }
+    setState(() => _checkingCode = true);
+    final uid = await _referralService.getReferrerUid(code);
+    if (mounted) {
+      setState(() {
+        _referrerUid = uid;
+        _codeValid   = uid != null;
+        _checkingCode = false;
+      });
+    }
   }
 
   // ── Register account → save to Firestore ──────────────────────────────────
@@ -343,11 +297,17 @@ class _CreateProfileExpandedScreenState
         dob: _dobController.text.trim(),
         pin: _pinController.text.trim(),
         postcode: _postcodeController.text.trim(),
-        address1: _address1Controller.text.trim(),
-        address2: _address2Controller.text.trim(),
+        houseNo: _houseNoController.text.trim().toUpperCase(),
+        streetName: _streetNameController.text.trim().toUpperCase(),
+        town: _townController.text.trim().toUpperCase(),
         city: _cityController.text.trim(),
         country: _selectedCountry,
       );
+      // If user entered a valid referral code, save referredByUid
+      if (_referrerUid != null) {
+        await _referralService.saveReferredBy(_referrerUid!);
+      }
+
       // Mark this device as having signed up before
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('has_signed_up', true);
@@ -465,7 +425,7 @@ class _CreateProfileExpandedScreenState
                   const SizedBox(height: 14),
 
                   // Full name
-                  _label('Full Name *'),
+                  _label('Legal Full Name *'),
                   const SizedBox(height: 6),
                   TextFormField(
                     controller: _nameController,
@@ -488,20 +448,37 @@ class _CreateProfileExpandedScreenState
                     validator: (v) =>
                         v == null || v.isEmpty ? 'Full name is required' : null,
                     style: _inputStyle(),
-                    decoration: _fieldDec('First Name  Middle Name  Surname'),
+                    decoration: _fieldDec(
+                        'As it appears on your passport or driving licence'),
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(Icons.info_outline_rounded,
-                          size: 12, color: _primary),
-                      const SizedBox(width: 5),
-                      Text(
-                        'Enter your full name exactly as it appears on your ID',
-                        style: GoogleFonts.inter(
-                            fontSize: 11, color: Colors.grey[500]),
-                      ),
-                    ],
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFBEB),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color: const Color(0xFFF59E0B).withOpacity(0.4)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.verified_user_outlined,
+                            size: 14, color: Color(0xFFB45309)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Used to verify your identity — mismatches with your ID may delay your account approval.',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: const Color(0xFF92400E),
+                              height: 1.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
 
                   const SizedBox(height: 14),
@@ -626,155 +603,219 @@ class _CreateProfileExpandedScreenState
                 title: 'Address Details',
                 icon: Icons.location_on_outlined,
                 children: [
-                  // Postcode
+                  // ── 1. Postcode + Look Up ──────────────────────────────
                   _label('Postcode *'),
                   const SizedBox(height: 6),
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
                         child: TextFormField(
                           controller: _postcodeController,
                           textCapitalization: TextCapitalization.characters,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9 ]')),
+                          ],
                           style: _inputStyle(),
-                          decoration: _fieldDec('e.g. SW1A 1AA'),
+                          decoration: _fieldDec('e.g. SW1A 1AA').copyWith(
+                            suffixIcon: _isPostcodeVerified
+                                ? const Icon(Icons.check_circle_rounded,
+                                    color: _green, size: 20)
+                                : null,
+                          ),
+                          validator: (v) => v == null || v.trim().isEmpty
+                              ? 'Postcode is required'
+                              : null,
                         ),
                       ),
                       const SizedBox(width: 10),
-                      ElevatedButton(
-                        onPressed: _isLookingUp ? null : _lookupPostcode,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _primary,
-                          minimumSize: const Size(0, 50),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 14),
-                          elevation: 0,
+                      SizedBox(
+                        height: 50,
+                        child: ElevatedButton.icon(
+                          onPressed: _isLookingUp ? null : _lookupPostcode,
+                          icon: _isLookingUp
+                              ? const SizedBox(
+                                  width: 16, height: 16,
+                                  child: CircularProgressIndicator(
+                                      color: Colors.white, strokeWidth: 2))
+                              : Icon(_isPostcodeVerified
+                                  ? Icons.verified_rounded
+                                  : Icons.search_rounded,
+                                  size: 18),
+                          label: Text(
+                            _isPostcodeVerified ? 'Verified' : 'Look Up',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                                _isPostcodeVerified ? _green : _primary,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            elevation: 0,
+                          ),
                         ),
-                        child: _isLookingUp
-                            ? const SizedBox(
-                                width: 18, height: 18,
-                                child: CircularProgressIndicator(
-                                    color: Colors.white, strokeWidth: 2))
-                            : Text(
-                                'Look up',
-                                style: GoogleFonts.inter(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
-                              ),
                       ),
                     ],
                   ),
 
-                  // Manual entry hint / edit manually link
-                  if (_showManualEntryHint && !_addressFieldsLocked)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.info_outline_rounded,
-                              size: 14, color: _primary),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Enter your address manually below ↓',
-                            style: GoogleFonts.inter(
-                                fontSize: 12,
-                                color: _primary,
-                                fontWeight: FontWeight.w600),
-                          ),
-                        ],
+                  // Status banners
+                  if (_isPostcodeVerified) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: _green.withOpacity(0.07),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: _green.withOpacity(0.3)),
                       ),
-                    ),
-
-                  if (_addressFieldsLocked)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Row(
+                      child: const Row(
                         children: [
-                          const Icon(Icons.lock_outline_rounded,
-                              size: 14, color: _green),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Address auto-filled. ',
-                            style: GoogleFonts.inter(
-                                fontSize: 12,
-                                color: _green,
-                                fontWeight: FontWeight.w500),
-                          ),
-                          GestureDetector(
-                            onTap: _handleEditManually,
+                          Icon(Icons.check_circle_outline_rounded,
+                              size: 16, color: _green),
+                          SizedBox(width: 8),
+                          Expanded(
                             child: Text(
-                              'Edit manually',
-                              style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  color: _primary,
-                                  fontWeight: FontWeight.w700,
-                                  decoration: TextDecoration.underline),
+                              'Postcode confirmed — fill in your house number and street below.',
+                              style: TextStyle(
+                                color: _green,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                height: 1.4,
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
+                  ] else if (_showManualEntryHint) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(Icons.info_outline_rounded,
+                            size: 14, color: _primary),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Enter your address manually below ↓',
+                          style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: _primary,
+                              fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ],
 
                   const SizedBox(height: 14),
 
-                  // Address Line 1
-                  _label('Address Line 1 *'),
+                  // ── 2. House / Business No or Name ────────────────────
+                  _label('House / Business No or Name *'),
                   const SizedBox(height: 6),
                   TextFormField(
-                    controller: _address1Controller,
-                    readOnly: _addressFieldsLocked,
+                    controller: _houseNoController,
+                    textCapitalization: TextCapitalization.characters,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9 \-/]')),
+                    ],
                     onChanged: (_) => setState(() {}),
-                    validator: (v) =>
-                        v == null || v.isEmpty ? 'Address is required' : null,
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? 'House / business number or name is required'
+                        : null,
                     style: _inputStyle(),
-                    decoration: _fieldDec('e.g. 123 Example Street').copyWith(
-                      fillColor: _addressFieldsLocked
-                          ? const Color(0xFFE8F5E9)
-                          : const Color(0xFFF0F6FA),
+                    decoration: _fieldDec('e.g. 12 or Flat 3A').copyWith(
+                      suffixIcon: _houseNoController.text.trim().isNotEmpty
+                          ? const Icon(Icons.check_circle_rounded,
+                              color: _green, size: 20)
+                          : null,
                     ),
                   ),
 
                   const SizedBox(height: 14),
 
-                  // Address Line 2
-                  _label('Address Line 2 (Optional)'),
+                  // ── 3. Street / Road Name ─────────────────────────────
+                  _label('Street / Road Name *'),
                   const SizedBox(height: 6),
                   TextFormField(
-                    controller: _address2Controller,
-                    readOnly: _addressFieldsLocked,
+                    controller: _streetNameController,
+                    textCapitalization: TextCapitalization.characters,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9 \-]')),
+                    ],
+                    onChanged: (_) => setState(() {}),
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? 'Street / road name is required'
+                        : null,
                     style: _inputStyle(),
-                    decoration: _fieldDec('Apartment, suite, unit, etc.').copyWith(
-                      fillColor: _addressFieldsLocked
-                          ? const Color(0xFFE8F5E9)
-                          : const Color(0xFFF0F6FA),
+                    decoration: _fieldDec('e.g. HIGH STREET').copyWith(
+                      suffixIcon: _streetNameController.text.trim().isNotEmpty
+                          ? const Icon(Icons.check_circle_rounded,
+                              color: _green, size: 20)
+                          : null,
                     ),
                   ),
 
                   const SizedBox(height: 14),
 
-                  // City
+                  // ── 4. Town (auto-filled from Mapbox) ─────────────────
+                  _label('Town *'),
+                  const SizedBox(height: 6),
+                  TextFormField(
+                    controller: _townController,
+                    textCapitalization: TextCapitalization.characters,
+                    onChanged: (_) => setState(() {}),
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? 'Town is required'
+                        : null,
+                    style: _inputStyle(),
+                    decoration: _fieldDec('e.g. WEMBLEY').copyWith(
+                      helperText: _isPostcodeVerified &&
+                              _townController.text.trim().isNotEmpty
+                          ? 'Auto-filled from postcode'
+                          : null,
+                      helperStyle: GoogleFonts.inter(
+                          fontSize: 11, color: _green),
+                      suffixIcon: _townController.text.trim().isNotEmpty
+                          ? const Icon(Icons.check_circle_rounded,
+                              color: _green, size: 20)
+                          : null,
+                    ),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  // ── 5. City (auto-filled from postcode mapping) ────────
                   _label('City *'),
                   const SizedBox(height: 6),
                   TextFormField(
                     controller: _cityController,
-                    readOnly: _addressFieldsLocked,
+                    textCapitalization: TextCapitalization.words,
                     onChanged: (_) => setState(() {}),
-                    validator: (v) =>
-                        v == null || v.isEmpty ? 'City is required' : null,
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? 'City is required'
+                        : null,
                     style: _inputStyle(),
                     decoration: _fieldDec('e.g. London').copyWith(
-                      fillColor: _addressFieldsLocked
-                          ? const Color(0xFFE8F5E9)
-                          : const Color(0xFFF0F6FA),
+                      helperText: _isPostcodeVerified &&
+                              _cityController.text.trim().isNotEmpty
+                          ? 'Auto-filled from postcode'
+                          : null,
+                      helperStyle: GoogleFonts.inter(
+                          fontSize: 11, color: _green),
+                      suffixIcon: _cityController.text.trim().isNotEmpty
+                          ? const Icon(Icons.check_circle_rounded,
+                              color: _green, size: 20)
+                          : null,
                     ),
                   ),
 
                   const SizedBox(height: 14),
 
-                  // Country dropdown
+                  // ── 6. Country ────────────────────────────────────────
                   _label('Country *'),
                   const SizedBox(height: 6),
                   Container(
@@ -804,6 +845,80 @@ class _CreateProfileExpandedScreenState
                   ),
                 ],
               ),
+
+              const SizedBox(height: 16),
+
+              // ── Invite Code (optional) ─────────────────────────────────
+              _label('Got an invite code?'),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _inviteCodeController,
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. GOAX72KP',
+                        hintStyle: GoogleFonts.inter(fontSize: 13, color: Colors.grey[400]),
+                        prefixIcon: const Icon(Icons.card_giftcard_rounded,
+                            color: Color(0xFF0392CA), size: 18),
+                        suffixIcon: _inviteCodeController.text.isNotEmpty
+                            ? (_checkingCode
+                                ? const Padding(
+                                    padding: EdgeInsets.all(12),
+                                    child: SizedBox(
+                                      width: 16, height: 16,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0392CA)),
+                                    ))
+                                : Icon(
+                                    _codeValid ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                                    color: _codeValid ? Colors.green : Colors.red,
+                                    size: 20,
+                                  ))
+                            : null,
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF0392CA)),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      ),
+                      style: GoogleFonts.inter(
+                          fontSize: 14, fontWeight: FontWeight.w700, letterSpacing: 2),
+                      onChanged: (_) => setState(() { _codeValid = false; _referrerUid = null; }),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  ElevatedButton(
+                    onPressed: _checkingCode ? null : _checkInviteCode,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0392CA),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                    child: Text('Apply', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700)),
+                  ),
+                ],
+              ),
+              if (_codeValid)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text('Invite code applied.',
+                      style: GoogleFonts.inter(fontSize: 12, color: Colors.green[700], fontWeight: FontWeight.w600)),
+                ),
+              if (!_codeValid && _inviteCodeController.text.isNotEmpty && !_checkingCode)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text('Code not found. Check it and try again.',
+                      style: GoogleFonts.inter(fontSize: 12, color: Colors.red[700])),
+                ),
 
               const SizedBox(height: 16),
 
@@ -869,7 +984,7 @@ class _CreateProfileExpandedScreenState
                                 recognizer: TapGestureRecognizer()
                                   ..onTap = () => _showLegalSheet(
                                         title: 'Terms & Conditions',
-                                        content: _termsContent,
+                                        content: _termsFromDb ?? _termsContent,
                                       ),
                               ),
                               const TextSpan(text: ' and '),
@@ -883,7 +998,7 @@ class _CreateProfileExpandedScreenState
                                 recognizer: TapGestureRecognizer()
                                   ..onTap = () => _showLegalSheet(
                                         title: 'Privacy Policy',
-                                        content: _privacyContent,
+                                        content: _privacyFromDb ?? _privacyContent,
                                       ),
                               ),
                               const TextSpan(
@@ -908,7 +1023,7 @@ class _CreateProfileExpandedScreenState
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      'Your details are encrypted and stored securely. GoOuts is FCA regulated.',
+                      'Your details are encrypted and stored securely. Payment services provided by Stripe Payments Europe Ltd (FCA ref: 900461).',
                       style: GoogleFonts.inter(
                           fontSize: 11, color: Colors.grey[500], height: 1.5),
                     ),
@@ -1065,7 +1180,7 @@ Registered in England & Wales
 
 IMPORTANT — PLEASE READ CAREFULLY
 
-By registering for a GoOuts account and ticking the acceptance box, you are entering into a legally binding agreement with GoOuts Limited ("GoOuts", "we", "us", "our"). These Terms govern your use of the GoOuts mobile application, wallet, cashback services, escrow facility, and advance facility. If you do not agree to these Terms in their entirety, you must not register or use our services.
+By registering for a GoOuts account and ticking the acceptance box, you are entering into a legally binding agreement with GoOuts Technologies Limited ("GoOuts", "we", "us", "our"). These Terms govern your use of the GoOuts mobile application, wallet, cashback services, escrow facility, and advance facility. If you do not agree to these Terms in their entirety, you must not register or use our services.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -1113,7 +1228,7 @@ PART 3 — THE GOOUTS WALLET
 
 3.1 The GoOuts Wallet allows you to hold funds, receive Cashback, and make payments at participating Partners.
 
-3.2 Funds held in your Wallet are safeguarded in a segregated client account held with a regulated UK financial institution and are not used for GoOuts' own business purposes.
+3.2 Your GoOuts Wallet is powered by Stripe. Funds you add are held in a Stripe account in your name. GoOuts does not hold your money. Stripe Payments Europe Ltd (FCA ref: 900461) is the authorised payment institution. Payment providers may be updated from time to time; any change will be notified to you in advance.
 
 3.3 You are responsible for maintaining the security of your four-digit PIN and login credentials. GoOuts will never request your PIN via email, telephone, SMS, or any channel other than the app's secure payment confirmation screen.
 
@@ -1320,15 +1435,16 @@ PART 13 — GOVERNING LAW & DISPUTES
 
 CONTACT
 
-GoOuts Limited
+GoOuts Technologies Limited
 support@goouts.co.uk
 disputes@goouts.co.uk
 complaints@goouts.co.uk
 
 Registered in England & Wales
-FCA Reference: [Pending Registration]
+GoOuts Technologies Limited operates as a Technical Service Provider under Schedule 1, Part 2(j) of the UK Payment Services Regulations 2017.
+Payment services provided by Stripe Payments Europe Ltd (FCA ref: 900461).
 
-These Terms were last reviewed and approved by GoOuts Legal, May 2026.
+These Terms were last reviewed and approved by GoOuts Legal, June 2026.
 ''';
 
   static const String _privacyContent = '''

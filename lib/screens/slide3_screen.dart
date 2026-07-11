@@ -83,7 +83,7 @@ class Slide3Screen extends StatelessWidget {
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(
-                  'One-Click Shares',
+                  'One Click Share',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     fontSize: 28,

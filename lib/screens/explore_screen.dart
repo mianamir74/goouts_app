@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/message_service.dart';
 
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
@@ -17,227 +19,175 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  bool _loading = true;
 
-  // ── Categories ──────────────────────────────────────────
-  final List<Map<String, dynamic>> _categories = [
-    {'icon': Icons.coffee_rounded,         'label': 'Cafes',       'route': 'Cafes',       'color': Color(0xFF5C3D1E)},
-    {'icon': Icons.restaurant_rounded,     'label': 'Restaurants', 'route': 'Restaurants', 'color': Color(0xFF3B1F0A)},
-    {'icon': Icons.sports_bar_rounded,     'label': 'Pubs',        'route': 'Pubs',        'color': Color(0xFF1A3A1A)},
-    {'icon': Icons.nightlife_rounded,      'label': 'Clubs',       'route': 'Clubs',       'color': Color(0xFF1A0533)},
-    {'icon': Icons.fastfood_rounded,       'label': 'Fast Food',   'route': 'Fast Food',   'color': Color(0xFF0A2A4A)},
-    {'icon': Icons.music_note_rounded,     'label': 'Music',       'route': 'Music',       'color': Color(0xFF0D3B2E)},
-    {'icon': Icons.theater_comedy_rounded, 'label': 'Comedy',      'route': 'Comedy',      'color': Color(0xFF2C1A08)},
-    {'icon': Icons.local_bar_rounded,      'label': 'Bars',        'route': 'Clubs',       'color': Color(0xFF0A3A4A)},
-  ];
+  // ── Category icon / colour lookup (covers all known names + any new ones fall back) ──
+  static const _catColors = <String, Color>{
+    'Cafes':       Color(0xFF5C3D1E),
+    'Restaurants': Color(0xFF3B1F0A),
+    'Pubs':        Color(0xFF1A3A1A),
+    'Clubs':       Color(0xFF1A0533),
+    'Bars':        Color(0xFF0A3A4A),
+    'Fast Food':   Color(0xFF0A2A4A),
+    'Music':       Color(0xFF0D3B2E),
+    'Comedy':      Color(0xFF2C1A08),
+    'Retail':      Color(0xFF0A2A2A),
+    'Gyms':        Color(0xFF1A2A1A),
+  };
+  static const _catIcons = <String, IconData>{
+    'Cafes':       Icons.coffee_rounded,
+    'Restaurants': Icons.restaurant_rounded,
+    'Pubs':        Icons.sports_bar_rounded,
+    'Clubs':       Icons.nightlife_rounded,
+    'Bars':        Icons.local_bar_rounded,
+    'Fast Food':   Icons.fastfood_rounded,
+    'Music':       Icons.music_note_rounded,
+    'Comedy':      Icons.theater_comedy_rounded,
+    'Retail':      Icons.shopping_bag_rounded,
+    'Gyms':        Icons.fitness_center_rounded,
+  };
+  static const Color _defaultCatColor = Color(0xFF0392CA);
+  static const IconData _defaultCatIcon = Icons.storefront_rounded;
 
-  // ── Near You (mixed, curated) ────────────────────────────
-  final List<Map<String, dynamic>> _nearYou = [
-    {
-      'name': 'Monmouth Coffee Co.',
-      'category': 'Café',
-      'cashback': '12%',
-      'rating': '4.9',
-      'distance': '0.3 mi',
-      'color': Color(0xFF5C3D1E),
-      'icon': Icons.coffee_rounded,
-      'imageUrl': 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400&q=75',
-      'address': '2 Park St, Borough Market, SE1 9AB',
-      'visits': '18.4k+ visits',
-      'phone': '020 7232 3010',
-      'cashback_pct': '12%',
-      'type': 'Café',
-      'reviews': '3.1k',
-      'desc': 'One of London\'s most celebrated independent coffee roasters, beloved for its single-origin brews served in a rustic Borough Market setting.',
-    },
-    {
-      'name': 'Dishoom Covent Garden',
-      'category': 'Indian Restaurant',
-      'cashback': '10%',
-      'rating': '4.8',
-      'distance': '0.7 mi',
-      'color': Color(0xFF3B1F0A),
-      'icon': Icons.restaurant_rounded,
-      'imageUrl': 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&q=75',
-      'address': '12 Upper St Martin\'s Lane, WC2H 9FB',
-      'visits': '32.5k+ visits',
-      'phone': '020 7420 9320',
-      'cashback_pct': '10%',
-      'type': 'Restaurant',
-      'reviews': '8.4k',
-      'desc': 'Inspired by the iconic Irani cafés of Bombay, Dishoom serves extraordinary food all day long.',
-    },
-    {
-      'name': 'The Churchill Arms',
-      'category': 'Historic Pub',
-      'cashback': '15%',
-      'rating': '4.8',
-      'distance': '1.1 mi',
-      'color': Color(0xFF1A3A1A),
-      'icon': Icons.sports_bar_rounded,
-      'imageUrl': 'https://images.unsplash.com/photo-1525268323446-0505b6fe7778?w=400&q=75',
-      'address': '119 Kensington Church St, W8 7LN',
-      'visits': '24.6k+ visits',
-      'phone': '020 7727 4242',
-      'cashback_pct': '15%',
-      'type': 'Pub',
-      'reviews': '2.6k',
-      'desc': 'A legendary Kensington pub draped in hanging flower baskets and festive lights.',
-    },
-    {
-      'name': 'Fabric',
-      'category': 'Nightclub',
-      'cashback': '8%',
-      'rating': '4.7',
-      'distance': '1.4 mi',
-      'color': Color(0xFF1A0533),
-      'icon': Icons.nightlife_rounded,
-      'imageUrl': 'https://images.unsplash.com/photo-1566737236500-c8ac43014a67?w=400&q=75',
-      'address': '77a Charterhouse St, Farringdon, EC1M 6HJ',
-      'visits': '42.1k+ visits',
-      'phone': '020 7336 8898',
-      'cashback_pct': '8%',
-      'type': 'Nightclub',
-      'reviews': '5.2k',
-      'desc': 'One of the world\'s most respected nightclubs, a cornerstone of London\'s electronic music scene.',
-    },
-    {
-      'name': 'Sketch',
-      'category': 'Restaurant & Bar',
-      'cashback': '12%',
-      'rating': '4.7',
-      'distance': '1.8 mi',
-      'color': Color(0xFF1C1C2E),
-      'icon': Icons.wine_bar_rounded,
-      'imageUrl': 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&q=75',
-      'address': '9 Conduit St, Mayfair, W1S 2XG',
-      'visits': '14.8k+ visits',
-      'phone': '020 7659 4500',
-      'cashback_pct': '12%',
-      'type': 'Restaurant & Bar',
-      'reviews': '4.9k',
-      'desc': 'A spectacular collection of restaurants and bars housed in an 18th-century Mayfair townhouse.',
-    },
-    {
-      'name': 'Poppies Fish & Chips',
-      'category': 'Fast Food',
-      'cashback': '10%',
-      'rating': '4.6',
-      'distance': '0.9 mi',
-      'color': Color(0xFF0A2A4A),
-      'icon': Icons.fastfood_rounded,
-      'imageUrl': 'https://images.unsplash.com/photo-1585325701956-60dd9c8553bc?w=400&q=75',
-      'address': '6-8 Hanbury St, Spitalfields, E1 6QR',
-      'visits': '11.2k+ visits',
-      'phone': '020 7247 0892',
-      'cashback_pct': '10%',
-      'type': 'Fast Food',
-      'reviews': '2.1k',
-      'desc': 'London\'s most celebrated fish and chips restaurant. Fresh fish, hand-cut chips, classic British seaside food done right.',
-    },
-    {
-      'name': 'Bleecker Burger',
-      'category': 'Fast Food',
-      'cashback': '8%',
-      'rating': '4.7',
-      'distance': '1.2 mi',
-      'color': Color(0xFF0A2A4A),
-      'icon': Icons.fastfood_rounded,
-      'imageUrl': 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&q=75',
-      'address': '3 Bloomberg Arcade, EC4N 8AR',
-      'visits': '9.8k+ visits',
-      'phone': '020 3146 4500',
-      'cashback_pct': '8%',
-      'type': 'Fast Food',
-      'reviews': '1.8k',
-      'desc': 'Award-winning burgers made from dry-aged beef, served in a no-fuss setting in the heart of the City.',
-    },
-  ];
+  // ── Live data from Firestore ────────────────────────────
+  List<Map<String, dynamic>> _categories   = [];
+  List<Map<String, dynamic>> _nearYou      = [];
+  List<Map<String, dynamic>> _topCashback  = [];
+  List<Map<String, dynamic>> _allPartners  = []; // full list for search
 
-  // ── Top Cashback ─────────────────────────────────────────
-  final List<Map<String, dynamic>> _topCashback = [
-    {
-      'name': 'Attendant Coffee',
-      'cashback': '15%',
-      'category': 'Café',
-      'color': Color(0xFF4A2C17),
-      'imageUrl': 'https://images.unsplash.com/photo-1442512595331-e89e73853f31?w=400&q=75',
-      'address': '74 Great Titchfield St, Fitzrovia, W1W 7QP',
-      'visits': '7.3k+ visits',
-      'phone': '020 7580 6089',
-      'cashback_pct': '15%',
-      'type': 'Café',
-      'rating': '4.8',
-      'reviews': '1.9k',
-      'desc': 'A unique café housed in a restored Victorian underground public toilet.',
-    },
-    {
-      'name': 'The Churchill Arms',
-      'cashback': '15%',
-      'category': 'Historic Pub',
-      'color': Color(0xFF1A3A1A),
-      'imageUrl': 'https://images.unsplash.com/photo-1525268323446-0505b6fe7778?w=400&q=75',
-      'address': '119 Kensington Church St, W8 7LN',
-      'visits': '24.6k+ visits',
-      'phone': '020 7727 4242',
-      'cashback_pct': '15%',
-      'type': 'Pub',
-      'rating': '4.8',
-      'reviews': '2.6k',
-      'desc': 'A legendary Kensington pub draped in hanging flower baskets and festive lights.',
-    },
-    {
-      'name': 'Monmouth Coffee Co.',
-      'cashback': '12%',
-      'category': 'Café',
-      'color': Color(0xFF5C3D1E),
-      'imageUrl': 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400&q=75',
-      'address': '2 Park St, Borough Market, SE1 9AB',
-      'visits': '18.4k+ visits',
-      'phone': '020 7232 3010',
-      'cashback_pct': '12%',
-      'type': 'Café',
-      'rating': '4.9',
-      'reviews': '3.1k',
-      'desc': 'One of London\'s most celebrated independent coffee roasters.',
-    },
-    {
-      'name': 'Sketch',
-      'cashback': '12%',
-      'category': 'Restaurant & Bar',
-      'color': Color(0xFF1C1C2E),
-      'imageUrl': 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&q=75',
-      'address': '9 Conduit St, Mayfair, W1S 2XG',
-      'visits': '14.8k+ visits',
-      'phone': '020 7659 4500',
-      'cashback_pct': '12%',
-      'type': 'Restaurant & Bar',
-      'rating': '4.7',
-      'reviews': '4.9k',
-      'desc': 'A spectacular collection of restaurants and bars in a Mayfair townhouse.',
-    },
-  ];
+  // ── initState + Firestore loader ──────────────────────
+  @override
+  void initState() {
+    super.initState();
+    _loadFromFirestore();
+  }
+
+  Future<void> _loadFromFirestore() async {
+    try {
+      final results = await Future.wait([
+        FirebaseFirestore.instance.collection('partner_config').doc('global').get(),
+        FirebaseFirestore.instance
+            .collection('partners')
+            .where('isActive', isEqualTo: true)
+            .get(),
+      ]);
+      final configSnap   = results[0] as DocumentSnapshot;
+      final partnersSnap = results[1] as QuerySnapshot;
+
+      // Categories from Firestore (active only)
+      List<Map<String, dynamic>> cats = [];
+      final rawCats = configSnap.data() != null
+          ? (configSnap.data() as Map<String, dynamic>)['categories']
+          : null;
+      if (rawCats != null) {
+        for (final c in rawCats as List) {
+          final name   = (c is Map ? c['name'] : c).toString();
+          final status = c is Map ? (c['status'] ?? 'active').toString() : 'active';
+          if (status == 'hold') continue;
+          cats.add({
+            'icon':  _catIcons[name]  ?? _defaultCatIcon,
+            'label': name,
+            'route': name,
+            'color': _catColors[name] ?? _defaultCatColor,
+          });
+        }
+      }
+      // Fallback if Firestore empty
+      if (cats.isEmpty) {
+        cats = [
+          {'icon': Icons.coffee_rounded,         'label': 'Cafes',       'route': 'Cafes',       'color': const Color(0xFF5C3D1E)},
+          {'icon': Icons.restaurant_rounded,     'label': 'Restaurants', 'route': 'Restaurants', 'color': const Color(0xFF3B1F0A)},
+          {'icon': Icons.sports_bar_rounded,     'label': 'Pubs',        'route': 'Pubs',        'color': const Color(0xFF1A3A1A)},
+          {'icon': Icons.nightlife_rounded,      'label': 'Clubs',       'route': 'Clubs',       'color': const Color(0xFF1A0533)},
+          {'icon': Icons.fastfood_rounded,       'label': 'Fast Food',   'route': 'Fast Food',   'color': const Color(0xFF0A2A4A)},
+          {'icon': Icons.music_note_rounded,     'label': 'Music',       'route': 'Music',       'color': const Color(0xFF0D3B2E)},
+          {'icon': Icons.theater_comedy_rounded, 'label': 'Comedy',      'route': 'Comedy',      'color': const Color(0xFF2C1A08)},
+          {'icon': Icons.local_bar_rounded,      'label': 'Bars',        'route': 'Bars',        'color': const Color(0xFF0A3A4A)},
+        ];
+      }
+
+      // Partners from Firestore
+      final allCards = partnersSnap.docs
+          .map((d) => _partnerToCard({'id': d.id, ...d.data() as Map<String, dynamic>}))
+          .toList();
+
+      final nearYou = List<Map<String, dynamic>>.from(allCards)
+        ..sort((a, b) => (b['_createdMs'] as int).compareTo(a['_createdMs'] as int));
+      final topCashback = List<Map<String, dynamic>>.from(allCards)
+        ..sort((a, b) => (b['_cashbackNum'] as double).compareTo(a['_cashbackNum'] as double));
+
+      if (mounted) {
+        setState(() {
+          _categories  = cats;
+          _allPartners = allCards;
+          _nearYou     = nearYou.take(6).toList();
+          _topCashback = topCashback.take(5).toList();
+          _loading     = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Map<String, dynamic> _partnerToCard(Map<String, dynamic> doc) {
+    final cat = doc['category']?.toString() ?? '';
+    final pct = (doc['cashbackPercent'] as num?) ?? 0;
+    final ts  = doc['createdAt'];
+    return {
+      ...doc,
+      'imageUrl':    doc['bannerUrl'] ?? '',
+      'cashback':    '${pct.toStringAsFixed(0)}%',
+      'cashback_pct':'${pct.toStringAsFixed(0)}%',
+      'rating':      (doc['rating'] as num?)?.toStringAsFixed(1) ?? '0.0',
+      'distance':    'Nearby',
+      'color':       _catColors[cat] ?? _defaultCatColor,
+      'icon':        _catIcons[cat]  ?? _defaultCatIcon,
+      'type':        cat,
+      'desc':        doc['description'] ?? '',
+      'phone':       doc['phone'] ?? '',
+      'visits':      doc['visits'] ?? '',
+      'reviews':     '',
+      'foodTags':    doc['foodTags'] ?? [],
+      '_createdMs':  ts != null ? (ts as Timestamp).millisecondsSinceEpoch : 0,
+      '_cashbackNum': pct.toDouble(),
+    };
+  }
+
+  // ─────────────────────────────────────────────────────
+  // (hardcoded data removed — all loaded from Firestore)
+  // ─────────────────────────────────────────────────────
+
 
   bool _venueMatchesQuery(Map<String, dynamic> v, String q) {
     final fields = [
-      v['name']     as String? ?? '',
-      v['category'] as String? ?? '',
-      v['type']     as String? ?? '',
-      v['desc']     as String? ?? '',
-      v['address']  as String? ?? '',
+      v['name']        as String? ?? '',
+      v['category']    as String? ?? '',
+      v['type']        as String? ?? '',
+      v['desc']        as String? ?? '',
+      v['address']     as String? ?? '',
+      v['description'] as String? ?? '',
     ];
-    return fields.any((f) => f.toLowerCase().contains(q));
+    if (fields.any((f) => f.toLowerCase().contains(q))) return true;
+    // Also search food tags list
+    final tags = v['foodTags'];
+    if (tags is List) {
+      return tags.any((t) => t.toString().toLowerCase().contains(q));
+    }
+    return false;
   }
 
+  // When searching: search ALL partners, not just the visible 6/5 subsets
   List<Map<String, dynamic>> get _filteredNearYou {
     if (_searchQuery.isEmpty) return _nearYou;
     final q = _searchQuery.toLowerCase();
-    return _nearYou.where((v) => _venueMatchesQuery(v, q)).toList();
+    final source = _allPartners.isNotEmpty ? _allPartners : _nearYou;
+    return source.where((v) => _venueMatchesQuery(v, q)).toList();
   }
 
   List<Map<String, dynamic>> get _filteredTopCashback {
     if (_searchQuery.isEmpty) return _topCashback;
-    final q = _searchQuery.toLowerCase();
-    return _topCashback.where((v) => _venueMatchesQuery(v, q)).toList();
+    return []; // hide top cashback section while searching — results shown in near you
   }
 
   @override
@@ -290,44 +240,53 @@ class _ExploreScreenState extends State<ExploreScreen> {
               ],
             ),
             const Spacer(),
-            GestureDetector(
-              onTap: () => Navigator.pushNamed(context, '/messages'),
-              child: Stack(
-                children: [
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                            color: Colors.black.withOpacity(0.06),
-                            blurRadius: 6)
-                      ],
-                    ),
-                    child: const Icon(Icons.notifications_outlined,
-                        color: Colors.black87, size: 22),
-                  ),
-                  Positioned(
-                    top: 0,
-                    right: 0,
-                    child: Container(
-                      width: 16,
-                      height: 16,
-                      decoration: const BoxDecoration(
-                          color: Colors.red, shape: BoxShape.circle),
-                      child: Center(
-                        child: Text('3',
-                            style: GoogleFonts.inter(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white)),
+            StreamBuilder<int>(
+              stream: MessageService().unreadNotificationsStream(),
+              builder: (context, snap) {
+                final count = snap.data ?? 0;
+                return GestureDetector(
+                  onTap: () => Navigator.pushNamed(context, '/notifications'),
+                  child: Stack(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                                color: Colors.black.withOpacity(0.06),
+                                blurRadius: 6)
+                          ],
+                        ),
+                        child: const Icon(Icons.notifications_outlined,
+                            color: Colors.black87, size: 22),
                       ),
-                    ),
+                      if (count > 0)
+                        Positioned(
+                          top: 0,
+                          right: 0,
+                          child: Container(
+                            width: 16,
+                            height: 16,
+                            decoration: const BoxDecoration(
+                                color: Colors.red, shape: BoxShape.circle),
+                            child: Center(
+                              child: Text(
+                                count > 9 ? '9+' : '$count',
+                                style: GoogleFonts.inter(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                ],
-              ),
+                );
+              },
             ),
           ],
         ),
@@ -378,7 +337,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
       );
 
   // ── Categories grid ──────────────────────────────────────
-  Widget _buildCategories() => Padding(
+  Widget _buildCategories() {
+    if (_loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 40),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -447,6 +413,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
           ],
         ),
       );
+  }
 
   // ── Near You ─────────────────────────────────────────────
   Widget _buildNearYou() => Column(

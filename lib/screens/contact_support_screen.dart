@@ -26,6 +26,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
     {'label': 'Cashback Query',     'value': 'cashback_query'},
     {'label': 'Card Problem',       'value': 'card_problem'},
     {'label': 'KYC / Verification', 'value': 'kyc_verification'},
+    {'label': 'Food Delivery',      'value': 'food_delivery'},
     {'label': 'Other',              'value': 'other'},
   ];
 
@@ -74,6 +75,15 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
       {'label': 'Re-submit Documents',      'icon': 'upload',     'desc': 'I need to upload my documents again'},
       {'label': 'Other Verification Issue', 'icon': 'help',       'desc': 'Another question about verification'},
     ],
+    'food_delivery': [
+      {'label': 'Order Late / Not Arrived',      'icon': 'hourglass',  'desc': 'My food order has not arrived yet'},
+      {'label': 'Wrong Items Delivered',         'icon': 'error',      'desc': 'I received the incorrect items'},
+      {'label': 'Missing Items',                 'icon': 'help',       'desc': 'Some items were missing from my order'},
+      {'label': 'Driver Issue',                  'icon': 'warning',    'desc': 'I had a problem with the delivery driver'},
+      {'label': 'Order Cancelled by Restaurant', 'icon': 'block',      'desc': 'The restaurant cancelled my order'},
+      {'label': 'Refund Not Received',           'icon': 'wallet',     'desc': 'Expected refund not appearing in my wallet'},
+      {'label': 'Other Food Delivery Issue',     'icon': 'help',       'desc': 'Something else about my food delivery'},
+    ],
   };
 
   // ── Icon map ──────────────────────────────────────────────────────────────
@@ -104,6 +114,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
     'face':        Icons.face_rounded,
     'home':        Icons.home_outlined,
     'upload':      Icons.upload_rounded,
+    'delivery':    Icons.delivery_dining_rounded,
   };
 
   // ── State ─────────────────────────────────────────────────────────────────
@@ -113,17 +124,43 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
   Map<String, dynamic>? _selectedCashbackTxn;
   Map<String, dynamic>? _selectedSupportTxn; // for transaction/card/security topics
 
+  // Stores the self-service data fetched — passed as context snapshot to ticket
+  Map<String, dynamic> _lastSelfServiceData = {};
+
   final _subjectCtrl = TextEditingController();
   final _messageCtrl = TextEditingController();
   bool _submitting = false;
   bool _loadingCheck = false;
   String? _errorMsg;
 
+  // Pre-filled from route args (food delivery deep-link)
+  String? _prefilledOrderId;
+  bool _argsInitDone = false;
+
   @override
   void dispose() {
     _subjectCtrl.dispose();
     _messageCtrl.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_argsInitDone) {
+      _argsInitDone = true;
+      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      if (args != null) {
+        final orderId = args['orderId'] as String?;
+        if (orderId != null && orderId.isNotEmpty) {
+          setState(() {
+            _prefilledOrderId = orderId;
+            _selectedTopicValue = 'food_delivery';
+            _selectedTopicLabel = 'Food Delivery';
+          });
+        }
+      }
+    }
   }
 
   // ── Self-service check ────────────────────────────────────────────────────
@@ -140,23 +177,76 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
     setState(() { _loadingCheck = true; _errorMsg = null; });
     final data = await _selfService.fetchForTopic(_selectedTopicValue);
     if (!mounted) return;
-    setState(() { _loadingCheck = false; _selectedCashbackTxn = null; _selectedSupportTxn = null; });
+    setState(() {
+      _loadingCheck = false;
+      _selectedCashbackTxn = null;
+      _selectedSupportTxn = null;
+      _lastSelfServiceData = data; // store for context snapshot
+    });
     _showSelfServiceSheet(data);
   }
 
   // ── Submit ticket ─────────────────────────────────────────────────────────
   Future<void> _submit({String message = ''}) async {
     setState(() { _submitting = true; _errorMsg = null; });
+
+    // Build a clean context snapshot for admin — strip out non-serialisable objects
+    final Map<String, dynamic> snapshot = {};
+    if (_lastSelfServiceData.isNotEmpty) {
+      // Wallet balance
+      if (_lastSelfServiceData['walletBalance'] != null)
+        snapshot['walletBalance'] = _lastSelfServiceData['walletBalance'];
+      // KYC status
+      if (_lastSelfServiceData['kycStatus'] != null)
+        snapshot['kycStatus'] = _lastSelfServiceData['kycStatus'];
+      if (_lastSelfServiceData['kycLabel'] != null)
+        snapshot['kycLabel'] = _lastSelfServiceData['kycLabel'];
+      // Card status
+      if (_lastSelfServiceData['cardStatus'] != null)
+        snapshot['cardStatus'] = _lastSelfServiceData['cardStatus'];
+      // Recent transactions (last 3, id + title + amount + date + status)
+      final txns = (_lastSelfServiceData['transactions'] ??
+                    _lastSelfServiceData['spendingTransactions'] ?? []) as List;
+      if (txns.isNotEmpty) {
+        snapshot['recentTransactions'] = txns.take(3).map((t) => {
+          'id':     t['id']     ?? '',
+          'title':  t['title']  ?? '',
+          'amount': t['amount'] ?? '',
+          'date':   t['date']   ?? '',
+          'status': t['status'] ?? '',
+        }).toList();
+      }
+      // Selected transaction (if user tapped one in the self-service view)
+      final selTxn = _selectedCashbackTxn ?? _selectedSupportTxn;
+      if (selTxn != null) {
+        snapshot['selectedTransaction'] = {
+          'id':     selTxn['id']     ?? '',
+          'title':  selTxn['title']  ?? '',
+          'amount': selTxn['amount'] ?? '',
+          'date':   selTxn['date']   ?? '',
+          'status': selTxn['status'] ?? '',
+        };
+      }
+    }
+
     try {
-      final ticketNumber = await _service.submitTicket(
+      final result = await _service.submitTicket(
         category: _selectedTopicValue,
         categoryLabel: _selectedTopicLabel,
         subject: _selectedSubTopic ?? _selectedTopicLabel,
         message: message,
         subTopic: _selectedSubTopic ?? '',
+        selfServiceAttempted: _lastSelfServiceData.isNotEmpty,
+        contextSnapshot: snapshot,
+        linkedTransactionId: (_selectedCashbackTxn ?? _selectedSupportTxn)?['id'] as String?,
       );
       if (!mounted) return;
-      _showSuccess(ticketNumber);
+      _showSuccess(
+        ticketId:     result['ticketId']     ?? '',
+        ticketNumber: result['ticketNumber'] ?? '',
+        subject:      _selectedSubTopic ?? _selectedTopicLabel,
+        userName:     result['fullName']     ?? '',
+      );
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -167,7 +257,12 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
     }
   }
 
-  void _showSuccess(String ticketNumber) {
+  void _showSuccess({
+    required String ticketId,
+    required String ticketNumber,
+    required String subject,
+    required String userName,
+  }) {
     setState(() => _submitting = false);
     showModalBottomSheet(
       context: context,
@@ -203,21 +298,32 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity, height: 50,
-              child: ElevatedButton(
+              child: ElevatedButton.icon(
                 onPressed: () {
-                  Navigator.pop(context);
-                  Navigator.pushNamed(context, '/support-tickets');
+                  Navigator.pop(context); // close sheet
+                  Navigator.pushNamed(
+                    context,
+                    '/support-ticket-chat',
+                    arguments: {
+                      'ticketId':     ticketId,
+                      'ticketNumber': ticketNumber,
+                      'subject':      subject,
+                      'userName':     userName,
+                    },
+                  );
                 },
+                icon: const Icon(Icons.chat_rounded,
+                    color: Colors.white, size: 18),
+                label: Text('Open My Ticket',
+                    style: GoogleFonts.inter(
+                        fontSize: 15, fontWeight: FontWeight.w700,
+                        color: Colors.white)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _primary,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14)),
                   elevation: 0,
                 ),
-                child: Text('View My Tickets',
-                    style: GoogleFonts.inter(
-                        fontSize: 15, fontWeight: FontWeight.w700,
-                        color: Colors.white)),
               ),
             ),
             const SizedBox(height: 10),
@@ -548,11 +654,12 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
       Map<String, dynamic> data, StateSetter setSheet) {
     final sub = _selectedSubTopic ?? '';
     switch (data['type'] as String? ?? '') {
-      case 'transaction': return _selfServiceTransaction(data, sub, setSheet);
-      case 'cashback':    return _selfServiceCashback(data, setSheet, sub);
-      case 'security':    return _selfServiceSecurity(data, sub, setSheet);
-      case 'card':        return _selfServiceCard(data, sub, setSheet);
-      case 'kyc':         return _selfServiceKyc(data);
+      case 'transaction':    return _selfServiceTransaction(data, sub, setSheet);
+      case 'cashback':       return _selfServiceCashback(data, setSheet, sub);
+      case 'security':       return _selfServiceSecurity(data, sub, setSheet);
+      case 'card':           return _selfServiceCard(data, sub, setSheet);
+      case 'kyc':            return _selfServiceKyc(data);
+      case 'food_delivery':  return _selfServiceFoodDelivery(sub);
       default:
         return _infoTile(Icons.info_outline_rounded, _primary,
             'Tip', 'Fill in the form and our team will assist you shortly.');
@@ -1101,6 +1208,96 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
         _infoTile(Icons.lightbulb_outline_rounded, _teal,
             'Verification Tips',
             'Ensure your ID is a valid government-issued document, not expired, and fully visible. Your selfie must clearly show your face matching the document.'),
+      ],
+    );
+  }
+
+  // ── Food Delivery ────────────────────────────────────────────────────────
+  Widget _selfServiceFoodDelivery(String sub) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_prefilledOrderId != null)
+          Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFD6EEF8),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: _primary.withOpacity(0.3)),
+            ),
+            child: Row(children: [
+              const Icon(Icons.delivery_dining_rounded, color: _primary, size: 18),
+              const SizedBox(width: 10),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Linked Order', style: GoogleFonts.inter(fontSize: 11,
+                    fontWeight: FontWeight.w600, color: Colors.grey[500])),
+                Text('#${_prefilledOrderId!.length > 8 ? _prefilledOrderId!.substring(0, 8).toUpperCase() : _prefilledOrderId!.toUpperCase()}',
+                    style: GoogleFonts.inter(fontSize: 14,
+                        fontWeight: FontWeight.w700, color: _primary)),
+              ])),
+              const Icon(Icons.check_circle_rounded, color: _primary, size: 16),
+            ]),
+          ),
+        if (sub == 'Order Late / Not Arrived') ...[
+          _infoTile(Icons.hourglass_bottom_rounded, Colors.orange, 'Typical Delivery Times',
+              'Most GoOuts deliveries arrive within the estimated time shown on your order tracking screen.
+
+'
+              '• Weather or traffic can cause short delays
+'
+              '• Contact your driver via the in-app chat on the order tracking screen
+'
+              '• If your order shows "Delivered" but you have not received it, submit a ticket below.'),
+          const SizedBox(height: 8),
+          _infoTile(Icons.map_rounded, _teal, 'Check Live Tracking',
+              'Open your order in the GoOuts app to see your driver's live position on the map.'),
+        ] else if (sub == 'Wrong Items Delivered' || sub == 'Missing Items') ...[
+          _infoTile(Icons.restaurant_menu_rounded, Colors.orange, 'What happens next',
+              'If you received incorrect or missing items, we'll arrange a refund or replacement.
+
+'
+              '• Take a photo of the items received (helpful for our team)
+'
+              '• Refunds are credited instantly to your GoOuts wallet
+'
+              '• Submit the ticket below — include details of what was missing or wrong.'),
+          const SizedBox(height: 8),
+          _infoTile(Icons.account_balance_wallet_rounded, _primary, 'Refund Method',
+              'GoOuts refunds food delivery issues directly to your GoOuts wallet — no card reversal needed.'),
+        ] else if (sub == 'Driver Issue') ...[
+          _infoTile(Icons.warning_amber_rounded, Colors.orange, 'Driver Behaviour Concern',
+              'We take driver conduct seriously. Your feedback helps us maintain quality.
+
+'
+              '• If you feel unsafe, contact emergency services first
+'
+              '• Your report will be reviewed by our safety team within 24 hours
+'
+              '• The driver's account will be reviewed and may be suspended.'),
+        ] else if (sub == 'Order Cancelled by Restaurant') ...[
+          _infoTile(Icons.account_balance_wallet_rounded, _primary, 'Automatic Refund',
+              'When a restaurant cancels your order, the full amount including delivery fee is automatically refunded to your GoOuts wallet within minutes.
+
+'
+              'If your wallet has not updated, please allow up to 30 minutes and pull to refresh.'),
+        ] else if (sub == 'Refund Not Received') ...[
+          _infoTile(Icons.account_balance_wallet_rounded, _primary, 'Where Refunds Go',
+              'GoOuts food delivery refunds go to your GoOuts wallet — not back to your bank card.
+
+'
+              '• Open the Wallet screen and pull down to refresh
+'
+              '• Refunds typically appear within 1–5 minutes
+'
+              '• If it has been over 30 minutes, submit a ticket below.'),
+        ] else ...[
+          _infoTile(Icons.delivery_dining_rounded, _primary, 'Food Delivery Support',
+              'Our team is available to help with any food delivery issue. Include as much detail as possible so we can resolve it quickly.'),
+        ],
+        const SizedBox(height: 10),
+        _infoTile(Icons.info_outline_rounded, Colors.grey[600]!, 'Useful tip',
+            'You can also rate your order and report specific issues directly from the Order Tracking screen after delivery.'),
       ],
     );
   }

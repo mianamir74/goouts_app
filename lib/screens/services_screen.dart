@@ -16,14 +16,15 @@ class _ServicesScreenState extends State<ServicesScreen> {
   static const Color _bg = Color(0xFFF2F4F7);
 
   final List<Map<String, dynamic>> _allServices = [
-    {'icon': Icons.coffee_rounded, 'label': 'Cafes'},
-    {'icon': Icons.restaurant_rounded, 'label': 'Restaurants'},
-    {'icon': Icons.nightlife_rounded, 'label': 'Clubs'},
-    {'icon': Icons.sports_bar_rounded, 'label': 'Pubs'},
-    {'icon': Icons.fastfood_rounded, 'label': 'Fast Food'},
-    {'icon': Icons.music_note_rounded, 'label': 'Music'},
-    {'icon': Icons.theater_comedy_rounded, 'label': 'Comedy'},
-    {'icon': Icons.local_bar_rounded, 'label': 'Bars'},
+    {'icon': Icons.delivery_dining_rounded, 'label': 'Food Delivery', 'isNew': true, 'route': '/food-delivery'},
+    {'icon': Icons.coffee_rounded, 'label': 'Cafes', 'isNew': false, 'route': '/nearby'},
+    {'icon': Icons.restaurant_rounded, 'label': 'Restaurants', 'isNew': false, 'route': '/nearby'},
+    {'icon': Icons.nightlife_rounded, 'label': 'Clubs', 'isNew': false, 'route': '/nearby'},
+    {'icon': Icons.sports_bar_rounded, 'label': 'Pubs', 'isNew': false, 'route': '/nearby'},
+    {'icon': Icons.fastfood_rounded, 'label': 'Fast Food', 'isNew': false, 'route': '/nearby'},
+    {'icon': Icons.music_note_rounded, 'label': 'Music', 'isNew': false, 'route': '/nearby'},
+    {'icon': Icons.theater_comedy_rounded, 'label': 'Comedy', 'isNew': false, 'route': '/nearby'},
+    {'icon': Icons.local_bar_rounded, 'label': 'Bars', 'isNew': false, 'route': '/nearby'},
   ];
 
   final List<Map<String, dynamic>> _offers = [
@@ -85,6 +86,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
             const SizedBox(height: 14),
             _buildSearchBar(),
             const SizedBox(height: 20),
+            _buildFoodDeliveryBanner(context),
+            const SizedBox(height: 20),
             _buildSpecialOffers(context),
             const SizedBox(height: 20),
             _buildAllServices(),
@@ -97,6 +100,75 @@ class _ServicesScreenState extends State<ServicesScreen> {
       bottomNavigationBar: _buildBottomNav(),
     );
   }
+
+  Widget _buildFoodDeliveryBanner(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: GestureDetector(
+          onTap: () => Navigator.pushNamed(context, '/food-delivery'),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFEA580C), Color(0xFFF59E0B)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Stack(
+              children: [
+                Positioned(
+                  right: -10,
+                  top: -10,
+                  child: Icon(Icons.delivery_dining_rounded,
+                      size: 110, color: Colors.white.withOpacity(0.12)),
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.25),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text('NEW', style: GoogleFonts.inter(
+                                fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white)),
+                          ),
+                          const SizedBox(height: 8),
+                          Text('GoOuts Food\nDelivery',
+                              style: GoogleFonts.inter(
+                                  fontSize: 22, fontWeight: FontWeight.w800,
+                                  color: Colors.white, height: 1.2)),
+                          const SizedBox(height: 8),
+                          Text('Order from local restaurants.\nFree delivery with Social Boost.',
+                              style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: Colors.white.withOpacity(0.9),
+                                  height: 1.5)),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(Icons.delivery_dining_rounded,
+                          color: Color(0xFFEA580C), size: 36),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
 
   Widget _buildSearchBar() => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -316,26 +388,56 @@ class _ServicesScreenState extends State<ServicesScreen> {
               itemCount: _allServices.length,
               itemBuilder: (context, index) {
                 final s = _allServices[index];
+                final isNew = s['isNew'] as bool;
+                final route = s['route'] as String;
                 return GestureDetector(
-                  onTap: () => Navigator.pushNamed(context, '/nearby', arguments: {'category': s['label']}),
+                  onTap: () => Navigator.pushNamed(context, route,
+                      arguments: {'category': s['label']}),
                   child: Column(
                     children: [
-                      Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE8F4FB),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Icon(s['icon'] as IconData,
-                            color: _primary, size: 26),
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(
+                            width: 60,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              color: isNew
+                                  ? const Color(0xFFFEF3C7)
+                                  : const Color(0xFFE8F4FB),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Icon(s['icon'] as IconData,
+                                color: isNew ? const Color(0xFFEA580C) : _primary,
+                                size: 26),
+                          ),
+                          if (isNew)
+                            Positioned(
+                              top: -6,
+                              right: -6,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEA580C),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text('NEW',
+                                    style: GoogleFonts.inter(
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white)),
+                              ),
+                            ),
+                        ],
                       ),
                       const SizedBox(height: 6),
                       Text(
                         s['label'] as String,
                         textAlign: TextAlign.center,
                         style: GoogleFonts.inter(
-                            fontSize: 11, color: Colors.grey[700]),
+                            fontSize: 11,
+                            color: isNew ? const Color(0xFFEA580C) : Colors.grey[700],
+                            fontWeight: isNew ? FontWeight.w700 : FontWeight.normal),
                       ),
                     ],
                   ),

@@ -1,383 +1,389 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+
+// ─── Design tokens (Stitch) ───────────────────────────────────────────────────
+const Color _primary          = Color(0xFF0392CA);
+const Color _surfaceColor     = Color(0xFFF9F9FC);
+const Color _onSurface        = Color(0xFF191C1E);
+const Color _onSurfaceVariant = Color(0xFF42474E);
+const Color _successGreen     = Color(0xFF0A7A3E);
+const Color _successContainer = Color(0xFFE8F5E9);
 
 class NotificationDetailScreen extends StatelessWidget {
   const NotificationDetailScreen({super.key});
 
-  static const Color _primary = Color(0xFF0392CA);
-  static const Color _dark = Color(0xFF0D1B3E);
-  static const Color _teal = Color(0xFF0A6E8A);
+  // ── Icon/colour helpers ───────────────────────────────────────────────────
+  static IconData _iconFor(String type) {
+    switch (type) {
+      case 'kyc_approved':  return Icons.verified_outlined;
+      case 'kyc_rejected':  return Icons.security_outlined;
+      case 'ticket_reply':  return Icons.chat_outlined;
+      case 'ticket_status': return Icons.support_agent_outlined;
+      case 'cashback':      return Icons.account_balance_wallet_outlined;
+      case 'transaction':   return Icons.receipt_long_outlined;
+      case 'security':      return Icons.shield_outlined;
+      default:              return Icons.notifications_none_outlined;
+    }
+  }
+
+  static Color _iconBgFor(String type) {
+    switch (type) {
+      case 'kyc_approved':  return const Color(0xFFE8F5E9);
+      case 'kyc_rejected':
+      case 'security':      return const Color(0xFFFFEBEE);
+      case 'ticket_reply':
+      case 'cashback':      return const Color(0xFFE1F5FE);
+      case 'ticket_status': return const Color(0xFFEDE7F6);
+      case 'transaction':   return const Color(0xFFF5F5F5);
+      default:              return const Color(0xFFF5F5F5);
+    }
+  }
+
+  static Color _iconColorFor(String type) {
+    switch (type) {
+      case 'kyc_approved':  return _successGreen;
+      case 'kyc_rejected':
+      case 'security':      return const Color(0xFFC62828);
+      case 'ticket_reply':
+      case 'cashback':      return _primary;
+      case 'ticket_status': return const Color(0xFF6A1B9A);
+      default:              return Colors.grey.shade600;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final args =
-        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    final title = args?['title'] as String? ?? 'Cashback Earned';
-    final body = args?['body'] as String? ??
-        'You\'ve received \$12.50 cashback from your last purchase at Starbucks.';
-    final iconData = args?['icon'] as IconData? ??
-        Icons.account_balance_wallet_rounded;
-    final iconBg =
-        args?['iconBg'] as Color? ?? const Color(0xFFD6EEF8);
-    final iconColor = args?['iconColor'] as Color? ?? _primary;
+    final args   = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>? ?? {};
+    final type   = (args['type']  ?? '').toString();
+    final title  = (args['title'] ?? 'Notification').toString();
+    final body   = (args['body']  ?? '').toString();
+    final data   = Map<String, dynamic>.from(args['data'] as Map? ?? {});
+
+    // Extra fields for cashback/transaction
+    final merchant      = (data['merchant']      ?? args['merchant']      ?? '').toString();
+    final transactionId = (data['transactionId'] ?? args['transactionId'] ?? '').toString();
+    final amount        = (data['amount']        ?? args['amount']        ?? '').toString();
+    final category      = (data['category']      ?? args['category']      ?? '').toString();
+    final status        = (data['status']        ?? args['status']        ?? 'Completed').toString();
+    final dateLabel     = (data['dateLabel']     ?? args['dateLabel']     ?? '').toString();
+
+    final icon      = _iconFor(type);
+    final iconBg    = _iconBgFor(type);
+    final iconColor = _iconColorFor(type);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F4F7),
+      backgroundColor: _surfaceColor,
       appBar: AppBar(
         backgroundColor: Colors.white,
-        elevation: 0.5,
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded,
-              color: Colors.black87, size: 24),
-          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back, color: _onSurface),
+          onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text(
-          'Notification Detail',
-          style: GoogleFonts.inter(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: _dark),
-        ),
-        centerTitle: false,
+        centerTitle: true,
+        title: Text('Notification Detail',
+          style: GoogleFonts.inter(fontSize: 20,
+              fontWeight: FontWeight.bold, color: _onSurface)),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.more_vert_rounded,
-                color: Colors.black87, size: 22),
-            onPressed: () {},
-          ),
+          if (transactionId.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.copy_outlined, color: _onSurface, size: 20),
+              tooltip: 'Copy transaction ID',
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: transactionId));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Copied: $transactionId',
+                      style: GoogleFonts.inter()),
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12))),
+                );
+              },
+            ),
+          const SizedBox(width: 8),
         ],
       ),
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 32, 20, 110),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Large icon circle
+                const SizedBox(height: 40),
+
+                // ── Icon header ─────────────────────────────────────────────
                 Container(
-                  width: 80,
-                  height: 80,
+                  width: 100, height: 100,
                   decoration: BoxDecoration(
-                    color: iconBg,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(iconData, color: iconColor, size: 36),
+                      color: iconBg, shape: BoxShape.circle),
+                  child: Icon(icon, color: iconColor, size: 48),
                 ),
+                const SizedBox(height: 32),
 
-                const SizedBox(height: 20),
-
-                // Title
-                Text(
-                  title,
+                Text(title,
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                      color: _dark,
-                      height: 1.3),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  body,
+                  style: GoogleFonts.inter(fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: _onSurface, height: 1.2)),
+                const SizedBox(height: 12),
+
+                Text(body,
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
-                      fontSize: 14,
-                      color: Colors.grey[500],
-                      height: 1.5),
-                ),
+                  style: GoogleFonts.inter(fontSize: 16,
+                      color: _onSurfaceVariant, height: 1.5)),
 
-                const SizedBox(height: 28),
+                const SizedBox(height: 40),
 
-                // Details card
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2))
-                    ],
+                // ── Detail card (shown for cashback / transaction) ──────────
+                if (merchant.isNotEmpty || transactionId.isNotEmpty)
+                  _buildDetailCard(
+                    merchant: merchant,
+                    transactionId: transactionId,
+                    amount: amount,
+                    category: category,
+                    status: status,
+                    dateLabel: dateLabel,
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Merchant + Status row
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('MERCHANT',
-                                    style: GoogleFonts.inter(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.grey[400],
-                                        letterSpacing: 0.6)),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 36,
-                                      height: 36,
-                                      decoration: BoxDecoration(
-                                        color: Colors.green[700],
-                                        borderRadius:
-                                            BorderRadius.circular(8),
-                                      ),
-                                      child: const Icon(Icons.coffee_rounded,
-                                          color: Colors.white, size: 18),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text('Starbucks',
-                                        style: GoogleFonts.inter(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w600,
-                                            color: _dark)),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text('STATUS',
-                                  style: GoogleFonts.inter(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.grey[400],
-                                      letterSpacing: 0.6)),
-                              const SizedBox(height: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color:
-                                      Colors.green.withOpacity(0.1),
-                                  borderRadius:
-                                      BorderRadius.circular(20),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.check_circle_rounded,
-                                        color: Colors.green, size: 13),
-                                    const SizedBox(width: 4),
-                                    Text('Completed',
-                                        style: GoogleFonts.inter(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.green)),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
 
-                      Divider(height: 24, color: Colors.grey[100]),
+                const SizedBox(height: 60),
 
-                      // Date + Transaction ID
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('DATE',
-                                    style: GoogleFonts.inter(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.grey[400],
-                                        letterSpacing: 0.6)),
-                                const SizedBox(height: 6),
-                                Text('Today, 2:15 PM',
-                                    style: GoogleFonts.inter(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                        color: _dark)),
-                              ],
-                            ),
-                          ),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('TRANSACTION ID',
-                                    style: GoogleFonts.inter(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.grey[400],
-                                        letterSpacing: 0.6)),
-                                const SizedBox(height: 6),
-                                Text('TXN-90823412',
-                                    style: GoogleFonts.inter(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                        color: _dark)),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+                // ── Action buttons ──────────────────────────────────────────
+                ..._buildActions(context, type, data),
 
-                      Divider(height: 24, color: Colors.grey[100]),
-
-                      // Category
-                      Text('CATEGORY',
-                          style: GoogleFonts.inter(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey[400],
-                              letterSpacing: 0.6)),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(Icons.coffee_rounded,
-                              color: _primary, size: 18),
-                          const SizedBox(width: 8),
-                          Text('Food & Drink',
-                              style: GoogleFonts.inter(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: _dark)),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+                const SizedBox(height: 100),
               ],
             ),
           ),
-
-          // Bottom buttons
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              color: const Color(0xFFF2F4F7),
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ElevatedButton(
-                    onPressed: () =>
-                        Navigator.pushNamed(context, '/wallet'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _teal,
-                      minimumSize: const Size(double.infinity, 54),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14)),
-                      elevation: 0,
-                    ),
-                    child: Text('View Wallet',
-                        style: GoogleFonts.inter(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white)),
-                  ),
-                  const SizedBox(height: 10),
-                  OutlinedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.share_outlined,
-                        color: _teal, size: 18),
-                    label: Text('Share Transaction',
-                        style: GoogleFonts.inter(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: _teal)),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 54),
-                      side: BorderSide(color: Colors.grey[300]!),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
       bottomNavigationBar: _buildBottomNav(context),
     );
   }
 
-  Widget _buildBottomNav(BuildContext context) => Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 10,
-                offset: const Offset(0, -2))
-          ],
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _navItem(context, Icons.home_rounded, 'Home', '/home'),
-                _navItem(context, Icons.explore_rounded, 'Explore',
-                    '/nearby'),
-                _navItem(context, Icons.account_balance_wallet_rounded,
-                    'Wallet', '/wallet'),
-                _navItemActive(),
-                _navItem(context, Icons.person_rounded, 'Profile',
-                    '/profile'),
-              ],
+  // ── Detail card ────────────────────────────────────────────────────────────
+  Widget _buildDetailCard({
+    required String merchant,
+    required String transactionId,
+    required String amount,
+    required String category,
+    required String status,
+    required String dateLabel,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.04),
+              blurRadius: 20, offset: const Offset(0, 10)),
+        ],
+        border: Border.all(color: Colors.black.withOpacity(0.05)),
+      ),
+      child: Column(
+        children: [
+          // Merchant row
+          if (merchant.isNotEmpty) ...[
+            _detailRow(
+              label: 'MERCHANT',
+              child: Text(merchant,
+                style: GoogleFonts.inter(fontWeight: FontWeight.bold,
+                    color: _onSurface, fontSize: 16)),
+              trailing: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                    color: _successContainer,
+                    borderRadius: BorderRadius.circular(20)),
+                child: Row(children: [
+                  const Icon(Icons.check_circle,
+                      color: _successGreen, size: 14),
+                  const SizedBox(width: 4),
+                  Text(status.isNotEmpty ? status : 'Completed',
+                    style: GoogleFonts.inter(color: _successGreen,
+                        fontWeight: FontWeight.bold, fontSize: 12)),
+                ]),
+              ),
             ),
-          ),
-        ),
-      );
+            const Divider(height: 48),
+          ],
 
-  Widget _navItem(BuildContext context, IconData icon, String label,
-          String route) =>
-      GestureDetector(
-        onTap: () => Navigator.pushNamed(context, route),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+          // Date + Transaction ID
+          if (transactionId.isNotEmpty) ...[
+            _detailRow(
+              label: 'DATE',
+              child: Text(dateLabel.isNotEmpty ? dateLabel : 'Today',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w600,
+                    color: _onSurface, fontSize: 15)),
+              trailing: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text('TRANSACTION ID',
+                    style: GoogleFonts.inter(fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: _onSurfaceVariant.withOpacity(0.6),
+                        letterSpacing: 0.5)),
+                  const SizedBox(height: 4),
+                  Text(transactionId,
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w600,
+                        color: _onSurface, fontSize: 14)),
+                ],
+              ),
+            ),
+            const Divider(height: 48),
+          ],
+
+          // Category
+          if (category.isNotEmpty)
+            _detailRow(
+              label: 'CATEGORY',
+              child: Row(children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                      color: const Color(0xFFE0F2F1),
+                      borderRadius: BorderRadius.circular(8)),
+                  child: const Icon(Icons.local_cafe,
+                      color: Color(0xFF00796B), size: 18),
+                ),
+                const SizedBox(width: 12),
+                Text(category,
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w600,
+                      color: _onSurface, fontSize: 15)),
+              ]),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _detailRow({required String label, required Widget child, Widget? trailing}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold,
+              color: _onSurfaceVariant.withOpacity(0.6), letterSpacing: 0.5)),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Icon(icon, color: Colors.grey[400], size: 24),
-            const SizedBox(height: 3),
-            Text(label,
-                style: GoogleFonts.inter(
-                    fontSize: 11, color: Colors.grey[400])),
+            child,
+            if (trailing != null) trailing,
           ],
         ),
-      );
+      ],
+    );
+  }
 
-  Widget _navItemActive() => Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xFFE0F3FB),
-          borderRadius: BorderRadius.circular(24),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.receipt_long_rounded,
-                color: _primary, size: 22),
-            const SizedBox(width: 6),
-            Text('Activity',
-                style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: _primary)),
-          ],
-        ),
+  // ── Action buttons per type ────────────────────────────────────────────────
+  List<Widget> _buildActions(BuildContext context, String type, Map<String, dynamic> data) {
+    switch (type) {
+      case 'cashback':
+      case 'transaction':
+        return [
+          _primaryBtn('View Wallet',
+            () => Navigator.pushNamed(context, '/wallet')),
+          const SizedBox(height: 16),
+          _outlineBtn(Icons.share_outlined, 'Share Transaction', () {}),
+        ];
+      case 'kyc_rejected':
+        return [
+          _primaryBtn('Complete Verification',
+            () => Navigator.pushNamed(context, '/kyc')),
+        ];
+      case 'kyc_approved':
+        return [
+          _primaryBtn('View Profile',
+            () => Navigator.pushNamed(context, '/profile')),
+        ];
+      case 'security':
+        return [
+          _primaryBtn('Secure My Account',
+            () => Navigator.pushNamed(context, '/profile-security')),
+        ];
+      default:
+        return [
+          _primaryBtn('Done', () => Navigator.pop(context)),
+        ];
+    }
+  }
+
+  Widget _primaryBtn(String label, VoidCallback onTap) => SizedBox(
+    width: double.infinity, height: 60,
+    child: ElevatedButton(
+      onPressed: onTap,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: _primary, foregroundColor: Colors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+      child: Text(label, style: GoogleFonts.inter(
+          fontSize: 18, fontWeight: FontWeight.bold)),
+    ),
+  );
+
+  Widget _outlineBtn(IconData icon, String label, VoidCallback onTap) => SizedBox(
+    width: double.infinity, height: 60,
+    child: OutlinedButton(
+      onPressed: onTap,
+      style: OutlinedButton.styleFrom(
+        side: BorderSide(color: _onSurface.withOpacity(0.1)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Icon(icon, color: _primary, size: 20),
+        const SizedBox(width: 12),
+        Text(label, style: GoogleFonts.inter(
+            fontSize: 16, fontWeight: FontWeight.bold, color: _primary)),
+      ]),
+    ),
+  );
+
+  // ── Bottom nav (Stitch style) ─────────────────────────────────────────────
+  Widget _buildBottomNav(BuildContext context) => Container(
+    padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      border: Border(top: BorderSide(color: Colors.grey[200]!)),
+    ),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceAround,
+      children: [
+        _navItem(context, Icons.home_outlined,                   'Home',     '/home',     false),
+        _navItem(context, Icons.explore_outlined,                'Explore',  '/explore',  false),
+        _navItem(context, Icons.account_balance_wallet_outlined, 'Wallet',   '/wallet',   false),
+        _navItem(context, Icons.receipt_long_outlined,           'Activity', '/activity', true),
+        _navItem(context, Icons.person_outline,                  'Profile',  '/profile',  false),
+      ],
+    ),
+  );
+
+  Widget _navItem(BuildContext ctx, IconData icon, String label,
+      String route, bool isActive) {
+    if (isActive) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(color: const Color(0xFFE1F5FE),
+            borderRadius: BorderRadius.circular(20)),
+        child: Row(children: [
+          Icon(icon, color: _primary, size: 20),
+          const SizedBox(width: 8),
+          Text(label, style: GoogleFonts.inter(
+              color: _primary, fontSize: 12, fontWeight: FontWeight.bold)),
+        ]),
       );
+    }
+    return GestureDetector(
+      onTap: () => Navigator.pushNamed(ctx, route),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, color: _onSurfaceVariant, size: 24),
+        const SizedBox(height: 4),
+        Text(label, style: GoogleFonts.inter(
+            color: _onSurfaceVariant, fontSize: 11)),
+      ]),
+    );
+  }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_service.dart';
+import '../widgets/pre_auth_support_sheet.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -514,7 +515,23 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 40),
+                const SizedBox(height: 24),
+                // Pre-auth support link
+                Center(
+                  child: GestureDetector(
+                    onTap: () => showPreAuthSupportSheet(context),
+                    child: Text(
+                      'Having trouble? Get help',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: Colors.white70,
+                        decoration: TextDecoration.underline,
+                        decorationColor: Colors.white54,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
               ],
             ),
           ),

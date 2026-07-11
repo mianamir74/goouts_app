@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -15,120 +16,21 @@ class _FaqScreenState extends State<FaqScreen> {
 
   final List<Map<String, dynamic>> _quickHelp = const [
     {'icon': Icons.account_balance_wallet_rounded, 'label': 'My Wallet'},
-    {'icon': Icons.swap_horiz_rounded, 'label': 'Shares'},
     {'icon': Icons.credit_card_rounded, 'label': 'Cashback'},
+    {'icon': Icons.delivery_dining_rounded, 'label': 'Food Orders'},
     {'icon': Icons.shield_rounded, 'label': 'Account Security'},
   ];
 
-  final List<Map<String, String>> _faqs = const [
-    {
-      'q': 'How to claim my £2 bonus?',
-      'a':
-          'Your £2 welcome bonus is automatically added to your wallet once you complete your first transaction using your GoOuts card. Simply make any purchase at a participating partner and the bonus will appear within 24 hours.',
-    },
-    {
-      'q': 'How long do shares take?',
-      'a':
-          'Cashback shares are credited to your wallet within 14 days of a confirmed purchase. This processing window allows time for the merchant to confirm the transaction. You can track the status in your Wallet → Cashback section.',
-    },
-    {
-      'q': 'Why is my account pending verification?',
-      'a':
-          'Your account is under KYC (Know Your Customer) review. This usually takes 1–2 business days. Make sure your ID document is clear and matches your registered name. You will receive a notification once verification is complete.',
-    },
-    {
-      'q': 'Can I change my registered phone number?',
-      'a':
-          'Yes. Go to Profile → Account Settings → Personal Information and tap on your phone number to update it. You will need to verify the new number with a one-time OTP before the change takes effect.',
-    },
-    {
-      'q': 'Can I refer a partner?',
-      'a':
-          'Absolutely — and we\'d love that! If you know a business that would be a great fit for GoOuts, go ahead and refer them. Once they\'re on board and live on the platform, we\'ll add £25 to your wallet as a thank-you. The best part? There\'s no limit — you can refer as many partners as you like and earn £25 for every single one.',
-    },
-    {
-      'q': 'How does instant cashback work?',
-      'a':
-          'Every time you pay at a GoOuts partner venue using your GoOuts virtual card, cashback is credited to your wallet the moment the payment is confirmed — no waiting, no claiming. The cashback percentage varies by partner and is shown on the partner\'s page before you pay.',
-    },
-    {
-      'q': 'Is there a minimum cashback amount to use?',
-      'a':
-          'No minimum at all. Any amount in your wallet — even a few pence — can be used towards your next payment at a partner venue. Simply choose how much to apply when you tap Pay.',
-    },
-    {
-      'q': 'Why is my wallet balance different from my cashback balance?',
-      'a':
-          'Your wallet balance is the total amount available to spend right now. Your cashback balance is the running total of all cashback you have ever earned. The two can differ if you have spent some of your cashback or received other credits into your wallet.',
-    },
-    {
-      'q': 'What is the GoOuts virtual card?',
-      'a':
-          'Your GoOuts virtual card is a digital debit card that works at any GoOuts partner venue. It is linked securely to your bank account via Open Banking — there is no money sitting on the card itself. When you pay, the exact amount is swept from your bank in real time, keeping everything safe and instant.',
-    },
-    {
-      'q': 'Is my bank account safe when I pay with GoOuts?',
-      'a':
-          'Yes, completely. GoOuts uses Open Banking and Variable Recurring Payments (VRP) — the same regulated technology used by major UK banks. We never store your bank login details and each payment requires your authorisation. Your money only moves when you choose to pay.',
-    },
-    {
-      'q': 'Why was my payment declined?',
-      'a':
-          'Payments can be declined for a few reasons: your bank did not authorise the transaction, there were insufficient funds in your linked bank account, or you have reached a daily spending limit set by your bank. Check your bank app for details and try again, or contact your bank if the issue continues.',
-    },
-    {
-      'q': 'What documents do I need to verify my identity?',
-      'a':
-          'You will need a valid government-issued photo ID — a passport or driving licence works perfectly. You will also need to take a quick selfie so we can match your face to the document. Make sure your ID is not expired and that all four corners are visible in the photo.',
-    },
-    {
-      'q': 'How long does KYC verification take?',
-      'a':
-          'In most cases, verification is completed within a couple of minutes. Occasionally our team may need to review your documents manually, which can take up to 2 business days. You will receive a notification as soon as a decision is made.',
-    },
-    {
-      'q': 'Why was my ID rejected?',
-      'a':
-          'The most common reasons are a blurry or dark photo, an expired document, or a name that does not match your GoOuts profile. Make sure you are in good lighting, hold the document flat and steady, and use the exact name shown on your ID when registering. You can re-submit directly from the Profile screen.',
-    },
-    {
-      'q': 'How do I find GoOuts partner venues near me?',
-      'a':
-          'Open the Explore tab and tap "Near You". GoOuts will show you all partner venues within your area on a map and as a list. You can filter by category — restaurants, bars, cafés, and more — to find exactly what you\'re in the mood for.',
-    },
-    {
-      'q': 'Why is a venue not giving me cashback?',
-      'a':
-          'Cashback is only available at officially verified GoOuts partner venues. If a venue is not showing a cashback rate on its partner page, it is not currently part of the programme. You can suggest a venue to us and we\'ll do our best to get them on board.',
-    },
-    {
-      'q': 'What happens to my cashback if I return an item?',
-      'a':
-          'If a purchase is refunded or reversed, any cashback earned on that transaction will be reclaimed from your wallet. This ensures cashback is only kept for genuine completed purchases. If you believe a clawback was made in error, please contact our support team.',
-    },
-    {
-      'q': 'What is a GoOuts PIN and why do I need it?',
-      'a':
-          'Your GoOuts PIN is a 4-digit code that protects your account. It is required any time you want to edit your personal information, saved addresses, or security settings. Think of it as a second layer of protection — even if someone has access to your phone, they cannot change your details without your PIN.',
-    },
-    {
-      'q': 'What should I do if I lose my phone?',
-      'a':
-          'Act quickly — go to Profile → Security and freeze your virtual card immediately from another device or ask someone to help you. Then contact our support team so we can flag your account. Once you have your new device, simply log back in with your registered phone number and OTP.',
-    },
-    {
-      'q': 'Can I have more than one GoOuts account?',
-      'a':
-          'No — GoOuts allows one account per person. Each account is tied to a verified identity and phone number. Creating multiple accounts is against our terms and may result in all accounts being suspended. If you are having trouble accessing your account, our support team is happy to help.',
-    },
-    {
-      'q': 'How does GoOuts process my payment at the till?',
-      'a':
-          'Before you tap your GoOuts card, you confirm exactly how much cashback and wallet balance you want to use on the payment sheet. When you tap your GoOuts Virtual Card at the till, our system reads those confirmed details instantly.\n\nThe till requests the full bill amount — say £150. GoOuts approves the full £150 to the merchant, so the partner always receives every penny. Behind the scenes, our system only sweeps the remaining balance from your bank — for example, if you used £100 cashback and £50 wallet, your bank is charged nothing. If you used £100 cashback and no wallet, your bank is charged £50.\n\nNothing moves without your confirmation. If you close the payment sheet without completing it, no charge is made, no balance is updated, and no transaction is recorded.',
-    },
-  ];
+  final Set<String> _expanded = {};
+  String? _selectedCategory; // null = show all
 
-  final Set<int> _expanded = {};
+  // Maps Quick Help label → FAQ category field value
+  static const Map<String, String> _categoryMap = {
+    'My Wallet':        'Wallet',
+    'Cashback':         'Cashback',
+    'Food Orders':      'Food Orders',
+    'Account Security': 'Account Security',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -226,39 +128,52 @@ class _FaqScreenState extends State<FaqScreen> {
               itemCount: _quickHelp.length,
               itemBuilder: (context, i) {
                 final item = _quickHelp[i];
-                return Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2))
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFD6EEF8),
-                          shape: BoxShape.circle,
+                final label = item['label'] as String;
+                final category = _categoryMap[label];
+                final isActive = _selectedCategory == category;
+                return GestureDetector(
+                  onTap: () => setState(() {
+                    _selectedCategory = isActive ? null : category;
+                    _expanded.clear();
+                  }),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    decoration: BoxDecoration(
+                      color: isActive ? _primary : Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2))
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: isActive
+                                ? Colors.white.withOpacity(0.2)
+                                : const Color(0xFFD6EEF8),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(item['icon'] as IconData,
+                              color: isActive ? Colors.white : _teal,
+                              size: 22),
                         ),
-                        child: Icon(item['icon'] as IconData,
-                            color: _teal, size: 22),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        item['label'] as String,
-                        style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: _dark),
-                      ),
-                    ],
+                        const SizedBox(height: 8),
+                        Text(
+                          label,
+                          style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: isActive ? Colors.white : _dark),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },
@@ -266,91 +181,175 @@ class _FaqScreenState extends State<FaqScreen> {
 
             const SizedBox(height: 22),
 
-            Text(
-              'FREQUENT QUESTIONS',
-              style: GoogleFonts.inter(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[500],
-                  letterSpacing: 1.0),
+            Row(
+              children: [
+                Text(
+                  'FREQUENT QUESTIONS',
+                  style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[500],
+                      letterSpacing: 1.0),
+                ),
+                if (_selectedCategory != null) ...[
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => setState(() {
+                      _selectedCategory = null;
+                      _expanded.clear();
+                    }),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: _primary.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _selectedCategory!,
+                            style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: _primary),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(Icons.close_rounded, size: 12, color: _primary),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
             const SizedBox(height: 10),
 
-            ...List.generate(_faqs.length, (i) {
-              final faq = _faqs[i];
-              final isOpen = _expanded.contains(i);
-              return GestureDetector(
-                onTap: () => setState(() {
-                  if (isOpen) {
-                    _expanded.remove(i);
-                  } else {
-                    _expanded.add(i);
-                  }
-                }),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  margin: const EdgeInsets.only(bottom: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: isOpen
-                        ? Border.all(
-                            color: _primary.withOpacity(0.25), width: 1)
-                        : null,
-                    boxShadow: [
-                      BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2))
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 16),
-                        child: Row(
+            StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('faqs')
+                  .where('isActive', isEqualTo: true)
+                  .orderBy('order')
+                  .snapshots(),
+              builder: (context, snap) {
+                if (snap.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(32),
+                      child: CircularProgressIndicator(color: _primary, strokeWidth: 2),
+                    ),
+                  );
+                }
+                if (!snap.hasData || snap.data!.docs.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        'No FAQs available at this time.',
+                        style: GoogleFonts.inter(fontSize: 14, color: Colors.grey[400]),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  );
+                }
+                final allDocs = snap.data!.docs;
+                final docs = _selectedCategory == null
+                    ? allDocs
+                    : allDocs.where((d) {
+                        final data = d.data() as Map<String, dynamic>;
+                        return (data['category'] as String?) == _selectedCategory;
+                      }).toList();
+
+                if (docs.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        'No FAQs in this category yet.',
+                        style: GoogleFonts.inter(fontSize: 14, color: Colors.grey[400]),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  );
+                }
+
+                return Column(
+                  children: docs.map((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    final question = data['question'] as String? ?? '';
+                    final answer = data['answer'] as String? ?? '';
+                    final id = doc.id;
+                    final isOpen = _expanded.contains(id);
+                    return GestureDetector(
+                      onTap: () => setState(() {
+                        if (isOpen) {
+                          _expanded.remove(id);
+                        } else {
+                          _expanded.add(id);
+                        }
+                      }),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        margin: const EdgeInsets.only(bottom: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: isOpen
+                              ? Border.all(color: _primary.withOpacity(0.25), width: 1)
+                              : null,
+                          boxShadow: [
+                            BoxShadow(
+                                color: Colors.black.withOpacity(0.04),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2))
+                          ],
+                        ),
+                        child: Column(
                           children: [
-                            Expanded(
-                              child: Text(
-                                faq['q']!,
-                                style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    fontWeight: isOpen
-                                        ? FontWeight.w700
-                                        : FontWeight.w500,
-                                    color: _dark),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      question,
+                                      style: GoogleFonts.inter(
+                                          fontSize: 14,
+                                          fontWeight: isOpen ? FontWeight.w700 : FontWeight.w500,
+                                          color: _dark),
+                                    ),
+                                  ),
+                                  Icon(
+                                    isOpen
+                                        ? Icons.keyboard_arrow_up_rounded
+                                        : Icons.keyboard_arrow_down_rounded,
+                                    color: isOpen ? _primary : Colors.grey,
+                                    size: 22,
+                                  ),
+                                ],
                               ),
                             ),
-                            Icon(
-                              isOpen
-                                  ? Icons.keyboard_arrow_up_rounded
-                                  : Icons.keyboard_arrow_down_rounded,
-                              color: isOpen ? _primary : Colors.grey,
-                              size: 22,
-                            ),
+                            if (isOpen) ...[
+                              Divider(height: 1, color: Colors.grey[100]),
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                                child: Text(
+                                  answer,
+                                  style: GoogleFonts.inter(
+                                      fontSize: 13,
+                                      color: Colors.grey[600],
+                                      height: 1.6),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
-                      if (isOpen) ...[
-                        Divider(height: 1, color: Colors.grey[100]),
-                        Padding(
-                          padding:
-                              const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                          child: Text(
-                            faq['a']!,
-                            style: GoogleFonts.inter(
-                                fontSize: 13,
-                                color: Colors.grey[600],
-                                height: 1.6),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              );
-            }),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
 
             const SizedBox(height: 20),
 

@@ -34,6 +34,7 @@ import 'screens/notification_detail_screen.dart';
 import 'screens/message_center_screen.dart';
 import 'screens/faq_screen.dart';
 import 'screens/support_tickets_screen.dart';
+import 'screens/support_ticket_chat_screen.dart';
 import 'screens/contact_support_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/special_offers_screen.dart';
@@ -43,27 +44,109 @@ import 'screens/activity_screen.dart';
 import 'screens/explore_screen.dart';
 import 'screens/kyc_screen.dart';
 import 'screens/payment_review_screen.dart';
+import 'screens/biometric_lock_screen.dart';
+import 'screens/food_delivery_screen.dart';
+import 'screens/food_address_picker_screen.dart';
+import 'screens/food_menu_screen.dart';
+import 'screens/food_order_tracking_screen.dart';
+import 'screens/food_delivery_chat_screen.dart';
+import 'screens/food_order_history_screen.dart';
+import 'screens/refer_friend_screen.dart';
 import 'screens/family_plan_screen.dart';
 import 'screens/goouts_plus_unlocked_screen.dart';
 import 'screens/family_cashback_intro_screen.dart';
+import 'dart:async';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'services/partner_seed_service.dart';
+import 'services/user_fcm_service.dart';
+import 'services/delivery_address_service.dart';
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  // Initialise push notifications
+  await UserFcmService.instance.initialize();
+  // Load persisted delivery address
+  await DeliveryAddressService().init();
   // Auto-seeds merchants collection once — skips if already done
   PartnerSeedService().seedOnce().catchError((_) {});
   runApp(const GoOutsApp());
 }
 
-class GoOutsApp extends StatelessWidget {
+/// Route a FCM RemoteMessage to the correct screen.
+void routeFromMessage(RemoteMessage msg) {
+  final nav = navigatorKey.currentState;
+  if (nav == null) return;
+  final data   = msg.data;
+  final screen = (data['screen'] ?? '').toString();
+  switch (screen) {
+    case 'support_ticket_chat':
+      nav.pushNamed('/support-ticket-chat', arguments: {
+        'ticketId':     data['ticketId']     ?? '',
+        'subject':      data['subject']      ?? 'Support Ticket',
+        'ticketNumber': data['ticketNumber'] ?? '',
+        'userName':     'GoOuts Support',
+      });
+      break;
+    case 'kyc':
+      nav.pushNamed('/kyc');
+      break;
+    case 'profile':
+      nav.pushNamed('/profile');
+      break;
+    case 'wallet':
+      nav.pushNamed('/wallet');
+      break;
+    case 'messages':
+      nav.pushNamed('/messages');
+      break;
+    case 'refer_friend':
+      nav.pushNamed('/refer-friend');
+      break;
+    case 'notifications':
+    default:
+      nav.pushNamed('/notifications');
+      break;
+  }
+}
+
+class GoOutsApp extends StatefulWidget {
   const GoOutsApp({super.key});
+
+  @override
+  State<GoOutsApp> createState() => _GoOutsAppState();
+}
+
+class _GoOutsAppState extends State<GoOutsApp> {
+  StreamSubscription<RemoteMessage>? _openedSub;
+
+  @override
+  void initState() {
+    super.initState();
+    // Background tap — app was running in background
+    _openedSub = UserFcmService.instance.openedMessages.listen(routeFromMessage);
+
+    // Terminated tap — app was killed; handle after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final initial = UserFcmService.instance.consumeInitialMessage();
+      if (initial != null) routeFromMessage(initial);
+    });
+  }
+
+  @override
+  void dispose() {
+    _openedSub?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'GoOuts',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
@@ -101,6 +184,16 @@ class GoOutsApp extends StatelessWidget {
         '/faq': (context) => const FaqScreen(),
         '/support-tickets': (context) => const SupportTicketsScreen(),
         '/contact-support': (context) => const ContactSupportScreen(),
+        '/support-ticket-chat': (context) {
+          final args = ModalRoute.of(context)!.settings.arguments
+              as Map<String, dynamic>?;
+          return SupportTicketChatScreen(
+            ticketId:     args?['ticketId']     as String? ?? '',
+            subject:      args?['subject']      as String? ?? '',
+            ticketNumber: args?['ticketNumber'] as String? ?? '',
+            userName:     args?['userName']     as String? ?? '',
+          );
+        },
         '/login': (context) => const LoginScreen(),
         '/special-offers': (context) => const SpecialOffersScreen(),
         '/partner-offer': (context) => const PartnerOfferScreen(),
@@ -116,6 +209,20 @@ class GoOutsApp extends StatelessWidget {
         '/explore': (context) => const ExploreScreen(),
         '/kyc': (context) => const KycScreen(),
         '/payment-review': (context) => const PaymentReviewScreen(),
+        '/biometric-lock': (context) => const BiometricLockScreen(nextRoute: '/home'),
+        '/food-delivery': (context) => const FoodDeliveryScreen(),
+        '/food-address-picker': (context) => const FoodAddressPickerScreen(),
+        '/food-menu': (context) => const FoodMenuScreen(),
+        // Task #73 — cart/checkout screen (placeholder until built)
+        '/food-cart': (context) => Scaffold(
+          appBar: AppBar(title: const Text('Your Cart')),
+          body: const Center(child: Text('Cart coming soon — Task #73')),
+        ),
+        // Task #74 — live order tracking + Add to Order
+        '/food-order-tracking': (context) => const FoodOrderTrackingScreen(),
+        '/food-delivery-chat': (context) => const FoodDeliveryChatScreen(),
+        '/food-order-history': (context) => const FoodOrderHistoryScreen(),
+        '/refer-friend': (context) => const ReferFriendScreen(),
       },
     );
   }

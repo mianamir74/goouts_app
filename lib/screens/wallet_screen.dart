@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
 import '../services/user_service.dart';
 import '../services/transaction_service.dart';
+import '../services/message_service.dart';
+import 'transfer_screen.dart';
 
 class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key});
@@ -39,6 +41,7 @@ class _WalletScreenState extends State<WalletScreen> {
   double _monthTopUp = 0.0;
 
   Future<void> _loadAllData() async {
+    try {
     final userData = await UserService().getCurrentUser();
     final firestoreTransactions = await TransactionService().getTransactions();
 
@@ -77,6 +80,9 @@ class _WalletScreenState extends State<WalletScreen> {
       _cardAddedToWallet = userData?['cardAddedToWallet'] as bool? ?? false;
       _loadingData = false;
     });
+    } catch (_) {
+      if (mounted) setState(() => _loadingData = false);
+    }
   }
 
   String _monthName(int month) {
@@ -231,39 +237,48 @@ class _WalletScreenState extends State<WalletScreen> {
               ),
             ),
             const Spacer(),
-            GestureDetector(
-              onTap: () => Navigator.pushNamed(context, '/messages'),
-              child: Stack(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.notifications_outlined,
-                        color: Colors.white, size: 20),
-                  ),
-                  Positioned(
-                    top: 0,
-                    right: 0,
-                    child: Container(
-                      width: 16,
-                      height: 16,
-                      decoration: const BoxDecoration(
-                          color: Colors.red, shape: BoxShape.circle),
-                      child: Center(
-                        child: Text('2',
-                            style: GoogleFonts.inter(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white)),
+            StreamBuilder<int>(
+              stream: MessageService().unreadNotificationsStream(),
+              builder: (context, snap) {
+                final count = snap.data ?? 0;
+                return GestureDetector(
+                  onTap: () => Navigator.pushNamed(context, '/notifications'),
+                  child: Stack(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.notifications_outlined,
+                            color: Colors.white, size: 20),
                       ),
-                    ),
+                      if (count > 0)
+                        Positioned(
+                          top: 0,
+                          right: 0,
+                          child: Container(
+                            width: 16,
+                            height: 16,
+                            decoration: const BoxDecoration(
+                                color: Colors.red, shape: BoxShape.circle),
+                            child: Center(
+                              child: Text(
+                                count > 9 ? '9+' : '$count',
+                                style: GoogleFonts.inter(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                ],
-              ),
+                );
+              },
             ),
           ],
         ),
@@ -411,7 +426,9 @@ class _WalletScreenState extends State<WalletScreen> {
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () =>
-                        Navigator.pushNamed(context, '/transfer'),
+                        Navigator.push(context, MaterialPageRoute(
+                          builder: (_) => TransferScreen(availableBalance: _balance),
+                        )),
                     icon: Icon(Icons.share_rounded,
                         color: Colors.white.withOpacity(0.9), size: 18),
                     label: Text(

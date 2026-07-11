@@ -51,6 +51,11 @@ class _OtpScreenState extends State<OtpScreen>
     super.initState();
     _startTimer();
 
+    // Auto-focus first box so keyboard opens immediately
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusNodes[0].requestFocus();
+    });
+
     // Shake animation setup
     _shakeCtrl = AnimationController(
       vsync: this,
@@ -149,15 +154,6 @@ class _OtpScreenState extends State<OtpScreen>
       _focusNodes[index - 1].requestFocus();
       _controllers[index - 1].clear();
       setState(() {});
-    }
-  }
-
-  Future<void> _pasteFromClipboard() async {
-    final data = await Clipboard.getData(Clipboard.kTextPlain);
-    final text = data?.text ?? '';
-    final digits = text.replaceAll(RegExp(r'\D'), '');
-    if (digits.length >= 6) {
-      _fillFromString(digits);
     }
   }
 
@@ -359,7 +355,8 @@ class _OtpScreenState extends State<OtpScreen>
               const SizedBox(height: 32),
 
               // ── OTP boxes with shake ───────────────────────────────────
-              AnimatedBuilder(
+              AutofillGroup(
+                child: AnimatedBuilder(
                 animation: _shakeAnim,
                 builder: (context, child) => Transform.translate(
                   offset: Offset(_shakeAnim.value, 0),
@@ -378,6 +375,9 @@ class _OtpScreenState extends State<OtpScreen>
                         child: TextField(
                           controller: _controllers[index],
                           focusNode: _focusNodes[index],
+                          autofillHints: index == 0
+                              ? const [AutofillHints.oneTimeCode]
+                              : null,
                           keyboardType: TextInputType.number,
                           textAlign: TextAlign.center,
                           maxLength: 1,
@@ -435,6 +435,7 @@ class _OtpScreenState extends State<OtpScreen>
                   }),
                 ),
               ),
+              ), // AutofillGroup
 
               const SizedBox(height: 14),
 
@@ -461,54 +462,31 @@ class _OtpScreenState extends State<OtpScreen>
 
               const SizedBox(height: 16),
 
-              // ── Paste + Resend row ─────────────────────────────────────
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Paste button
-                  GestureDetector(
-                    onTap: _pasteFromClipboard,
-                    child: Row(
-                      children: [
-                        Icon(Icons.content_paste_rounded,
-                            size: 15, color: _primary),
-                        const SizedBox(width: 5),
-                        Text(
-                          'Paste code',
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: _primary,
-                          ),
+              // ── Resend row ─────────────────────────────────────────────
+              Center(
+                child: GestureDetector(
+                  onTap: _canResend ? _resendOtp : null,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        "Didn't receive?  ",
+                        style: GoogleFonts.inter(
+                            fontSize: 13, color: Colors.grey[600]),
+                      ),
+                      Text(
+                        _canResend
+                            ? 'Resend'
+                            : 'Resend (${_secondsLeft}s)',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: _canResend ? _primary : Colors.grey[400],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-
-                  // Resend
-                  GestureDetector(
-                    onTap: _canResend ? _resendOtp : null,
-                    child: Row(
-                      children: [
-                        Text(
-                          "Didn't receive?  ",
-                          style: GoogleFonts.inter(
-                              fontSize: 13, color: Colors.grey[600]),
-                        ),
-                        Text(
-                          _canResend
-                              ? 'Resend'
-                              : 'Resend (${_secondsLeft}s)',
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: _canResend ? _primary : Colors.grey[400],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                ),
               ),
 
               const Spacer(),

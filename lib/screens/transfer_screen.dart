@@ -3,7 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class TransferScreen extends StatefulWidget {
-  const TransferScreen({super.key});
+  const TransferScreen({super.key, this.availableBalance});
+  final double? availableBalance;
 
   @override
   State<TransferScreen> createState() => _TransferScreenState();
@@ -13,6 +14,7 @@ class _TransferScreenState extends State<TransferScreen> {
   final _receiverController = TextEditingController();
   final _amountController = TextEditingController();
   double _amount = 0;
+  bool _isLoading = false;
 
   static const Color _primary = Color(0xFF0392CA);
   static const Color _dark = Color(0xFF0D1B3E);
@@ -47,7 +49,34 @@ class _TransferScreenState extends State<TransferScreen> {
           IconButton(
             icon: const Icon(Icons.help_outline_rounded,
                 color: Colors.grey, size: 22),
-            onPressed: () {},
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                  title: Text('How to Transfer',
+                      style: GoogleFonts.inter(
+                          fontWeight: FontWeight.w700,
+                          color: _dark)),
+                  content: Text(
+                    'Enter the recipient\'s registered email or phone number, '
+                    'then enter the amount you wish to transfer from your GoOuts wallet. '
+                    'Transfers are instant and free between GoOuts users.',
+                    style: GoogleFonts.inter(
+                        fontSize: 14, color: Colors.grey[700])),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: Text('Got it',
+                          style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w700,
+                              color: _primary)),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -474,12 +503,46 @@ class _TransferScreenState extends State<TransferScreen> {
               color: const Color(0xFFF2F4F7),
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
               child: ElevatedButton.icon(
-                onPressed: () =>
-                    Navigator.pushNamed(context, '/transfer-success'),
-                icon: const Icon(Icons.bolt_rounded,
-                    color: Colors.white, size: 22),
+                onPressed: _isLoading ? null : () async {
+                  final receiver = _receiverController.text.trim();
+                  if (receiver.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Please enter a recipient.')));
+                    return;
+                  }
+                  if (_amount <= 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Please enter a valid amount.')));
+                    return;
+                  }
+                  final available = widget.availableBalance ?? 0.0;
+                  if (_amount > available) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(
+                          'Insufficient balance. Available: £\${available.toStringAsFixed(2)}')));
+                    return;
+                  }
+                  setState(() => _isLoading = true);
+                  try {
+                    await Future.delayed(const Duration(seconds: 1));
+                    if (mounted) Navigator.pushNamed(context, '/transfer-success');
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Transfer failed: \$e')));
+                    }
+                  } finally {
+                    if (mounted) setState(() => _isLoading = false);
+                  }
+                },
+                icon: _isLoading
+                    ? const SizedBox(
+                        width: 20, height: 20,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2))
+                    : const Icon(Icons.bolt_rounded, color: Colors.white, size: 22),
                 label: Text(
-                  'Share Instantly',
+                  _isLoading ? 'Processing...' : 'Share Instantly',
                   style: GoogleFonts.inter(
                       fontSize: 17,
                       fontWeight: FontWeight.w700,
