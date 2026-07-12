@@ -259,7 +259,7 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
 
     // Step 2: pick refund method
     final refundMethod = await _showRefundMethodSheet(
-      refundAmount: _cancelFreeRemaining != null ? _order?['grandTotal'] as double? ?? 0.0 : 0.0,
+      refundAmount: _cancelFreeRemaining != null ? (_order?['grandTotal'] as double?) ?? 0.0 : 0.0,
       cashbackEarned: _cashbackEarned,
       context: 'cancel',
     );
