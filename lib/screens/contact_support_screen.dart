@@ -1241,55 +1241,37 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
           ),
         if (sub == 'Order Late / Not Arrived') ...[
           _infoTile(Icons.hourglass_bottom_rounded, Colors.orange, 'Typical Delivery Times',
-              'Most GoOuts deliveries arrive within the estimated time shown on your order tracking screen.
-
-'
-              '• Weather or traffic can cause short delays
-'
-              '• Contact your driver via the in-app chat on the order tracking screen
-'
+              'Most GoOuts deliveries arrive within the estimated time shown on your order tracking screen.\n\n'
+              '• Weather or traffic can cause short delays\n'
+              '• Contact your driver via the in-app chat on the order tracking screen\n'
               '• If your order shows "Delivered" but you have not received it, submit a ticket below.'),
           const SizedBox(height: 8),
           _infoTile(Icons.map_rounded, _teal, 'Check Live Tracking',
-              'Open your order in the GoOuts app to see your driver's live position on the map.'),
+              "Open your order in the GoOuts app to see your driver's live position on the map."),
         ] else if (sub == 'Wrong Items Delivered' || sub == 'Missing Items') ...[
           _infoTile(Icons.restaurant_menu_rounded, Colors.orange, 'What happens next',
-              'If you received incorrect or missing items, we'll arrange a refund or replacement.
-
-'
-              '• Take a photo of the items received (helpful for our team)
-'
-              '• Refunds are credited instantly to your GoOuts wallet
-'
+              "If you received incorrect or missing items, we'll arrange a refund or replacement.\n\n"
+              '• Take a photo of the items received (helpful for our team)\n'
+              '• Refunds are credited instantly to your GoOuts wallet\n'
               '• Submit the ticket below — include details of what was missing or wrong.'),
           const SizedBox(height: 8),
           _infoTile(Icons.account_balance_wallet_rounded, _primary, 'Refund Method',
               'GoOuts refunds food delivery issues directly to your GoOuts wallet — no card reversal needed.'),
         ] else if (sub == 'Driver Issue') ...[
           _infoTile(Icons.warning_amber_rounded, Colors.orange, 'Driver Behaviour Concern',
-              'We take driver conduct seriously. Your feedback helps us maintain quality.
-
-'
-              '• If you feel unsafe, contact emergency services first
-'
-              '• Your report will be reviewed by our safety team within 24 hours
-'
-              '• The driver's account will be reviewed and may be suspended.'),
+              'We take driver conduct seriously. Your feedback helps us maintain quality.\n\n'
+              '• If you feel unsafe, contact emergency services first\n'
+              '• Your report will be reviewed by our safety team within 24 hours\n'
+              "• The driver's account will be reviewed and may be suspended."),
         ] else if (sub == 'Order Cancelled by Restaurant') ...[
           _infoTile(Icons.account_balance_wallet_rounded, _primary, 'Automatic Refund',
-              'When a restaurant cancels your order, the full amount including delivery fee is automatically refunded to your GoOuts wallet within minutes.
-
-'
+              'When a restaurant cancels your order, the full amount including delivery fee is automatically refunded to your GoOuts wallet within minutes.\n\n'
               'If your wallet has not updated, please allow up to 30 minutes and pull to refresh.'),
         ] else if (sub == 'Refund Not Received') ...[
           _infoTile(Icons.account_balance_wallet_rounded, _primary, 'Where Refunds Go',
-              'GoOuts food delivery refunds go to your GoOuts wallet — not back to your bank card.
-
-'
-              '• Open the Wallet screen and pull down to refresh
-'
-              '• Refunds typically appear within 1–5 minutes
-'
+              'GoOuts food delivery refunds go to your GoOuts wallet — not back to your bank card.\n\n'
+              '• Open the Wallet screen and pull down to refresh\n'
+              '• Refunds typically appear within 1–5 minutes\n'
               '• If it has been over 30 minutes, submit a ticket below.'),
         ] else ...[
           _infoTile(Icons.delivery_dining_rounded, _primary, 'Food Delivery Support',
