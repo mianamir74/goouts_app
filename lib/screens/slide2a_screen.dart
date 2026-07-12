@@ -131,6 +131,8 @@ class Slide2aScreen extends StatelessWidget {
                 _dot(false),
                 const SizedBox(width: 6),
                 _dot(false),
+                const SizedBox(width: 6),
+                _dot(false),
               ],
             ),
 

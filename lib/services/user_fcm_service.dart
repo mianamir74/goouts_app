@@ -69,7 +69,13 @@ class UserFcmService {
     });
 
     _authSub = _auth.authStateChanges().listen((user) async {
-      if (user != null) await _syncToken();
+      if (user != null) {
+        try {
+          await _syncToken();
+        } catch (e) {
+          debugPrint('FCM [goouts_app] auth listener error: $e');
+        }
+      }
     });
   }
 
@@ -193,33 +199,41 @@ class UserFcmService {
       );
 
   Future<void> _syncToken({bool? notificationsEnabled}) async {
-    final user = _auth.currentUser;
-    if (user == null) return;
-    final token = await _messaging.getToken();
-    if (token == null || token.isEmpty) return;
-    await _saveToken(
-      token: token,
-      notificationsEnabled: notificationsEnabled ?? await _notificationsEnabled(),
-    );
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return;
+      final token = await _messaging.getToken();
+      if (token == null || token.isEmpty) return;
+      await _saveToken(
+        token: token,
+        notificationsEnabled: notificationsEnabled ?? await _notificationsEnabled(),
+      );
+    } catch (e) {
+      debugPrint('FCM [goouts_app] _syncToken error: $e');
+    }
   }
 
   Future<void> _saveToken({
     required String token,
     required bool   notificationsEnabled,
   }) async {
-    final user = _auth.currentUser;
-    if (user == null) return;
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return;
 
-    await _firestore.collection('users').doc(user.uid).set(
-      {
-        'fcmToken':           token,
-        'fcmTokenUpdatedAt':  FieldValue.serverTimestamp(),
-        'notificationsEnabled': notificationsEnabled,
-      },
-      SetOptions(merge: true),
-    );
+      await _firestore.collection('users').doc(user.uid).set(
+        {
+          'fcmToken':           token,
+          'fcmTokenUpdatedAt':  FieldValue.serverTimestamp(),
+          'notificationsEnabled': notificationsEnabled,
+        },
+        SetOptions(merge: true),
+      );
 
-    debugPrint('FCM [goouts_app] token saved for user ${user.uid}');
+      debugPrint('FCM [goouts_app] token saved for user ${user.uid}');
+    } catch (e) {
+      debugPrint('FCM [goouts_app] _saveToken error: $e');
+    }
   }
 
   Future<bool> _notificationsEnabled() async {

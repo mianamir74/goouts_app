@@ -127,6 +127,8 @@ class Slide3Screen extends StatelessWidget {
                 _dot(true),
                 const SizedBox(width: 6),
                 _dot(false),
+                const SizedBox(width: 6),
+                _dot(false),
               ],
             ),
 

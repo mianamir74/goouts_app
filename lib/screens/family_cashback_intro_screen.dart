@@ -28,7 +28,9 @@ class FamilyCashbackIntroScreen extends StatelessWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: primaryColor),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => fromOnboarding
+              ? Navigator.pushReplacementNamed(context, '/slide4')
+              : Navigator.of(context).pop(),
         ),
         centerTitle: true,
         title: Text(
@@ -41,12 +43,25 @@ class FamilyCashbackIntroScreen extends StatelessWidget {
           ),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.arrow_forward, color: primaryColor),
-            onPressed: () => fromOnboarding
-                ? Navigator.pushReplacementNamed(context, '/signup')
-                : Navigator.pushNamed(context, '/family-plan'),
-          ),
+          if (fromOnboarding)
+            TextButton(
+              onPressed: () =>
+                  Navigator.pushReplacementNamed(context, '/signup'),
+              child: Text(
+                'Finish',
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: primaryColor,
+                ),
+              ),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.arrow_forward, color: primaryColor),
+              onPressed: () =>
+                  Navigator.pushNamed(context, '/family-plan'),
+            ),
           const SizedBox(width: 8),
         ],
       ),
