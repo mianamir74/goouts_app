@@ -2,7 +2,7 @@ workflows:
 
   # ─── GoOuts Consumer App → TestFlight ────────────────────────────────────────
   goouts-consumer-ios:
-    name: GoOuts Consumer App - TestFlight
+    name: GoOuts Cashback App - TestFlight
     max_build_duration: 60
     instance_type: mac_mini_m2
 
