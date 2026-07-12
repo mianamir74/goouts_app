@@ -37,7 +37,7 @@ class BiometricService {
     try {
       return await _auth.authenticate(
         localizedReason: reason,
-        options: const AuthenticationOptions(
+        options: AuthenticationOptions(
           stickyAuth: true,
           biometricOnly: false, // allows PIN fallback on device level
         ),

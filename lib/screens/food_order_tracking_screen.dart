@@ -2031,4 +2031,173 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
       ),
     );
   }
+
+  // ── Addition card ──────────────────────────────────────────────────────────
+  Widget _buildAdditionCard(Map<String, dynamic> addition) {
+    final items = List<Map<String, dynamic>>.from(addition['items'] ?? []);
+    final status = addition['status'] as String? ?? 'pending';
+    final Color statusColor = status == 'approved'
+        ? Colors.green
+        : status == 'rejected'
+            ? Colors.red
+            : Colors.orange;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: statusColor.withOpacity(0.4)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 4, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Add to Order Request',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: _navy)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                child: Text(status.toUpperCase(),
+                    style: GoogleFonts.inter(color: statusColor, fontWeight: FontWeight.w700, fontSize: 10)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...items.map((item) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('${item['name']} ×${item['quantity']}',
+                        style: GoogleFonts.inter(fontSize: 12, color: Colors.grey[700])),
+                    Text('£${((item['subtotal'] ?? 0) as num).toStringAsFixed(2)}',
+                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: _navy)),
+                  ],
+                ),
+              )),
+        ],
+      ),
+    );
+  }
+
+  // ── Order summary card ─────────────────────────────────────────────────────
+  Widget _buildOrderSummary(Map<String, dynamic> order, List<Map<String, dynamic>> items) {
+    final subtotal = (order['subtotal'] ?? order['totalAmount'] ?? 0) as num;
+    final deliveryFee = (order['deliveryFee'] ?? 0) as num;
+    final total = (order['totalAmount'] ?? subtotal + deliveryFee) as num;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Order Summary',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 15, color: _navy)),
+          const SizedBox(height: 12),
+          ...items.map((item) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text('${item['name']} ×${item['quantity']}',
+                          style: GoogleFonts.inter(fontSize: 13, color: Colors.grey[700])),
+                    ),
+                    Text('£${((item['subtotal'] ?? (item['price'] ?? 0) * (item['quantity'] ?? 1)) as num).toStringAsFixed(2)}',
+                        style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: _navy)),
+                  ],
+                ),
+              )),
+          const Divider(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Delivery fee', style: GoogleFonts.inter(fontSize: 13, color: Colors.grey[600])),
+              Text('£${deliveryFee.toStringAsFixed(2)}',
+                  style: GoogleFonts.inter(fontSize: 13, color: Colors.grey[600])),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Total', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14, color: _navy)),
+              Text('£${total.toStringAsFixed(2)}',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14, color: _primary)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Delivery info card ─────────────────────────────────────────────────────
+  Widget _buildDeliveryInfo(Map<String, dynamic> order) {
+    final address = order['deliveryAddress'] as String? ?? order['address'] as String? ?? 'N/A';
+    final instructions = order['deliveryInstructions'] as String? ?? '';
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Delivery Details',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 15, color: _navy)),
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.location_on_rounded, color: _primary, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(address,
+                    style: GoogleFonts.inter(fontSize: 13, color: Colors.grey[700])),
+              ),
+            ],
+          ),
+          if (instructions.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline_rounded, color: Colors.grey[500], size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(instructions,
+                      style: GoogleFonts.inter(fontSize: 12, color: Colors.grey[600])),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── Data model ────────────────────────────────────────────────────────────────
+class _PickerItem {
+  final String id;
+  final String name;
+  final double price;
+  final String imageUrl;
+  const _PickerItem({required this.id, required this.name, required this.price, required this.imageUrl});
 }
