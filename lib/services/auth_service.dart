@@ -10,20 +10,28 @@ class AuthService {
     required void Function() onAutoVerified,
     required void Function(String message) onError,
   }) async {
-    await _auth.verifyPhoneNumber(
-      phoneNumber: phoneNumber,
-      verificationCompleted: (PhoneAuthCredential credential) async {
-        await _auth.signInWithCredential(credential);
-        onAutoVerified();
-      },
-      verificationFailed: (FirebaseAuthException e) {
-        onError(e.message ?? 'Failed to send OTP. Please try again.');
-      },
-      codeSent: (String verificationId, int? resendToken) {
-        onCodeSent(verificationId, resendToken);
-      },
-      codeAutoRetrievalTimeout: (String verificationId) {},
-    );
+    try {
+      await _auth.verifyPhoneNumber(
+        phoneNumber: phoneNumber,
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          try {
+            await _auth.signInWithCredential(credential);
+            onAutoVerified();
+          } catch (e) {
+            onError('Auto-verification failed. Please enter the code manually.');
+          }
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          onError(e.message ?? 'Failed to send OTP. Please try again.');
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          onCodeSent(verificationId, resendToken);
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {},
+      );
+    } catch (e) {
+      onError('Could not send verification code. Please check your connection and try again.');
+    }
   }
 
   /// Verify the 6-digit OTP code entered by user
@@ -45,18 +53,22 @@ class AuthService {
     required void Function(String verificationId, int? resendToken) onCodeSent,
     required void Function(String message) onError,
   }) async {
-    await _auth.verifyPhoneNumber(
-      phoneNumber: phoneNumber,
-      forceResendingToken: resendToken,
-      verificationCompleted: (_) {},
-      verificationFailed: (FirebaseAuthException e) {
-        onError(e.message ?? 'Failed to resend OTP.');
-      },
-      codeSent: (String verificationId, int? newResendToken) {
-        onCodeSent(verificationId, newResendToken);
-      },
-      codeAutoRetrievalTimeout: (_) {},
-    );
+    try {
+      await _auth.verifyPhoneNumber(
+        phoneNumber: phoneNumber,
+        forceResendingToken: resendToken,
+        verificationCompleted: (_) {},
+        verificationFailed: (FirebaseAuthException e) {
+          onError(e.message ?? 'Failed to resend OTP.');
+        },
+        codeSent: (String verificationId, int? newResendToken) {
+          onCodeSent(verificationId, newResendToken);
+        },
+        codeAutoRetrievalTimeout: (_) {},
+      );
+    } catch (e) {
+      onError('Could not resend code. Please check your connection and try again.');
+    }
   }
 
   /// Current signed-in user
