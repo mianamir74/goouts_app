@@ -863,7 +863,7 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
           .orderBy('name')
           .get();
       _menuItems = snap.docs
-          .map((d) {
+          .map<_PickerItem>((d) {
             final data = d.data();
             return _PickerItem(
               id:            d.id,
@@ -2199,5 +2199,19 @@ class _PickerItem {
   final String name;
   final double price;
   final String imageUrl;
-  const _PickerItem({required this.id, required this.name, required this.price, required this.imageUrl});
+  final String categoryId;
+  final bool isRecommended;
+  final bool isPopular;
+  final int orderCount;
+
+  const _PickerItem({
+    required this.id,
+    required this.name,
+    required this.price,
+    required this.imageUrl,
+    this.categoryId = '',
+    this.isRecommended = false,
+    this.isPopular = false,
+    this.orderCount = 0,
+  });
 }
