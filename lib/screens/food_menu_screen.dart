@@ -144,7 +144,7 @@ class _FoodMenuScreenState extends State<FoodMenuScreen> {
 
       // Collect popular/recommended items (deduplicated, sorted by orderCount)
       final popular = cats
-          .expand((c) => c.items)
+          .expand<_MenuItem>((c) => c.items)
           .where((i) => i.isPopular || i.isRecommended)
           .fold<Map<String, _MenuItem>>({}, (map, i) { map[i.id] = i; return map; })
           .values
@@ -154,7 +154,7 @@ class _FoodMenuScreenState extends State<FoodMenuScreen> {
       // If no flagged items, fall back to top 6 by orderCount
       final topPicks = popular.isNotEmpty
           ? popular.take(8).toList()
-          : (cats.expand((c) => c.items).toList()
+          : (cats.expand<_MenuItem>((c) => c.items).toList()
               ..sort((a, b) => b.orderCount.compareTo(a.orderCount)))
               .take(6)
               .toList();
@@ -1011,9 +1011,9 @@ class _ItemSearchSheetState extends State<_ItemSearchSheet> {
 
   List<_MenuItem> get _results {
     final q = _query.toLowerCase();
-    if (q.isEmpty) return widget.categories.expand((c) => c.items).toList();
+    if (q.isEmpty) return widget.categories.expand<_MenuItem>((c) => c.items).toList();
     return widget.categories
-        .expand((c) => c.items)
+        .expand<_MenuItem>((c) => c.items)
         .where((i) =>
             i.name.toLowerCase().contains(q) ||
             i.description.toLowerCase().contains(q))
@@ -1198,35 +1198,4 @@ class _MenuItem {
     final lineTotal = price * qty;
     return double.parse((lineTotal - (lineTotal / (1 + vatRate / 100))).toStringAsFixed(2));
   }
-}
-══════════════════════════════════════════
-class _MenuCategory {
-  final String id;
-  final String name;
-  final List<_MenuItem> items;
-  const _MenuCategory({required this.id, required this.name, required this.items});
-}
-
-class _MenuItem {
-  final String id;
-  final String name;
-  final String description;
-  final double price;
-  final String imageUrl;
-  final String categoryId;
-  final bool isPopular;
-  final bool isRecommended;
-  final int  orderCount;
-
-  const _MenuItem({
-    required this.id,
-    required this.name,
-    required this.description,
-    required this.price,
-    required this.imageUrl,
-    required this.categoryId,
-    this.isPopular      = false,
-    this.isRecommended  = false,
-    this.orderCount     = 0,
-  });
 }
