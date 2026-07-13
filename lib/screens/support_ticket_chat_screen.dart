@@ -1,7 +1,12 @@
-import '../services/support_ticket_service.dart';
-
+import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import '../services/support_ticket_service.dart';
 import '../widgets/goouts_sheet.dart';
+
 class SupportTicketChatScreen extends StatefulWidget {
   final String ticketId;
   final String subject;
@@ -747,5 +752,4 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
       ),
     );
   }
-import '../widgets/goouts_sheet.dart';
 }

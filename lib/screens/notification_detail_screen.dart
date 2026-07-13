@@ -1,9 +1,8 @@
-import 'package:google_fonts/google_fonts.dart';
-
-import 'package:google_fonts/google_fonts.dart';
-// ─── Design tokens (Stitch) ───────────────────────────────────────────────────
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../widgets/goouts_sheet.dart';
+
 const Color _primary          = Color(0xFF0392CA);
 const Color _surfaceColor     = Color(0xFFF9F9FC);
 const Color _onSurface        = Color(0xFF191C1E);
@@ -384,5 +383,4 @@ class NotificationDetailScreen extends StatelessWidget {
       ]),
     );
   }
-import '../widgets/goouts_sheet.dart';
 }

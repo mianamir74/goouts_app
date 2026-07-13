@@ -1,7 +1,11 @@
-import '../services/family_service.dart';
-
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:confetti/confetti.dart';
+import 'dart:math';
+import '../services/user_service.dart';
 import '../services/family_service.dart';
 import '../widgets/goouts_sheet.dart';
+
 class GoOutsPlusUnlockedScreen extends StatefulWidget {
   const GoOutsPlusUnlockedScreen({super.key});
 
@@ -677,5 +681,4 @@ class _GoOutsPlusUnlockedScreenState extends State<GoOutsPlusUnlockedScreen>
           ],
         ),
       );
-import '../widgets/goouts_sheet.dart';
 }
