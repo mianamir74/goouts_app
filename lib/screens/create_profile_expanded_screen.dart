@@ -40,6 +40,7 @@ class _CreateProfileExpandedScreenState
   bool _isLookingUp = false;
   bool _isPostcodeVerified = false;
   bool _showManualEntryHint = false;
+  List<MapboxAddressResult> _addressSuggestions = [];
   String _selectedCountry = 'United Kingdom';
   String _selectedPrefix = 'Mr';
 
@@ -210,7 +211,7 @@ class _CreateProfileExpandedScreenState
     return buf.toString();
   }
 
-  // ── Postcode lookup ────────────────────────────────────────────────────────
+  // ── Postcode lookup → address dropdown ────────────────────────────────────
   Future<void> _lookupPostcode() async {
     final postcode = _postcodeController.text.trim();
     if (postcode.isEmpty) {
@@ -220,39 +221,48 @@ class _CreateProfileExpandedScreenState
       );
       return;
     }
-    setState(() => _isLookingUp = true);
+    setState(() { _isLookingUp = true; _addressSuggestions = []; });
 
-    final result = await _addressService.validatePostcode(postcode);
+    final results = await _addressService.validatePostcode(postcode);
     setState(() => _isLookingUp = false);
 
     if (!mounted) return;
 
-    if (result == null) {
+    if (results.isEmpty) {
       setState(() {
         _isPostcodeVerified = false;
         _showManualEntryHint = true;
       });
       GoOutsSheet.warning(context,
         title: 'Postcode Not Found',
-        message: 'Postcode not found. Please check and try again, or enter your address manually.',
+        message: 'No addresses found for this postcode. Please check and try again, or enter your address manually.',
       );
       return;
     }
 
-    // Auto-fill town, city and country from Mapbox result
-    final String inferredCity =
-        AddressLookupService.inferCityFromPostcode(postcode) ?? result.city;
-    final String country = AddressLookupService.isNorthernIrelandPostcode(postcode)
+    setState(() {
+      _addressSuggestions = results;
+      _isPostcodeVerified = false;
+      _showManualEntryHint = false;
+    });
+  }
+
+  // ── User picks address from dropdown ────────────────────────────────────────
+  void _onAddressSelected(MapboxAddressResult address) {
+    final String country = AddressLookupService.isNorthernIrelandPostcode(address.postcode)
         ? 'Northern Ireland'
-        : 'United Kingdom';
+        : address.country ?? 'United Kingdom';
 
     setState(() {
-      _postcodeController.text = result.postcode;
-      _townController.text = result.city.toUpperCase();
-      _cityController.text = inferredCity;
-      _selectedCountry = _countries.contains(country) ? country : 'United Kingdom';
-      _isPostcodeVerified = true;
-      _showManualEntryHint = false;
+      _postcodeController.text    = address.postcode;
+      _houseNoController.text     = address.houseNumber ?? '';
+      _streetNameController.text  = address.street ?? '';
+      _townController.text        = (address.town ?? address.city).toUpperCase();
+      _cityController.text        = address.city;
+      _selectedCountry            = _countries.contains(country) ? country : 'United Kingdom';
+      _isPostcodeVerified         = true;
+      _showManualEntryHint        = false;
+      _addressSuggestions         = [];
     });
   }
 
@@ -663,6 +673,85 @@ class _CreateProfileExpandedScreenState
                       ),
                     ],
                   ),
+
+                  // ── Address dropdown (after Look Up returns results) ──
+                  if (_addressSuggestions.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: _primary.withOpacity(0.2)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
+                            child: Text(
+                              'Select your address:',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ),
+                          ..._addressSuggestions.map((addr) => InkWell(
+                            onTap: () => _onAddressSelected(addr),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 10),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.location_on_outlined,
+                                      color: _primary, size: 16),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          addr.fullAddress
+                                              .split(',')
+                                              .take(2)
+                                              .join(','),
+                                          style: GoogleFonts.inter(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: _dark,
+                                          ),
+                                        ),
+                                        Text(
+                                          addr.postcode,
+                                          style: GoogleFonts.inter(
+                                            fontSize: 11,
+                                            color: Colors.grey[500],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const Icon(Icons.chevron_right_rounded,
+                                      color: Colors.grey, size: 16),
+                                ],
+                              ),
+                            ),
+                          )),
+                          const SizedBox(height: 4),
+                        ],
+                      ),
+                    ),
+                  ],
 
                   // Status banners
                   if (_isPostcodeVerified) ...[
