@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/referral_service.dart';
+import '../widgets/goouts_sheet.dart';
 
 class ReferFriendScreen extends StatefulWidget {
   const ReferFriendScreen({super.key});
@@ -520,4 +521,24 @@ class _ReferFriendScreenState extends State<ReferFriendScreen> {
                           color: done
                               ? _green.withOpacity(0.1)
                               : Colors.orange.withOpacity(0.1),
-            
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          done ? '+£2.00' : 'Pending',
+                          style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: done ? _green : Colors.orange[700]),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}

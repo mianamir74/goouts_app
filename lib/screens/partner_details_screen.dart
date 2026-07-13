@@ -10,6 +10,7 @@ import '../services/user_service.dart';
 import '../services/transaction_service.dart';
 import '../services/visit_verifier.dart';
 import '../utils/pin_hasher.dart';
+import '../widgets/goouts_sheet.dart';
 
 enum _VerifyState { loading, passed, failed, waiting }
 
@@ -3478,4 +3479,38 @@ class _SocialBoostSheetState extends State<_SocialBoostSheet>
               onPressed: () {
                 widget.onDone?.call();
                 Navigator.pop(context);
-    
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0A7A3E),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              child: Text('Done',
+                  style: GoogleFonts.inter(
+                      fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
+            ),
+          ],
+        ),
+      );
+    }
+
+  // ── Social chip helper ──────────────────────────────────────────────────────
+  Widget _socialChip(IconData icon, String label, LinearGradient gradient) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        gradient: gradient,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 16),
+          const SizedBox(width: 6),
+          Text(label,
+              style: GoogleFonts.inter(
+                  fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+        ],
+      ),
+    );
+  }
+}

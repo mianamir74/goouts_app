@@ -457,4 +457,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         const SizedBox(height: 4),
         Text(label, style: GoogleFonts.inter(
             color: _onSurfaceVariant, fontSize: 11)),
-      ])
+      ]),
+    );
+  }
+}
