@@ -31,6 +31,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   int    _reviewPoints  = 0;
   int    _visitCount    = 0;
   bool _firstCashbackEarned = false;
+  String _memberSince = '';
 
   Future<void> _pickProfileImage() async {
     final source = await showModalBottomSheet<ImageSource>(
@@ -146,6 +147,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _reviewPoints  = (data['reviewPoints'] as num?)?.toInt() ?? 0;
         _firstCashbackEarned = data['firstCashbackEarned'] as bool? ?? false;
         _photoUrl = data['photoUrl'] as String?;
+        final ts = data['createdAt'];
+        if (ts is Timestamp) {
+          final dt = ts.toDate();
+          _memberSince = 'Member since ${_monthName(dt.month)} ${dt.year}';
+        } else {
+          _memberSince = 'GoOuts Member';
+        }
         _address1 = data['address1'] as String? ?? '';
         _address2 = data['address2'] as String? ?? '';
         _city = data['city'] as String? ?? '';
@@ -167,6 +175,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (mounted) setState(() => _visitCount = snap.count ?? 0);
       }
     } catch (_) {}
+  }
+
+  String _monthName(int month) {
+    const months = ['Jan','Feb','Mar','Apr','May','Jun',
+                    'Jul','Aug','Sep','Oct','Nov','Dec'];
+    return months[(month - 1).clamp(0, 11)];
   }
 
   @override
@@ -339,7 +353,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
             const SizedBox(height: 4),
-            Text('Premium Member since 2023',
+            Text(_memberSince.isNotEmpty ? _memberSince : 'GoOuts Member',
                 style:
                     GoogleFonts.inter(fontSize: 13, color: Colors.grey[500])),
             const SizedBox(height: 14),
@@ -409,7 +423,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final String subtitle = _kycSubmitted
         ? 'Your identity has been verified successfully.'
         : _kycPending
-            ? 'Your documents are being reviewed — usually 2 minutes.'
+            ? 'Your documents are under review. We\'ll notify you within 1–2 business days.'
             : 'Required to unlock higher limits & cashback.';
 
     return GestureDetector(

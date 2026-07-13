@@ -56,6 +56,16 @@ class UserService {
 
     final hashedPin = PinHasher.hash(pin, user.uid);
 
+    // Preserve photoUrl set by create_profile_screen before this call.
+    // createUser() does a full .set() which would wipe it otherwise.
+    String? existingPhotoUrl;
+    try {
+      final existing = await _db.collection('users').doc(user.uid).get();
+      if (existing.exists) {
+        existingPhotoUrl = existing.data()?['photoUrl'] as String?;
+      }
+    } catch (_) {}
+
     await _db.collection('users').doc(user.uid).set({
       'uid': user.uid,
       'phone': user.phoneNumber ?? '',
@@ -88,6 +98,7 @@ class UserService {
       'inviteCode': ReferralService.generateInviteCode(), // unique invite code
       'referredByUid': null,
       'referralRewarded': false,
+      'photoUrl': existingPhotoUrl ?? '',
       'createdAt': FieldValue.serverTimestamp(),
     });
 

@@ -99,7 +99,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       if (cats.isEmpty) {
         cats = [
           {'icon': Icons.coffee_rounded,         'label': 'Cafes',       'route': 'Cafes',       'color': const Color(0xFF5C3D1E)},
-          {'icon': Icons.restaurant_rounded,     'label': 'Restaurants', 'route': 'Restaurants', 'color': const Color(0xFF3B1F0A)},
+          {'icon': Icons.restaurant_rounded,     'label': 'Restaurant', 'route': 'Restaurants', 'color': const Color(0xFF3B1F0A)},
           {'icon': Icons.sports_bar_rounded,     'label': 'Pubs',        'route': 'Pubs',        'color': const Color(0xFF1A3A1A)},
           {'icon': Icons.nightlife_rounded,      'label': 'Clubs',       'route': 'Clubs',       'color': const Color(0xFF1A0533)},
           {'icon': Icons.fastfood_rounded,       'label': 'Fast Food',   'route': 'Fast Food',   'color': const Color(0xFF0A2A4A)},
@@ -135,7 +135,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   Map<String, dynamic> _partnerToCard(Map<String, dynamic> doc) {
     final cat = doc['category']?.toString() ?? '';
-    final pct = (doc['cashbackPercent'] as num?) ?? 0;
+    final pct = (doc['cashbackPercent'] as num?) ?? (doc['cashbackPct'] as num?) ?? 0;
     final ts  = doc['createdAt'];
     return {
       ...doc,
@@ -370,7 +370,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
         // ── Horizontal page of icons ──────────────────────
         SizedBox(
-          height: 108,
+          height: 116,
           child: PageView.builder(
             controller: _catPageController,
             itemCount: pages.length,
@@ -413,7 +413,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                             ),
                             const SizedBox(height: 8),
                             SizedBox(
-                              height: 32,
+                              height: 40,
                               child: Align(
                                 alignment: Alignment.topCenter,
                                 child: Text(
