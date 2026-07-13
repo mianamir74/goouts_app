@@ -18,9 +18,13 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
   File? _profileImage;
   bool _isUploading = false;
 
+  // KYC doc type pre-selection ('driving_licence' | 'passport' | null)
+  String? _selectedDocType;
+
   Future<void> _pickImage() async {
     final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+    final picked =
+        await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
     if (picked != null) {
       setState(() {
         _profileImage = File(picked.path);
@@ -46,11 +50,26 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
               .set({'photoUrl': url}, SetOptions(merge: true));
         }
       } catch (_) {
-        // Silently ignore — photo can be added later from profile
+        // Photo can be added later from profile
       } finally {
         if (mounted) setState(() => _isUploading = false);
       }
     }
+
+    // Store pre-selected KYC doc type so KYC screen can pre-fill later
+    if (_selectedDocType != null) {
+      try {
+        final uid = FirebaseAuth.instance.currentUser?.uid;
+        if (uid != null) {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(uid)
+              .set({'preferredKycDocType': _selectedDocType},
+                  SetOptions(merge: true));
+        }
+      } catch (_) {}
+    }
+
     if (mounted) Navigator.pushNamed(context, '/create-profile-expanded');
   }
 
@@ -60,89 +79,70 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
       backgroundColor: const Color(0xFF0392CA),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 12),
 
-              // ── Header ─────────────────────────────────────────────────
-              Stack(
-                alignment: Alignment.center,
+              // ── Header row ─────────────────────────────────────────────
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: IconButton(
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                          color: Colors.white, size: 20),
-                      padding: EdgeInsets.zero,
-                      onPressed: () => Navigator.pop(context),
-                    ),
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                        color: Colors.white, size: 20),
+                    padding: EdgeInsets.zero,
+                    onPressed: () => Navigator.pop(context),
                   ),
-                  Text(
-                    'GoOuts',
-                    style: GoogleFonts.inter(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: -0.5,
+                  // GoOuts cloud/upload icon (top centre)
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      shape: BoxShape.circle,
                     ),
+                    child: const Icon(Icons.cloud_upload_outlined,
+                        color: Colors.white, size: 20),
                   ),
+                  // Spacer to balance back arrow
+                  const SizedBox(width: 40),
                 ],
               ),
 
               const SizedBox(height: 20),
 
-              // ── Step indicator ─────────────────────────────────────────
-              _buildStepIndicator(),
-
-              const SizedBox(height: 24),
-
               // ── Title ──────────────────────────────────────────────────
               Text(
-                'Set Up Your Profile',
+                'Create Profile',
                 style: GoogleFonts.inter(
-                  fontSize: 28,
+                  fontSize: 30,
                   fontWeight: FontWeight.w800,
                   color: Colors.white,
+                  height: 1.1,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(
-                'Add a profile photo to personalise your account.',
+                'Complete your registration to join GoOuts.',
                 style: GoogleFonts.inter(
                   fontSize: 14,
-                  color: Colors.white.withOpacity(0.85),
+                  color: Colors.white.withOpacity(0.8),
                   height: 1.5,
                 ),
               ),
 
-              const SizedBox(height: 32),
+              const SizedBox(height: 28),
 
-              // ── Profile Picture ────────────────────────────────────────
-              _label('Profile Picture'),
-              const SizedBox(height: 6),
-              Text(
-                'Optional — you can add one later from your profile.',
-                style: GoogleFonts.inter(
-                    fontSize: 12, color: Colors.white.withOpacity(0.65)),
-              ),
+              // ── Profile Picture ─────────────────────────────────────────
+              _sectionLabel('Profile Picture'),
               const SizedBox(height: 12),
               GestureDetector(
                 onTap: _pickImage,
-                child: Container(
-                  width: double.infinity,
-                  height: 150,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: _hasPhoto
-                          ? Colors.white
-                          : Colors.white.withOpacity(0.4),
-                      width: 1.5,
-                    ),
-                  ),
+                child: _DashedBorderContainer(
+                  height: 160,
+                  highlighted: _hasPhoto,
                   child: _profileImage != null
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(13),
@@ -150,9 +150,7 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                             fit: StackFit.expand,
                             children: [
                               Image.file(_profileImage!, fit: BoxFit.cover),
-                              Container(
-                                color: Colors.black.withOpacity(0.25),
-                              ),
+                              Container(color: Colors.black.withOpacity(0.25)),
                               Center(
                                 child: Text(
                                   'Tap to change',
@@ -170,30 +168,27 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Container(
-                              width: 64,
-                              height: 64,
+                              width: 56,
+                              height: 56,
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.15),
+                                color: Colors.white.withOpacity(0.2),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(
-                                Icons.add_a_photo_rounded,
-                                color: Colors.white,
-                                size: 30,
-                              ),
+                              child: const Icon(Icons.person_outline_rounded,
+                                  color: Colors.white, size: 28),
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 10),
                             Text(
-                              'Upload from Gallery',
+                              'Choose a Photo',
                               style: GoogleFonts.inter(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
                                 color: Colors.white,
                               ),
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 3),
                             Text(
-                              'JPG or PNG supported',
+                              'Make a great first impression',
                               style: GoogleFonts.inter(
                                 fontSize: 12,
                                 color: Colors.white.withOpacity(0.65),
@@ -204,32 +199,53 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                 ),
               ),
 
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
 
-              // ── Info card ──────────────────────────────────────────────
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(12),
+              // ── KYC Document Selection ──────────────────────────────────
+              _sectionLabel('KYC Verification (mandatory by law)'),
+              const SizedBox(height: 4),
+              Text(
+                'Required under UK Anti-Money Laundering Regulations. Choose your ID document.',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: Colors.white.withOpacity(0.7),
+                  height: 1.4,
                 ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.info_outline_rounded,
-                        color: Colors.white, size: 18),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Your identity will be verified in the next step. Make sure your details match your official ID.',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: Colors.white.withOpacity(0.85),
-                          height: 1.5,
-                        ),
+              ),
+              const SizedBox(height: 12),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: _DocTypeCard(
+                      icon: Icons.credit_card_rounded,
+                      label: 'Driving\nLicence',
+                      selected: _selectedDocType == 'driving_licence',
+                      onTap: () => setState(
+                          () => _selectedDocType = 'driving_licence'),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(
+                      'OR',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white.withOpacity(0.7),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  Expanded(
+                    child: _DocTypeCard(
+                      icon: Icons.badge_outlined,
+                      label: 'Passport',
+                      selected: _selectedDocType == 'passport',
+                      onTap: () =>
+                          setState(() => _selectedDocType = 'passport'),
+                    ),
+                  ),
+                ],
               ),
 
               const SizedBox(height: 32),
@@ -268,20 +284,31 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                 ),
               ),
 
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
 
-              // ── Skip for now ───────────────────────────────────────────
+              // ── T&C notice ─────────────────────────────────────────────
               Center(
-                child: TextButton(
-                  onPressed: () => Navigator.pushNamed(
-                      context, '/create-profile-expanded'),
-                  child: Text(
-                    'Skip for now',
+                child: RichText(
+                  textAlign: TextAlign.center,
+                  text: TextSpan(
                     style: GoogleFonts.inter(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white.withOpacity(0.75),
+                      fontSize: 12,
+                      color: Colors.white.withOpacity(0.65),
                     ),
+                    children: [
+                      const TextSpan(text: 'By continuing, you agree to our '),
+                      TextSpan(
+                        text: 'Terms and Conditions',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                          decoration: TextDecoration.underline,
+                          decorationColor: Colors.white,
+                        ),
+                      ),
+                      const TextSpan(text: '.'),
+                    ],
                   ),
                 ),
               ),
@@ -294,69 +321,167 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
     );
   }
 
-  Widget _label(String text) => Text(
+  Widget _sectionLabel(String text) => Text(
         text,
         style: GoogleFonts.inter(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
           color: Colors.white,
         ),
       );
+}
 
-  Widget _buildStepIndicator() => Row(
-        children: [
-          _stepDot(1, active: true, done: false),
-          _stepLine(active: false),
-          _stepDot(2, active: false, done: false),
-        ],
-      );
+// ── Dashed border container ─────────────────────────────────────────────────
+class _DashedBorderContainer extends StatelessWidget {
+  final Widget child;
+  final double height;
+  final bool highlighted;
 
-  Widget _stepDot(int step, {required bool active, required bool done}) =>
-      Row(
-        children: [
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              color: active || done
-                  ? Colors.white
-                  : Colors.white.withOpacity(0.25),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: done
-                  ? const Icon(Icons.check_rounded,
-                      color: Color(0xFF0392CA), size: 16)
-                  : Text(
-                      '$step',
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: active
-                            ? const Color(0xFF0392CA)
-                            : Colors.white.withOpacity(0.5),
-                      ),
-                    ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            step == 1 ? 'Profile Photo' : 'Your Details',
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              fontWeight: active ? FontWeight.w700 : FontWeight.w400,
-              color:
-                  active ? Colors.white : Colors.white.withOpacity(0.5),
-            ),
-          ),
-        ],
-      );
+  const _DashedBorderContainer({
+    required this.child,
+    required this.height,
+    this.highlighted = false,
+  });
 
-  Widget _stepLine({required bool active}) => Expanded(
-        child: Container(
-          height: 2,
-          margin: const EdgeInsets.symmetric(horizontal: 8),
-          color: active ? Colors.white : Colors.white.withOpacity(0.25),
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _DashedBorderPainter(
+        color: highlighted
+            ? Colors.white
+            : Colors.white.withOpacity(0.45),
+        radius: 14,
+        dashWidth: 6,
+        dashSpace: 5,
+        strokeWidth: 1.5,
+      ),
+      child: Container(
+        width: double.infinity,
+        height: height,
+        decoration: BoxDecoration(
+          color: highlighted
+              ? Colors.white.withOpacity(0.15)
+              : Colors.white.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(14),
         ),
-      );
+        child: child,
+      ),
+    );
+  }
+}
+
+class _DashedBorderPainter extends CustomPainter {
+  final Color color;
+  final double radius;
+  final double dashWidth;
+  final double dashSpace;
+  final double strokeWidth;
+
+  const _DashedBorderPainter({
+    required this.color,
+    required this.radius,
+    required this.dashWidth,
+    required this.dashSpace,
+    required this.strokeWidth,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke;
+
+    final rect =
+        Rect.fromLTWH(strokeWidth / 2, strokeWidth / 2,
+            size.width - strokeWidth, size.height - strokeWidth);
+    final rrect = RRect.fromRectAndRadius(rect, Radius.circular(radius));
+    final path = Path()..addRRect(rrect);
+
+    final metrics = path.computeMetrics();
+    for (final metric in metrics) {
+      double distance = 0;
+      while (distance < metric.length) {
+        canvas.drawPath(
+          metric.extractPath(distance, distance + dashWidth),
+          paint,
+        );
+        distance += dashWidth + dashSpace;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedBorderPainter old) =>
+      old.color != color ||
+      old.radius != radius ||
+      old.dashWidth != dashWidth ||
+      old.dashSpace != dashSpace ||
+      old.strokeWidth != strokeWidth;
+}
+
+// ── KYC document type card ───────────────────────────────────────────────────
+class _DocTypeCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _DocTypeCard({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: CustomPaint(
+        painter: _DashedBorderPainter(
+          color: selected ? Colors.white : Colors.white.withOpacity(0.45),
+          radius: 14,
+          dashWidth: 6,
+          dashSpace: 5,
+          strokeWidth: 1.5,
+        ),
+        child: Container(
+          height: 100,
+          decoration: BoxDecoration(
+            color: selected
+                ? Colors.white.withOpacity(0.2)
+                : Colors.white.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(selected ? 0.25 : 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon,
+                    color: Colors.white, size: 20),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
