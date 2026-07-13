@@ -10,6 +10,7 @@ import '../services/user_service.dart';
 import '../services/message_service.dart';
 import '../services/user_fcm_service.dart';
 import '../widgets/promo_overlay.dart';
+import '../widgets/goouts_sheet.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -119,7 +120,10 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _uploadingPhoto = true);
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid == null) return;
+      if (uid == null) {
+        if (mounted) setState(() => _uploadingPhoto = false);
+        return;
+      }
       final ref = FirebaseStorage.instance
           .ref()
           .child('users/$uid/profile_photo.jpg');
@@ -129,10 +133,21 @@ class _HomeScreenState extends State<HomeScreen> {
           .collection('users')
           .doc(uid)
           .set({'photoUrl': url}, SetOptions(merge: true));
-      if (mounted) setState(() => _photoUrl = url);
-    } catch (_) {
-    } finally {
-      if (mounted) setState(() => _uploadingPhoto = false);
+      if (mounted) {
+        setState(() { _photoUrl = url; _uploadingPhoto = false; });
+        GoOutsSheet.success(context,
+          title: 'Photo Updated',
+          message: 'Your profile photo has been saved.',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _uploadingPhoto = false);
+        GoOutsSheet.error(context,
+          title: 'Upload Failed',
+          message: 'Could not save your photo. Please check your connection and try again.',
+        );
+      }
     }
   }
 

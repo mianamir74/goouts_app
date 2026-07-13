@@ -80,11 +80,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
         await UserService().updateUser({'photoUrl': url});
         if (mounted) setState(() => _photoUrl = url);
       }
-    } catch (_) {
-      // Photo kept locally even if upload fails
-    } finally {
-      if (mounted) setState(() => _uploadingPhoto = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _uploadingPhoto = false);
+        GoOutsSheet.error(context,
+          title: 'Upload Failed',
+          message: 'Could not save your photo. Please check your connection and try again.',
+        );
+      }
+      return;
     }
+    if (mounted) setState(() => _uploadingPhoto = false);
   }
 
   Widget _photoOption(IconData icon, String label, ImageSource source) =>

@@ -1441,6 +1441,10 @@ PART 6 — CASHBACK & REWARDS (GENERAL)
 
 6.5 Cashback held in your Wallet has no expiry date, provided your account remains active. Accounts that have been inactive for twenty-four (24) consecutive months may be subject to account closure procedures, following thirty (30) days' written notice.
 
+6.6 CASHBACK REDEMPTION — NO CASH WITHDRAWAL
+
+GoOuts Cashback — including any Wallet balance credited from Cashback earnings or a Cashback Advance — is a loyalty reward for use exclusively at participating GoOuts Partner businesses. Cashback cannot be withdrawn as cash, transferred to a bank account, converted to currency, sent to a third party, or paid out in any form other than redemption at a GoOuts Partner. This restriction applies to all Cashback balances, including Escrow Cashback and any Advance amounts credited under Part 5. GoOuts does not offer a cash-out or withdrawal feature.
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 PART 7 — PAYMENT VERIFICATION & FRAUD PREVENTION
@@ -1468,11 +1472,44 @@ PART 8 — AUTHORISED PAYMENT METHOD & DIRECT DEBIT MANDATE
 
 PART 9 — KYC & IDENTITY VERIFICATION
 
-9.1 GoOuts is required under the Money Laundering, Terrorist Financing and Transfer of Funds (Information on the Payer) Regulations 2017 to verify the identity of its users.
+9.1 LEGAL BASIS
 
-9.2 You agree to provide any documentation reasonably requested by GoOuts to complete identity verification, including but not limited to: government-issued photo ID, proof of address, and a biometric selfie.
+GoOuts Technologies Limited is required by law to verify the identity of all account holders under the Money Laundering, Terrorist Financing and Transfer of Funds (Information on the Payer) Regulations 2017 (SI 2017/692) ("MLR 2017") and the Proceeds of Crime Act 2002. The full text of MLR 2017 is available at: https://www.legislation.gov.uk/uksi/2017/692/contents As a business operating a cashback rewards and digital wallet platform in the United Kingdom, GoOuts is subject to UK Anti-Money Laundering ("AML") obligations and is required to conduct Know Your Customer ("KYC") checks before users can actively use cashback and wallet features.
 
-9.3 Failure to complete identity verification within the requested timeframe may result in account restrictions, including suspension of the Wallet, Cashback, and Advance Facility.
+9.2 KYC IS MANDATORY
+
+All account holders must complete identity verification to access GoOuts' full cashback and wallet services. You will be prompted to complete KYC verification within the GoOuts app after registration. We aim to make this process quick and straightforward — typically under five minutes.
+
+9.3 WHAT YOU NEED TO PROVIDE
+
+To verify your identity, you will be asked to submit:
+  (a) a valid, government-issued photo ID (UK passport or driving licence); and
+  (b) a short selfie taken within the app to confirm that the document belongs to you.
+
+9.4 GRACE PERIOD
+
+We understand that completing verification immediately may not always be convenient. You may explore the GoOuts app and accumulate Cashback during a short grace period following registration. However, Cashback redemption and wallet spending will be restricted until KYC verification is approved. You will receive clear in-app prompts to complete verification, with reasonable notice before any restriction takes effect.
+
+9.5 FAILURE TO VERIFY
+
+If identity verification is not completed within the timeframe notified to you in-app, GoOuts reserves the right to:
+  (a) restrict your ability to redeem Cashback or use wallet features;
+  (b) suspend your account pending completion of verification; or
+  (c) in cases of suspected fraud or money laundering, close your account and report the matter to the relevant authorities.
+
+GoOuts will always provide written notice (via in-app message and registered email) before applying account restrictions under this Clause, except where immediate action is required to prevent fraud or comply with a legal obligation.
+
+9.6 RE-VERIFICATION
+
+GoOuts may request that you re-verify your identity where required by law, where we detect unusual account activity, or where a material change in your account usage warrants additional checks.
+
+9.7 DATA HANDLING
+
+Your verification documents are processed by our trusted identity-verification provider under strict data protection standards. GoOuts does not retain copies of your ID documents beyond the period required for verification and compliance purposes. All personal data is handled in accordance with our Privacy Policy and the UK General Data Protection Regulation (UK GDPR).
+
+9.8 CASHBACK REDEMPTION — RELATIONSHIP TO KYC
+
+GoOuts Cashback is a loyalty reward redeemable exclusively at participating GoOuts Partner businesses. It is not a financial product and cannot be withdrawn as cash or transferred to a bank account (see Clause 6.6). Nonetheless, our AML obligations under MLR 2017 apply to the operation of the GoOuts Wallet and cashback platform. KYC verification is therefore required for full platform access regardless of whether funds are withdrawn.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 

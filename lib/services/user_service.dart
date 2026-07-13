@@ -81,7 +81,7 @@ class UserService {
       'city': city,
       'country': country,
       'role': 'customer',
-      'kycStatus': 'pending',
+      'kycStatus': 'not_started',
       'walletBalance': 2.0,   // £2 welcome bonus credited on registration
       'cashbackBalance': 0.0,
       'cashbackPoints': 0,
