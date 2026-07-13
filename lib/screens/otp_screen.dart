@@ -115,12 +115,19 @@ class _OtpScreenState extends State<OtpScreen>
   // Input handling
   // ─────────────────────────────────────────────────────────────────────────
   void _onChanged(String value, int index) {
-    // Clear error state when user starts typing again
     if (_hasError) setState(() => _hasError = false);
 
     if (value.length == 6) {
-      // Full paste into first field — distribute across all boxes
+      // Full paste OR iOS autofill into box 0 — distribute across all boxes
       _fillFromString(value);
+      return;
+    }
+
+    // Backspace on empty box → move to previous box
+    if (value.isEmpty && index > 0) {
+      _focusNodes[index - 1].requestFocus();
+      _controllers[index - 1].clear();
+      setState(() {});
       return;
     }
 
@@ -130,7 +137,6 @@ class _OtpScreenState extends State<OtpScreen>
 
     setState(() {});
 
-    // Auto-submit when last box filled
     if (index == 5 && value.isNotEmpty && _isComplete) {
       Future.delayed(const Duration(milliseconds: 100), _verify);
     }
@@ -367,10 +373,7 @@ class _OtpScreenState extends State<OtpScreen>
                     return SizedBox(
                       width: 48,
                       height: 56,
-                      child: KeyboardListener(
-                        focusNode: FocusNode(),
-                        onKeyEvent: (e) => _onKeyEvent(e, index),
-                        child: TextField(
+                      child: TextField(
                           controller: _controllers[index],
                           focusNode: _focusNodes[index],
                           autofillHints: index == 0
@@ -378,7 +381,9 @@ class _OtpScreenState extends State<OtpScreen>
                               : null,
                           keyboardType: TextInputType.number,
                           textAlign: TextAlign.center,
-                          maxLength: 1,
+                          // box 0 accepts 6 chars so iOS autofill can insert full code
+                          // _onChanged immediately distributes to all 6 boxes
+                          maxLength: index == 0 ? 6 : 1,
                           inputFormatters: [
                             FilteringTextInputFormatter.digitsOnly,
                           ],
@@ -428,7 +433,6 @@ class _OtpScreenState extends State<OtpScreen>
                             ),
                           ),
                         ),
-                      ),
                     );
                   }),
                 ),
