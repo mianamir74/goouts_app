@@ -55,8 +55,10 @@ class _PreAuthSupportSheetState extends State<_PreAuthSupportSheet> {
 
   Future<void> _submit() async {
     if (_selectedTopic == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a topic.')));
+      GoOutsSheet.warning(context,
+        title: 'Topic Required',
+        message: 'Please select a topic.',
+      );
       return;
     }
     if (!(_formKey.currentState?.validate() ?? false)) return;
@@ -122,8 +124,10 @@ class _PreAuthSupportSheetState extends State<_PreAuthSupportSheet> {
     } catch (_) {
       if (mounted) {
         setState(() => _submitting = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to send. Please try again.')));
+        GoOutsSheet.error(context,
+          title: 'Send Failed',
+          message: 'Failed to send. Please try again.',
+        );
       }
     }
   }
