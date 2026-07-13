@@ -413,12 +413,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             : 'Required to unlock higher limits & cashback.';
 
     return GestureDetector(
-      onTap: done
-          ? null
-          : () async {
-              await Navigator.pushNamed(context, '/kyc');
-              if (mounted) _loadProfile();
-            },
+      onTap: () async {
+        await Navigator.pushNamed(context, '/kyc');
+        if (mounted) _loadProfile();
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 400),
         margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -456,9 +454,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
-            if (!done)
-              const Icon(Icons.chevron_right_rounded,
-                  color: Color(0xFFF59E0B), size: 20),
+            Icon(Icons.chevron_right_rounded,
+                color: done ? Colors.grey[400]! : const Color(0xFFF59E0B),
+                size: 20),
           ],
         ),
       ),

@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
@@ -66,6 +67,25 @@ class _KycScreenState extends State<KycScreen> {
   void initState() {
     super.initState();
     _initCameras();
+    _checkExistingKyc();
+  }
+
+  /// On open, check Firestore kycStatus — show correct status screen instead of blank form.
+  Future<void> _checkExistingKyc() async {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return;
+      final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      final status = doc.data()?['kycStatus'] as String? ?? '';
+      if (!mounted) return;
+      if (status == 'verified') {
+        setState(() { _submitted = true; _kycDecisionTier = 'GREEN'; });
+      } else if (status == 'pending') {
+        setState(() { _submitted = true; _kycDecisionTier = 'AMBER'; });
+      } else if (status == 'rejected') {
+        setState(() { _submitted = true; _kycDecisionTier = 'RED'; });
+      }
+    } catch (_) {}
   }
 
   Future<void> _initCameras() async {
@@ -912,8 +932,12 @@ class _KycScreenState extends State<KycScreen> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 36),
-              _primaryButton('Go to Home', onPressed: () {
-                Navigator.pushNamedAndRemoveUntil(context, '/home', (_) => false);
+              _primaryButton('Done', onPressed: () {
+                if (Navigator.canPop(context)) {
+                  Navigator.pop(context);
+                } else {
+                  Navigator.pushNamedAndRemoveUntil(context, '/home', (_) => false);
+                }
               }),
             ],
           ),
@@ -963,9 +987,14 @@ class _KycScreenState extends State<KycScreen> {
               }),
               const SizedBox(height: 12),
               TextButton(
-                onPressed: () =>
-                    Navigator.pushNamedAndRemoveUntil(context, '/home', (_) => false),
-                child: Text('Back to Home',
+                onPressed: () {
+                  if (Navigator.canPop(context)) {
+                    Navigator.pop(context);
+                  } else {
+                    Navigator.pushNamedAndRemoveUntil(context, '/home', (_) => false);
+                  }
+                },
+                child: Text('Back to Profile',
                     style: GoogleFonts.inter(
                         fontSize: 14, color: Colors.grey[600])),
               ),
@@ -1002,8 +1031,12 @@ class _KycScreenState extends State<KycScreen> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 36),
-            _primaryButton('Back to Home', onPressed: () {
-              Navigator.pushNamedAndRemoveUntil(context, '/home', (_) => false);
+            _primaryButton('Back to Profile', onPressed: () {
+              if (Navigator.canPop(context)) {
+                Navigator.pop(context);
+              } else {
+                Navigator.pushNamedAndRemoveUntil(context, '/home', (_) => false);
+              }
             }),
           ],
         ),
