@@ -139,7 +139,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     final ts  = doc['createdAt'];
     return {
       ...doc,
-      'imageUrl':    doc['bannerUrl'] ?? '',
+      'imageUrl':    doc['imageUrl'] ?? doc['bannerUrl'] ?? '',
       'cashback':    '${pct.toStringAsFixed(0)}%',
       'cashback_pct':'${pct.toStringAsFixed(0)}%',
       'rating':      (doc['rating'] as num?)?.toStringAsFixed(1) ?? '0.0',
