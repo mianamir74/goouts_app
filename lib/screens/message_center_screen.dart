@@ -1,11 +1,9 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'support_ticket_chat_screen.dart';
 import 'user_message_detail_screen.dart';
 
+import 'user_message_detail_screen.dart';
 // ─── Design tokens (Stitch) ───────────────────────────────────────────────────
+import 'user_message_detail_screen.dart';
+import '../widgets/goouts_sheet.dart';
 const Color _primary          = Color(0xFF0392CA);
 const Color _surfaceColor     = Color(0xFFF9F9FC);
 const Color _onSurface        = Color(0xFF191C1E);
@@ -385,33 +383,12 @@ class _MessageCenterScreenState extends State<MessageCenterScreen> {
           // Archive / Unarchive — no dialog needed
           return true;
         }
-        // Delete — confirm
-        return await showDialog<bool>(
-          context: context,
-          builder: (_) => AlertDialog(
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18)),
-            title: Text('Delete message?',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w800)),
-            content: Text(
-                'This will permanently remove the message.',
-                style: GoogleFonts.inter()),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancel')),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFDC2626),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10))),
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Delete'),
-              ),
-            ],
-          ),
-        ) ?? false;
+        // Delete — branded confirm sheet
+        return await GoOutsSheet.confirm(
+          context,
+          title: 'Delete Message?',
+          message: 'This will permanently remove the message.',
+        );
       },
 
       onDismissed: (direction) async {
@@ -419,46 +396,27 @@ class _MessageCenterScreenState extends State<MessageCenterScreen> {
           if (_isArchiveView) {
             await _unarchive(docId);
             if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text('Moved to inbox', style: GoogleFonts.inter()),
-                backgroundColor: _primary,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                action: SnackBarAction(
-                  label: 'Undo',
-                  textColor: Colors.white,
-                  onPressed: () => _archive(docId),
-                ),
-              ));
+              GoOutsSheet.info(context,
+                title: 'Moved to inbox',
+                message: 'Moved to inbox',
+              );
             }
           } else {
             await _archive(docId);
             if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text('Message archived', style: GoogleFonts.inter()),
-                backgroundColor: const Color(0xFF6366F1),
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                action: SnackBarAction(
-                  label: 'Undo',
-                  textColor: Colors.white,
-                  onPressed: () => _unarchive(docId),
-                ),
-              ));
+              GoOutsSheet.info(context,
+                title: 'Message archived',
+                message: 'Message archived',
+              );
             }
           }
         } else {
           await _delete(docId);
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text('Message deleted', style: GoogleFonts.inter()),
-              backgroundColor: const Color(0xFFDC2626),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ));
+            GoOutsSheet.error(context,
+              title: 'Message deleted',
+              message: 'Message deleted',
+            );
           }
         }
       },
@@ -545,69 +503,34 @@ class _MessageCenterScreenState extends State<MessageCenterScreen> {
       case 'archive':
         await _archive(docId);
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Message archived', style: GoogleFonts.inter()),
-            backgroundColor: const Color(0xFF6366F1),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            action: SnackBarAction(
-              label: 'Undo',
-              textColor: Colors.white,
-              onPressed: () => _unarchive(docId),
-            ),
-          ));
+          GoOutsSheet.info(context,
+            title: 'Message archived',
+            message: 'Message archived',
+          );
         }
         break;
       case 'unarchive':
         await _unarchive(docId);
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Moved to inbox', style: GoogleFonts.inter()),
-            backgroundColor: _primary,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            action: SnackBarAction(
-              label: 'Undo',
-              textColor: Colors.white,
-              onPressed: () => _archive(docId),
-            ),
-          ));
+          GoOutsSheet.info(context,
+            title: 'Moved to inbox',
+            message: 'Moved to inbox',
+          );
         }
         break;
       case 'delete':
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (_) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-            title: Text('Delete message?',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w800)),
-            content: Text('This will permanently remove the message.',
-                style: GoogleFonts.inter()),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancel')),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFDC2626),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10))),
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Delete'),
-              ),
-            ],
-          ),
-        ) ?? false;
+        final confirmed = await GoOutsSheet.confirm(
+          context,
+          title: 'Delete Message?',
+          message: 'This will permanently remove the message.',
+        );
         if (confirmed) {
           await _delete(docId);
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text('Message deleted', style: GoogleFonts.inter()),
-              backgroundColor: const Color(0xFFDC2626),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ));
+            GoOutsSheet.error(context,
+              title: 'Message deleted',
+              message: 'Message deleted',
+            );
           }
         }
         break;
@@ -877,4 +800,5 @@ class _MessageCenterScreenState extends State<MessageCenterScreen> {
       ]),
     );
   }
+import '../widgets/goouts_sheet.dart';
 }

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/user_service.dart';
 import '../services/transaction_service.dart';
+import '../widgets/goouts_sheet.dart';
 
 class AddFundsScreen extends StatefulWidget {
   const AddFundsScreen({super.key});
@@ -197,18 +198,9 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
                     });
                     Navigator.pop(context);
                     if (val > _tierMax) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Amount capped at £$_tierMax — your $_tierName tier limit.',
-                            style: GoogleFonts.inter(
-                                fontSize: 13, color: Colors.white),
-                          ),
-                          backgroundColor: _teal,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                        ),
+                      GoOutsSheet.info(context,
+                        title: 'Amount Adjusted',
+                        message: 'Capped at £$_tierMax — your $_tierName tier limit.',
                       );
                     }
                   },
@@ -270,16 +262,9 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Something went wrong. Please try again.',
-              style: GoogleFonts.inter(fontSize: 13, color: Colors.white),
-            ),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
+        GoOutsSheet.error(context,
+          title: 'Payment Failed',
+          message: 'Something went wrong. Please try again.',
         );
       }
     }
@@ -289,8 +274,8 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
       double totalAmount, double bonusAmount, bool hasBonus, double newBalance) async {
     await showModalBottomSheet(
       context: context,
-      isDismissible: false,
-      enableDrag: false,
+      isDismissible: true,
+      enableDrag: true,
       backgroundColor: Colors.transparent,
       builder: (_) => Container(
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
@@ -392,12 +377,16 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
               child: ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context); // close sheet
-                  Navigator.pop(context, {
-                    'total': totalAmount,
-                    'base': _selectedAmount.toDouble(),
-                    'bonus': bonusAmount,
-                    'hasBonus': hasBonus,
-                    'newBalance': newBalance,
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) {
+                      Navigator.pop(context, {
+                        'total': totalAmount,
+                        'base': _selectedAmount.toDouble(),
+                        'bonus': bonusAmount,
+                        'hasBonus': hasBonus,
+                        'newBalance': newBalance,
+                      });
+                    }
                   });
                 },
                 style: ElevatedButton.styleFrom(

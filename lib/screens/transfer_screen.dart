@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../widgets/goouts_sheet.dart';
 
 class TransferScreen extends StatefulWidget {
   const TransferScreen({super.key, this.availableBalance});
@@ -506,20 +507,25 @@ class _TransferScreenState extends State<TransferScreen> {
                 onPressed: _isLoading ? null : () async {
                   final receiver = _receiverController.text.trim();
                   if (receiver.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Please enter a recipient.')));
+                    GoOutsSheet.warning(context,
+                      title: 'Recipient Required',
+                      message: 'Please enter the recipient\'s details.',
+                    );
                     return;
                   }
                   if (_amount <= 0) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Please enter a valid amount.')));
+                    GoOutsSheet.warning(context,
+                      title: 'Invalid Amount',
+                      message: 'Please enter a valid transfer amount.',
+                    );
                     return;
                   }
                   final available = widget.availableBalance ?? 0.0;
                   if (_amount > available) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(
-                          'Insufficient balance. Available: £\${available.toStringAsFixed(2)}')));
+                    GoOutsSheet.warning(context,
+                      title: 'Insufficient Balance',
+                      message: 'Available balance: £${available.toStringAsFixed(2)}',
+                    );
                     return;
                   }
                   setState(() => _isLoading = true);
@@ -528,8 +534,10 @@ class _TransferScreenState extends State<TransferScreen> {
                     if (mounted) Navigator.pushNamed(context, '/transfer-success');
                   } catch (e) {
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Transfer failed: \$e')));
+                      GoOutsSheet.error(context,
+                        title: 'Transfer Failed',
+                        message: 'Something went wrong. Please try again.',
+                      );
                     }
                   } finally {
                     if (mounted) setState(() => _isLoading = false);

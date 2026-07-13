@@ -1,13 +1,7 @@
-import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import '../services/user_service.dart';
-import '../services/address_lookup_service.dart';
 import '../services/referral_service.dart';
 
+import '../services/referral_service.dart';
+import '../widgets/goouts_sheet.dart';
 class CreateProfileExpandedScreen extends StatefulWidget {
   const CreateProfileExpandedScreen({super.key});
 
@@ -213,8 +207,9 @@ class _CreateProfileExpandedScreenState
   Future<void> _lookupPostcode() async {
     final postcode = _postcodeController.text.trim();
     if (postcode.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a postcode first.')),
+      GoOutsSheet.warning(context,
+        title: 'Missing Postcode',
+        message: 'Please enter a postcode first.',
       );
       return;
     }
@@ -230,11 +225,9 @@ class _CreateProfileExpandedScreenState
         _isPostcodeVerified = false;
         _showManualEntryHint = true;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Postcode not found. Please check and try again, or enter your address manually.'),
-          duration: Duration(seconds: 3),
-        ),
+      GoOutsSheet.warning(context,
+        title: 'Postcode Not Found',
+        message: 'Postcode not found. Please check and try again, or enter your address manually.',
       );
       return;
     }
@@ -326,8 +319,9 @@ class _CreateProfileExpandedScreenState
     } catch (e) {
       if (mounted) {
         setState(() => _isSubmitting = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Registration failed. Please try again.')),
+        GoOutsSheet.error(context,
+          title: 'Registration Failed',
+          message: 'Registration failed. Please try again.',
         );
       }
     }
@@ -1627,4 +1621,5 @@ Last updated: May 2025
           ],
         ),
       );
+import '../widgets/goouts_sheet.dart';
 }

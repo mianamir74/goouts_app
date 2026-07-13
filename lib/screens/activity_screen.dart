@@ -1,9 +1,7 @@
-import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:shimmer/shimmer.dart';
-import '../services/transaction_service.dart';
 import '../services/user_service.dart';
 
+import '../services/user_service.dart';
+import '../widgets/goouts_sheet.dart';
 class ActivityScreen extends StatefulWidget {
   const ActivityScreen({super.key});
 
@@ -1865,16 +1863,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
           Future<void> handleSubmit() async {
             if (isSubmitting) return;
             if (selectedStars == 0) {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text('Please tap a star to rate your visit first.',
-                    style: GoogleFonts.inter(
-                        fontSize: 13, color: Colors.white)),
-                backgroundColor: Colors.orange[700],
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-                duration: const Duration(seconds: 2),
-              ));
+              GoOutsSheet.warning(context,
+                title: 'Please tap a star',
+                message: 'Please tap a star to rate your visit first.',
+              );
               return;
             }
             setSheetState(() => isSubmitting = true);
@@ -1895,16 +1887,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   setState(() => _reviewedTxnIds.add(transactionId));
                 }
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text(
-                      'You have already reviewed this visit.',
-                      style: GoogleFonts.inter(
-                          fontSize: 13, color: Colors.white)),
-                  backgroundColor: Colors.orange[700],
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ));
+                GoOutsSheet.info(context,
+                  title: 'Already Reviewed',
+                  message: 'You have already reviewed this visit.',
+                );
                 return;
               }
               // Update points
@@ -1928,15 +1914,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
             } catch (_) {
               if (!ctx.mounted) return;
               setSheetState(() => isSubmitting = false);
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text('Could not submit. Please try again.',
-                    style: GoogleFonts.inter(
-                        fontSize: 13, color: Colors.white)),
-                backgroundColor: Colors.redAccent,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-              ));
+              GoOutsSheet.error(context,
+                title: 'Could not submit. Please',
+                message: 'Could not submit. Please try again.',
+              );
             }
           }
 
@@ -2250,4 +2231,5 @@ class _ActivityScreenState extends State<ActivityScreen> {
       ],
     );
   }
+import '../widgets/goouts_sheet.dart';
 }

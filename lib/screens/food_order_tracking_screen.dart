@@ -1,17 +1,19 @@
-import 'dart:async';
-import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../widgets/live_tracking_map.dart';
 
+import '../widgets/live_tracking_map.dart';
 // ─────────────────────────────────────────────────────────────────────────────
+import '../widgets/live_tracking_map.dart';
 //  FoodOrderTrackingScreen  —  live order tracking + Add to Order (5-min window)
+import '../widgets/live_tracking_map.dart';
 //  Route:  /food-order-tracking
+import '../widgets/live_tracking_map.dart';
 //  Args:   orderId (String), restaurantId (String), restaurantName (String)
+import '../widgets/live_tracking_map.dart';
 // ─────────────────────────────────────────────────────────────────────────────
+import '../widgets/live_tracking_map.dart';
+import '../widgets/goouts_sheet.dart';
 class FoodOrderTrackingScreen extends StatefulWidget {
   const FoodOrderTrackingScreen({super.key});
 
@@ -274,17 +276,16 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
         'refundMethod' : refundMethod,
       });
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(res.data['message'] as String? ?? 'Order cancelled.'),
-        backgroundColor: _cancelFee > 0 ? _amber : _green,
-        duration: const Duration(seconds: 5),
-      ));
+      GoOutsSheet.info(context,
+        title: 'Order Cancelled',
+        message: 'res.data[\'message\'] as String? ?? \'Order cancelled.',
+      );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Cancellation failed: $e'),
-        backgroundColor: _red,
-      ));
+      GoOutsSheet.error(context,
+        title: 'Cancellation failed: $e',
+        message: 'Cancellation failed: $e',
+      );
     } finally {
       if (mounted) setState(() => _cancelling = false);
     }
@@ -699,11 +700,9 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
               });
               if (ctx.mounted) Navigator.pop(ctx);
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Complaint submitted — our team will review it.'),
-                    backgroundColor: Color(0xFF0D1B3E),
-                  ),
+                GoOutsSheet.info(context,
+                  title: 'Complaint submitted — our',
+                  message: 'Complaint submitted — our team will review it.',
                 );
               }
             } catch (_) {
@@ -959,24 +958,16 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
       if (mounted) {
         Navigator.pop(context); // close bottom sheet
         _pickerQty.clear();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Addition request sent to the restaurant!',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-            backgroundColor: _green,
-            behavior: SnackBarBehavior.floating,
-          ),
+        GoOutsSheet.success(context,
+          title: 'Addition request sent to',
+          message: 'Addition request sent to the restaurant!',
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to send request. Please try again.',
-                style: GoogleFonts.inter()),
-            backgroundColor: _red,
-            behavior: SnackBarBehavior.floating,
-          ),
+        GoOutsSheet.error(context,
+          title: 'Send Failed',
+          message: 'Failed to send request. Please try again.',
         );
       }
     }
@@ -1439,15 +1430,16 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
       });
       final msg = (res.data as Map?)?['message'] as String?;
       if (mounted && msg != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg), backgroundColor:
-              response == 'accept' ? _green : _primary),
+        GoOutsSheet.success(context,
+          title: 'msg',
+          message: 'msg',
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: _red),
+        GoOutsSheet.error(context,
+          title: 'Error',
+          message: 'Error: ${e.toString()}',
         );
       }
     } finally {
@@ -2214,4 +2206,5 @@ class _PickerItem {
     this.isPopular = false,
     this.orderCount = 0,
   });
+import '../widgets/goouts_sheet.dart';
 }

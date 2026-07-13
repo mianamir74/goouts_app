@@ -1,10 +1,7 @@
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../services/user_service.dart';
-import '../services/biometric_service.dart';
 import '../utils/pin_hasher.dart';
 
+import '../utils/pin_hasher.dart';
+import '../widgets/goouts_sheet.dart';
 class ProfileSecurityScreen extends StatefulWidget {
   const ProfileSecurityScreen({super.key});
 
@@ -44,8 +41,9 @@ class _ProfileSecurityScreenState extends State<ProfileSecurityScreen> {
 
   Future<void> _toggleBiometric(bool value) async {
     if (!_biometricSupported) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Biometrics not available on this device.')),
+      GoOutsSheet.info(context,
+        title: 'Not Available',
+        message: 'Biometrics not available on this device.',
       );
       return;
     }
@@ -59,12 +57,9 @@ class _ProfileSecurityScreenState extends State<ProfileSecurityScreen> {
     await BiometricService.instance.setEnabled(value);
     if (mounted) setState(() => _biometricEnabled = value);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(value
-              ? 'Biometric login enabled.'
-              : 'Biometric login disabled.'),
-        ),
+      GoOutsSheet.success(context,
+        title: 'Biometrics Enabled',
+        message: 'value ? \'Biometric login enabled.\' : \'Biometric login disabled.',
       );
     }
   }
@@ -192,8 +187,9 @@ class _ProfileSecurityScreenState extends State<ProfileSecurityScreen> {
                             await UserService().updateUser({'pin': newHash});
                             if (context.mounted) {
                               Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('PIN updated successfully.')),
+                              GoOutsSheet.success(context,
+                                title: 'PIN Updated',
+                                message: 'PIN updated successfully.',
                               );
                             }
                           },
@@ -534,4 +530,5 @@ class _ProfileSecurityScreenState extends State<ProfileSecurityScreen> {
         ),
         child: child,
       );
+import '../widgets/goouts_sheet.dart';
 }

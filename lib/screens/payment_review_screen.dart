@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../services/transaction_service.dart';
 
+import '../services/transaction_service.dart';
+import '../widgets/goouts_sheet.dart';
 class PaymentReviewScreen extends StatefulWidget {
   const PaymentReviewScreen({super.key});
 
@@ -30,8 +30,9 @@ class _PaymentReviewScreenState extends State<PaymentReviewScreen> {
 
   Future<void> _submitReview(String merchant, double amount, double cashback) async {
     if (_starRating == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a star rating first.')),
+      GoOutsSheet.warning(context,
+        title: 'Rating Required',
+        message: 'Please select a star rating first.',
       );
       return;
     }
@@ -53,28 +54,17 @@ class _PaymentReviewScreenState extends State<PaymentReviewScreen> {
         _isSaving = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
-                const SizedBox(width: 10),
-                Text('Review submitted! Thank you.',
-                    style: GoogleFonts.inter(fontSize: 13, color: Colors.white)),
-              ],
-            ),
-            backgroundColor: _green,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            duration: const Duration(seconds: 3),
-          ),
+        GoOutsSheet.success(context,
+          title: 'Review Submitted',
+          message: 'Review submitted! Thank you.',
         );
       }
     } catch (_) {
       setState(() => _isSaving = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to submit review. Please try again.')),
+        GoOutsSheet.error(context,
+          title: 'Submission Failed',
+          message: 'Failed to submit review. Please try again.',
         );
       }
     }
@@ -583,4 +573,5 @@ class _DottedLinePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_) => false;
+import '../widgets/goouts_sheet.dart';
 }

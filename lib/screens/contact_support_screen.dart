@@ -1,8 +1,7 @@
-import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../services/support_ticket_service.dart';
 import '../services/self_service_service.dart';
 
+import '../services/self_service_service.dart';
+import '../widgets/goouts_sheet.dart';
 class ContactSupportScreen extends StatefulWidget {
   const ContactSupportScreen({super.key});
 
@@ -426,16 +425,9 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                         child: ElevatedButton.icon(
                           onPressed: () {
                             Navigator.pop(ctx);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Great! Glad we could help.',
-                                    style: GoogleFonts.inter(
-                                        color: Colors.white)),
-                                backgroundColor: const Color(0xFF388E3C),
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10)),
-                              ),
+                            GoOutsSheet.success(context,
+                              title: 'All Good!',
+                              message: 'Great! Glad we could help.',
                             );
                           },
                           icon: const Icon(Icons.check_circle_rounded,
@@ -604,16 +596,9 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                         ? null
                         : () {
                             if (msgCtrl.text.trim().isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Please describe your issue.',
-                                      style: GoogleFonts.inter(
-                                          color: Colors.white)),
-                                  backgroundColor: Colors.red,
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10)),
-                                ),
+                              GoOutsSheet.warning(context,
+                                title: 'Message Required',
+                                message: 'Please describe your issue.',
                               );
                               return;
                             }
@@ -1846,4 +1831,5 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
           ],
         ),
       );
+import '../widgets/goouts_sheet.dart';
 }

@@ -1,16 +1,17 @@
-import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import '../services/cart_service.dart';
-import '../services/delivery_address_service.dart';
 import 'food_order_tracking_screen.dart';
 
+import 'food_order_tracking_screen.dart';
 // ─────────────────────────────────────────────────────────────────────────────
+import 'food_order_tracking_screen.dart';
 //  CheckoutScreen  —  Task #73
+import 'food_order_tracking_screen.dart';
 //  Auto-detects Social Boost free delivery code and shows popup before payment
+import 'food_order_tracking_screen.dart';
 // ─────────────────────────────────────────────────────────────────────────────
+import 'food_order_tracking_screen.dart';
+import '../widgets/goouts_sheet.dart';
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
 
@@ -319,12 +320,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   void _showSnack(String msg, {bool error = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg, style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
-      backgroundColor: error ? Colors.red[600] : _green,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-    ));
+    GoOutsSheet.error(context,
+      title: 'msg',
+      message: 'msg',
+    );
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -965,4 +964,5 @@ class _AddressPickerSheetState extends State<_AddressPickerSheet> {
       ),
     );
   }
+import '../widgets/goouts_sheet.dart';
 }

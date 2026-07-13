@@ -1,10 +1,7 @@
-import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:confetti/confetti.dart';
-import 'dart:math';
-import '../services/user_service.dart';
 import '../services/family_service.dart';
 
+import '../services/family_service.dart';
+import '../widgets/goouts_sheet.dart';
 class GoOutsPlusUnlockedScreen extends StatefulWidget {
   const GoOutsPlusUnlockedScreen({super.key});
 
@@ -471,19 +468,9 @@ class _GoOutsPlusUnlockedScreenState extends State<GoOutsPlusUnlockedScreen>
                               if (result['success'] == true) {
                                 _showActivationSuccess(context, result);
                               } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      result['error'] ??
-                                          'Something went wrong. Please try again.',
-                                      style: GoogleFonts.inter(fontSize: 13),
-                                    ),
-                                    backgroundColor: Colors.red[700],
-                                    behavior: SnackBarBehavior.floating,
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(10)),
-                                  ),
+                                GoOutsSheet.error(context,
+                                  title: 'Something Went Wrong',
+                                  message: 'result[\'error\'] ?? \'Something went wrong. Please try again.',
                                 );
                               }
                             },
@@ -690,4 +677,5 @@ class _GoOutsPlusUnlockedScreenState extends State<GoOutsPlusUnlockedScreen>
           ],
         ),
       );
+import '../widgets/goouts_sheet.dart';
 }

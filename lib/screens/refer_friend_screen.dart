@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/referral_service.dart';
 
 class ReferFriendScreen extends StatefulWidget {
@@ -50,20 +51,27 @@ class _ReferFriendScreenState extends State<ReferFriendScreen> {
     });
   }
 
-  void _shareCode() {
+  Future<void> _shareCode() async {
     if (_inviteCode == null) return;
-    final text =
-        'Join GoOuts with my invite code $_inviteCode and earn real cashback every time you shop or order food. Download the app: https://goouts.co.uk';
-    Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Share message copied to clipboard',
-            style: GoogleFonts.inter(fontSize: 13)),
-        backgroundColor: _green,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
+    final message = Uri.encodeComponent(
+      '🎉 Hey! Join GoOuts with my invite code *$_inviteCode* and earn real cashback every time you shop or eat out! 💳\n\nDownload the app: https://goouts.co.uk',
     );
+    final url = Uri.parse('https://wa.me/?text=$message');
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } else {
+      // Fallback: copy to clipboard
+      await Clipboard.setData(ClipboardData(
+        text:
+            '🎉 Hey! Join GoOuts with my invite code $_inviteCode and earn real cashback every time you shop or eat out! Download the app: https://goouts.co.uk',
+      ));
+      if (mounted) {
+        GoOutsSheet.success(context,
+          title: 'Copied!',
+          message: 'Copied to clipboard — WhatsApp not found',
+        );
+      }
+    }
   }
 
   @override
@@ -512,24 +520,4 @@ class _ReferFriendScreenState extends State<ReferFriendScreen> {
                           color: done
                               ? _green.withOpacity(0.1)
                               : Colors.orange.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          done ? '+£2.00' : 'Pending',
-                          style: GoogleFonts.inter(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: done ? _green : Colors.orange[700]),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          }),
-        ],
-      ),
-    );
-  }
-}
+            

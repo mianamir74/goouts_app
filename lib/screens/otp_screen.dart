@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
 import '../services/user_service.dart';
 import '../utils/pin_hasher.dart';
+import '../widgets/goouts_sheet.dart';
 
 class OtpScreen extends StatefulWidget {
   const OtpScreen({super.key});
@@ -175,15 +176,14 @@ class _OtpScreenState extends State<OtpScreen>
           _verificationId = newVerificationId;
           _resendToken = newResendToken;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('OTP resent successfully.')),
+        GoOutsSheet.success(context,
+          title: 'Code Resent',
+          message: 'A new verification code has been sent to your phone.',
         );
       },
       onError: (message) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
-        );
+        GoOutsSheet.error(context, title: 'Resend Failed', message: message);
       },
     );
   }
@@ -223,11 +223,9 @@ class _OtpScreenState extends State<OtpScreen>
               for (final c in _controllers) c.clear();
               _focusNodes[0].requestFocus();
               _shakeCtrl.forward(from: 0);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Incorrect PIN. Please try again.'),
-                  backgroundColor: Color(0xFFD32F2F),
-                ),
+              GoOutsSheet.error(context,
+                title: 'Incorrect PIN',
+                message: 'The PIN you entered is wrong. Please try again.',
               );
               return;
             }

@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/user_service.dart';
 import '../services/transaction_service.dart';
 import '../services/visit_verifier.dart';
@@ -106,7 +107,31 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
           IconButton(
             icon: const Icon(Icons.share_outlined,
                 color: Colors.black87, size: 22),
-            onPressed: () {},
+            onPressed: () async {
+              // Strip non-digits from phone and build WhatsApp link
+              final rawPhone = (args?['phone'] as String? ?? '').replaceAll(RegExp(r'\D'), '');
+              final partnerName = args?['name'] as String? ?? 'this place';
+              final cashbackPct = args?['cashback'] as String? ?? args?['cashback_pct'] as String? ?? '';
+              final message = Uri.encodeComponent(
+                '🎉 Check out $partnerName on GoOuts! '
+                'You can earn $cashbackPct cashback every time you visit. '
+                'Download the GoOuts Cashback app and start saving today! 💳',
+              );
+              Uri url;
+              if (rawPhone.isNotEmpty) {
+                url = Uri.parse('https://wa.me/$rawPhone?text=$message');
+              } else {
+                url = Uri.parse('https://wa.me/?text=$message');
+              }
+              if (await canLaunchUrl(url)) {
+                await launchUrl(url, mode: LaunchMode.externalApplication);
+              } else if (context.mounted) {
+                GoOutsSheet.warning(context,
+                  title: 'WhatsApp Not Found',
+                  message: 'WhatsApp is not installed',
+                );
+              }
+            },
           ),
         ],
       ),
@@ -466,22 +491,9 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
   Future<void> _checkAndShowReview(
       BuildContext context, String partnerName) async {
     // Show loading snackbar
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(children: [
-          const SizedBox(
-              width: 16, height: 16,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2, color: Colors.white)),
-          const SizedBox(width: 12),
-          Text('Checking your visits…',
-              style: GoogleFonts.inter(fontSize: 13, color: Colors.white)),
-        ]),
-        backgroundColor: _primary,
-        duration: const Duration(seconds: 4),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
+    GoOutsSheet.info(context,
+      title: 'Checking your visits…',
+      message: 'Checking your visits…',
     );
 
     final svc = TransactionService();
@@ -489,21 +501,12 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
     final reviewedIds = await svc.getReviewedTransactionIds(partnerName);
 
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-
+    
     // No visits at all
     if (allTxns.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              'No visits found for $partnerName. '
-              'Pay with GoOuts first to leave a review.',
-              style: GoogleFonts.inter(fontSize: 13, color: Colors.white)),
-          backgroundColor: Colors.grey[700],
-          behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
+      GoOutsSheet.info(context,
+        title: 'No Visits Yet',
+        message: 'No visits found for $partnerName. \' \'Pay with GoOuts first to leave a review.',
       );
       return;
     }
@@ -515,16 +518,9 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
 
     // All already reviewed
     if (unreviewed.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              'All your visits to $partnerName have been reviewed. Thank you!',
-              style: GoogleFonts.inter(fontSize: 13, color: Colors.white)),
-          backgroundColor: _green,
-          behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
+      GoOutsSheet.success(context,
+        title: 'All Reviewed',
+        message: 'All your visits to $partnerName have been reviewed. Thank you!',
       );
       return;
     }
@@ -805,16 +801,9 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
           Future<void> handleSubmit() async {
             if (isSubmitting) return;
             if (selectedStars == 0) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Please tap a star to rate your visit first.',
-                      style: GoogleFonts.inter(fontSize: 13, color: Colors.white)),
-                  backgroundColor: Colors.orange[700],
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                  duration: const Duration(seconds: 2),
-                ),
+              GoOutsSheet.warning(context,
+                title: 'Please tap a star',
+                message: 'Please tap a star to rate your visit first.',
               );
               return;
             }
@@ -853,17 +842,9 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
             } catch (e) {
               if (!ctx.mounted) return;
               setSheetState(() => isSubmitting = false);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Could not submit review. Please try again.',
-                    style: GoogleFonts.inter(fontSize: 13, color: Colors.white),
-                  ),
-                  backgroundColor: Colors.redAccent,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
+              GoOutsSheet.error(context,
+                title: 'Submission Failed',
+                message: 'Could not submit review. Please try again.',
               );
             }
           }
@@ -3497,39 +3478,4 @@ class _SocialBoostSheetState extends State<_SocialBoostSheet>
               onPressed: () {
                 widget.onDone?.call();
                 Navigator.pop(context);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0A7A3E),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-              child: Text('Done',
-                  style: GoogleFonts.inter(
-                      fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Social chip helper ──────────────────────────────────────────────────────
-  Widget _socialChip(IconData icon, String label, LinearGradient gradient) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        gradient: gradient,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: Colors.white, size: 16),
-          const SizedBox(width: 6),
-          Text(label,
-              style: GoogleFonts.inter(
-                  fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
-        ],
-      ),
-    );
-  }
-}
+    

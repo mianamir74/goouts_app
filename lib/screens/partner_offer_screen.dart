@@ -1,10 +1,7 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../services/user_service.dart';
-import '../services/transaction_service.dart';
 import '../services/visit_verifier.dart';
 
+import '../services/visit_verifier.dart';
+import '../widgets/goouts_sheet.dart';
 enum _StepState { passed, failed, loading, waiting }
 
 /// Counter-service (QR required) vs table-service (GPS only).
@@ -1046,8 +1043,9 @@ class PartnerOfferScreen extends StatelessWidget {
                               } catch (_) {
                                 setSheet(() => isProcessing = false);
                                 if (ctx.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Payment failed. Please try again.')),
+                                  GoOutsSheet.error(context,
+                                    title: 'Payment Failed',
+                                    message: 'Payment failed. Please try again.',
                                   );
                                 }
                               }
@@ -1174,4 +1172,5 @@ class PartnerOfferScreen extends StatelessWidget {
           ],
         ),
       );
+import '../widgets/goouts_sheet.dart';
 }

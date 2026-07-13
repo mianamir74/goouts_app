@@ -1,15 +1,7 @@
-import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import '../services/user_service.dart';
-import '../services/support_ticket_service.dart';
-import '../services/message_service.dart';
 import '../utils/pin_hasher.dart';
 
+import '../utils/pin_hasher.dart';
+import '../widgets/goouts_sheet.dart';
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -1150,8 +1142,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       'phone': newPhone,
                     });
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Profile updated successfully.')),
+                      GoOutsSheet.success(context,
+                        title: 'Profile Updated',
+                        message: 'Profile updated successfully.',
                       );
                     }
                   },
@@ -1291,15 +1284,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         : () async {
                             final a1 = a1Ctrl.text.trim();
                             if (a1.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Address line 1 is required.',
-                                      style: GoogleFonts.inter(color: Colors.white)),
-                                  backgroundColor: Colors.orange[700],
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10)),
-                                ),
+                              GoOutsSheet.warning(context,
+                                title: 'Address Required',
+                                message: 'Address line 1 is required.',
                               );
                               return;
                             }
@@ -1322,14 +1309,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               _hasAddress = _address1.isNotEmpty || _city.isNotEmpty;
                             });
                             Navigator.pop(ctx);
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                              content: Text('Address updated successfully.',
-                                  style: GoogleFonts.inter(color: Colors.white)),
-                              backgroundColor: _green,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10)),
-                            ));
+                            GoOutsSheet.success(context,
+                              title: 'Address Updated',
+                              message: 'Address updated successfully.',
+                            );
                           },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _primary,
@@ -1394,14 +1377,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _country = '';
                     _hasAddress = false;
                   });
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text('Address removed.',
-                        style: GoogleFonts.inter(color: Colors.white)),
-                    backgroundColor: Colors.grey[700],
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                  ));
+                  GoOutsSheet.info(context,
+                    title: 'Address Removed',
+                    message: 'Address removed.',
+                  );
                 }
               },
               child: Text('Remove',
@@ -1576,4 +1555,5 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 }
+import '../widgets/goouts_sheet.dart';
 

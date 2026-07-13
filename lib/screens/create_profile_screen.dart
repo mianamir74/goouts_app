@@ -2,6 +2,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class CreateProfileScreen extends StatefulWidget {
   const CreateProfileScreen({super.key});
@@ -13,6 +16,7 @@ class CreateProfileScreen extends StatefulWidget {
 class _CreateProfileScreenState extends State<CreateProfileScreen> {
   bool _hasPhoto = false;
   File? _profileImage;
+  bool _isUploading = false;
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
@@ -23,6 +27,31 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
         _hasPhoto = true;
       });
     }
+  }
+
+  Future<void> _handleContinue() async {
+    if (_profileImage != null) {
+      setState(() => _isUploading = true);
+      try {
+        final uid = FirebaseAuth.instance.currentUser?.uid;
+        if (uid != null) {
+          final ref = FirebaseStorage.instance
+              .ref()
+              .child('users/$uid/profile_photo.jpg');
+          await ref.putFile(_profileImage!);
+          final url = await ref.getDownloadURL();
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(uid)
+              .set({'photoUrl': url}, SetOptions(merge: true));
+        }
+      } catch (_) {
+        // Silently ignore — photo can be added later from profile
+      } finally {
+        if (mounted) setState(() => _isUploading = false);
+      }
+    }
+    if (mounted) Navigator.pushNamed(context, '/create-profile-expanded');
   }
 
   @override
@@ -210,8 +239,7 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                 width: double.infinity,
                 height: 54,
                 child: ElevatedButton(
-                  onPressed: () => Navigator.pushNamed(
-                      context, '/create-profile-expanded'),
+                  onPressed: _isUploading ? null : _handleContinue,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
@@ -219,14 +247,24 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                     ),
                     elevation: 0,
                   ),
-                  child: Text(
-                    'Continue',
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF0392CA),
-                    ),
-                  ),
+                  child: _isUploading
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                Color(0xFF0392CA)),
+                          ),
+                        )
+                      : Text(
+                          'Continue',
+                          style: GoogleFonts.inter(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF0392CA),
+                          ),
+                        ),
                 ),
               ),
 

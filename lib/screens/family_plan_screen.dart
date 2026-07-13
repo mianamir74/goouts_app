@@ -1,8 +1,7 @@
-import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../services/family_service.dart';
 import '../services/user_service.dart';
 
+import '../services/user_service.dart';
+import '../widgets/goouts_sheet.dart';
 class FamilyPlanScreen extends StatefulWidget {
   const FamilyPlanScreen({super.key});
 
@@ -113,17 +112,9 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
         _phoneController.clear();
         _searchResult = null;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            error ?? 'Request sent! They will see it in their GoOuts app.',
-            style: GoogleFonts.inter(fontSize: 13),
-          ),
-          backgroundColor: error != null ? Colors.red[700] : _green,
-          behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
+      GoOutsSheet.success(context,
+        title: 'Request Sent!',
+        message: 'error ?? \'Request sent! They will see it in their GoOuts app.',
       );
     }
   }
@@ -132,22 +123,15 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
     final error = await _familyService.acceptLinkRequest(requestId);
     if (mounted) {
       if (error != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(error, style: GoogleFonts.inter(fontSize: 13)),
-            backgroundColor: Colors.red[700],
-            behavior: SnackBarBehavior.floating,
-          ),
+        GoOutsSheet.error(context,
+          title: 'Error',
+          message: 'error',
         );
       } else {
         await _loadAll();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Family member added successfully!',
-                style: GoogleFonts.inter(fontSize: 13)),
-            backgroundColor: _green,
-            behavior: SnackBarBehavior.floating,
-          ),
+        GoOutsSheet.success(context,
+          title: 'Family member added successf…',
+          message: 'Family member added successfully!',
         );
       }
     }
@@ -966,4 +950,5 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
     }
     return name.isNotEmpty ? name[0].toUpperCase() : '?';
   }
+import '../widgets/goouts_sheet.dart';
 }

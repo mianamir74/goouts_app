@@ -21,6 +21,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
   String _searchQuery = '';
   bool _loading = true;
 
+  final PageController _catPageController = PageController();
+  int _catPage = 0;
+
   // ── Category icon / colour lookup (covers all known names + any new ones fall back) ──
   static const _catColors = <String, Color>{
     'Cafes':       Color(0xFF5C3D1E),
@@ -193,6 +196,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _catPageController.dispose();
     super.dispose();
   }
 
@@ -336,7 +340,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
         ),
       );
 
-  // ── Categories grid ──────────────────────────────────────
+  // ── Categories scrolling row + dots ─────────────────────
   Widget _buildCategories() {
     if (_loading) {
       return const Padding(
@@ -344,75 +348,120 @@ class _ExploreScreenState extends State<ExploreScreen> {
         child: Center(child: CircularProgressIndicator()),
       );
     }
-    return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Categories',
-                style: GoogleFonts.inter(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: _dark)),
-            const SizedBox(height: 14),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 16,
-                childAspectRatio: 0.82,
-              ),
-              itemCount: _categories.length,
-              itemBuilder: (context, index) {
-                final c = _categories[index];
-                return GestureDetector(
-                  onTap: () => Navigator.pushNamed(context, '/nearby',
-                      arguments: {'category': c['route'] as String}),
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 58,
-                        height: 58,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                                color: Colors.black.withOpacity(0.07),
-                                blurRadius: 6,
-                                offset: const Offset(0, 2))
+
+    // Split into pages of 4 items each
+    const itemsPerPage = 4;
+    final pages = <List<Map<String, dynamic>>>[];
+    for (int i = 0; i < _categories.length; i += itemsPerPage) {
+      final end = (i + itemsPerPage).clamp(0, _categories.length);
+      pages.add(_categories.sublist(i, end));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text('Categories',
+              style: GoogleFonts.inter(
+                  fontSize: 18, fontWeight: FontWeight.w700, color: _dark)),
+        ),
+        const SizedBox(height: 14),
+
+        // ── Horizontal page of icons ──────────────────────
+        SizedBox(
+          height: 108,
+          child: PageView.builder(
+            controller: _catPageController,
+            itemCount: pages.length,
+            onPageChanged: (p) => setState(() => _catPage = p),
+            itemBuilder: (context, pageIndex) {
+              final pageItems = pages[pageIndex];
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: List.generate(itemsPerPage, (i) {
+                    if (i >= pageItems.length) {
+                      return const SizedBox(width: 72); // empty slot
+                    }
+                    final c = pageItems[i];
+                    return GestureDetector(
+                      onTap: () => Navigator.pushNamed(context, '/nearby',
+                          arguments: {'category': c['route'] as String}),
+                      child: SizedBox(
+                        width: 72,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 60,
+                              height: 60,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                      color: Colors.black.withOpacity(0.07),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2))
+                                ],
+                              ),
+                              child: Icon(c['icon'] as IconData,
+                                  color: _primary, size: 26),
+                            ),
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              height: 32,
+                              child: Align(
+                                alignment: Alignment.topCenter,
+                                child: Text(
+                                  c['label'] as String,
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: _dark),
+                                ),
+                              ),
+                            ),
                           ],
                         ),
-                        child: Icon(c['icon'] as IconData,
-                            color: _primary, size: 26),
                       ),
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        height: 30,
-                        child: Align(
-                          alignment: Alignment.topCenter,
-                          child: Text(
-                            c['label'] as String,
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: _dark),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ],
+                    );
+                  }),
+                ),
+              );
+            },
+          ),
         ),
-      );
+
+        // ── Page dots ─────────────────────────────────────
+        if (pages.length > 1) ...[
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(pages.length, (i) {
+              final active = i == _catPage;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOut,
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                width: active ? 20 : 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: active ? _primary : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              );
+            }),
+          ),
+        ],
+      ],
+    );
   }
 
   // ── Near You ─────────────────────────────────────────────

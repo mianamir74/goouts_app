@@ -1,6 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/user_service.dart';
 import '../services/message_service.dart';
 import '../services/user_fcm_service.dart';
@@ -18,6 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String _displayName = '';
   String? _photoUrl;
   bool _loadingUser = true;
+  bool _uploadingPhoto = false;
 
   String get _greeting {
     final hour = DateTime.now().hour;
@@ -61,6 +67,72 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (_) {
       if (mounted) setState(() => _loadingUser = false);
+    }
+  }
+
+  Future<void> _pickAndUploadPhoto() async {
+    final picker = ImagePicker();
+    await showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.camera_alt_rounded),
+              title: const Text('Take Photo'),
+              onTap: () async {
+                Navigator.pop(context);
+                final picked = await picker.pickImage(
+                    source: ImageSource.camera, imageQuality: 80);
+                if (picked != null) _uploadPhoto(File(picked.path));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded),
+              title: const Text('Choose from Gallery'),
+              onTap: () async {
+                Navigator.pop(context);
+                final picked = await picker.pickImage(
+                    source: ImageSource.gallery, imageQuality: 80);
+                if (picked != null) _uploadPhoto(File(picked.path));
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _uploadPhoto(File file) async {
+    setState(() => _uploadingPhoto = true);
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return;
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('users/$uid/profile_photo.jpg');
+      await ref.putFile(file);
+      final url = await ref.getDownloadURL();
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .set({'photoUrl': url}, SetOptions(merge: true));
+      if (mounted) setState(() => _photoUrl = url);
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
     }
   }
 
@@ -217,28 +289,64 @@ class _HomeScreenState extends State<HomeScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: Colors.grey[300],
-                  child: ClipOval(
-                    child: _photoUrl != null && _photoUrl!.isNotEmpty
-                        ? Image.network(
-                            _photoUrl!,
-                            width: 60,
-                            height: 60,
-                            fit: BoxFit.cover,
-                            filterQuality: FilterQuality.high,
-                            errorBuilder: (_, __, ___) => const Icon(
-                              Icons.person_rounded,
-                              color: Colors.white,
-                              size: 30,
-                            ),
-                          )
-                        : const Icon(
-                            Icons.person_rounded,
-                            color: Colors.white,
-                            size: 30,
+                GestureDetector(
+                  onTap: _pickAndUploadPhoto,
+                  child: Stack(
+                    children: [
+                      CircleAvatar(
+                        radius: 30,
+                        backgroundColor: Colors.grey[300],
+                        child: ClipOval(
+                          child: _uploadingPhoto
+                              ? const SizedBox(
+                                  width: 60,
+                                  height: 60,
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          Color(0xFF0392CA)),
+                                    ),
+                                  ),
+                                )
+                              : _photoUrl != null && _photoUrl!.isNotEmpty
+                                  ? Image.network(
+                                      _photoUrl!,
+                                      width: 60,
+                                      height: 60,
+                                      fit: BoxFit.cover,
+                                      filterQuality: FilterQuality.high,
+                                      errorBuilder: (_, __, ___) => const Icon(
+                                        Icons.person_rounded,
+                                        color: Colors.white,
+                                        size: 30,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.person_rounded,
+                                      color: Colors.white,
+                                      size: 30,
+                                    ),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          width: 20,
+                          height: 20,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF0392CA),
+                            shape: BoxShape.circle,
                           ),
+                          child: const Icon(
+                            Icons.camera_alt_rounded,
+                            color: Colors.white,
+                            size: 12,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 // Bell icon (notifications)
@@ -451,14 +559,14 @@ class _HomeScreenState extends State<HomeScreen> {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: _services.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 18),
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
                 itemBuilder: (context, index) {
                   final s = _services[index];
                   return GestureDetector(
                     onTap: () => Navigator.pushNamed(context, '/nearby',
                         arguments: {'category': s['route'] as String}),
                     child: SizedBox(
-                      width: 72,
+                      width: 80,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.start,
                         crossAxisAlignment: CrossAxisAlignment.center,

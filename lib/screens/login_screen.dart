@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_service.dart';
 import '../widgets/pre_auth_support_sheet.dart';
+import '../widgets/goouts_sheet.dart';
+import '../widgets/goouts_loading_overlay.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -140,9 +142,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   onPressed: () {
                     final num = phoneCtrl.text.trim();
                     if (num.length < 10) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text('Please enter a valid UK mobile number.')),
+                      GoOutsSheet.warning(context,
+                        title: 'Invalid Number',
+                        message: 'Please enter a valid UK mobile number.',
                       );
                       return;
                     }
@@ -173,14 +175,16 @@ class _LoginScreenState extends State<LoginScreen> {
     final number = _phoneController.text.trim();
     final pin = _pinController.text.trim();
     if (number.length < 10) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid UK mobile number.')),
+      GoOutsSheet.warning(context,
+        title: 'Invalid Number',
+        message: 'Please enter a valid UK mobile number.',
       );
       return;
     }
     if (pin.length < 4) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter your 4-digit PIN.')),
+      GoOutsSheet.warning(context,
+        title: 'PIN Required',
+        message: 'Please enter your 4-digit PIN.',
       );
       return;
     }
@@ -208,8 +212,9 @@ class _LoginScreenState extends State<LoginScreen> {
       onError: (message) {
         if (!mounted) return;
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
+        GoOutsSheet.error(context,
+          title: 'Login Failed',
+          message: message,
         );
       },
     );
@@ -223,7 +228,9 @@ class _LoginScreenState extends State<LoginScreen> {
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
     return Scaffold(
       backgroundColor: _primary,
-      body: SafeArea(
+      body: Stack(
+        children: [
+          SafeArea(
         child: SingleChildScrollView(
           child: Container(
             width: double.infinity,
@@ -537,6 +544,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
+          if (_isLoading) const GoOutsLoadingOverlay(),
+        ],
+      ),
     );
-  }
-}

@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 import '../widgets/pre_auth_support_sheet.dart';
+import '../widgets/goouts_sheet.dart';
+import '../widgets/goouts_loading_overlay.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -49,8 +51,9 @@ class _SignupScreenState extends State<SignupScreen> {
   Future<void> _continue() async {
     final number = _phoneController.text.trim();
     if (number.length < 10) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid UK mobile number.')),
+      GoOutsSheet.warning(context,
+        title: 'Invalid Number',
+        message: 'Please enter a valid UK mobile number.',
       );
       return;
     }
@@ -78,9 +81,7 @@ class _SignupScreenState extends State<SignupScreen> {
       onError: (message) {
         if (!mounted) return;
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
-        );
+        GoOutsSheet.error(context, title: 'Sign Up Failed', message: message);
       },
     );
   }
@@ -175,7 +176,9 @@ For questions: legal@goouts.co.uk''',
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
       backgroundColor: _primary,
-      body: SafeArea(
+      body: Stack(
+        children: [
+          SafeArea(
         child: SingleChildScrollView(
           child: Container(
             width: double.infinity,
@@ -423,8 +426,9 @@ For questions: legal@goouts.co.uk''',
             ),
           ),
         ),
+          ),
+          if (_isLoading) const GoOutsLoadingOverlay(),
+        ],
       ),
     ),
     );
-  }
-}

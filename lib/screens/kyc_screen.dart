@@ -1,25 +1,23 @@
-import 'dart:io';
-import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:camera/camera.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:cloud_functions/cloud_functions.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:image_picker/image_picker.dart';
-import '../services/id_quality_inspector.dart';
-import '../services/biometric_selfie_inspector.dart';
-import '../services/document_quality_inspector.dart';
 import '../services/user_service.dart';
 
+import '../services/user_service.dart';
 // ─────────────────────────────────────────────────────────────────────────────
+import '../services/user_service.dart';
 // KYC Screen — 4 steps:
+import '../services/user_service.dart';
 //   0. Personal Details (text entry)
+import '../services/user_service.dart';
 //   1. ID Document Scan (camera + rounded-rect overlay)
+import '../services/user_service.dart';
 //   2. Live Selfie     (camera + oval overlay)
+import '../services/user_service.dart';
 //   3. Review & Submit
+import '../services/user_service.dart';
 // Continue is locked until both on-device inspectors return isValid:true.
+import '../services/user_service.dart';
 // ─────────────────────────────────────────────────────────────────────────────
+import '../services/user_service.dart';
+import '../widgets/goouts_sheet.dart';
 class KycScreen extends StatefulWidget {
   const KycScreen({super.key});
 
@@ -495,9 +493,9 @@ class _KycScreenState extends State<KycScreen> {
                   );
                 } else {
                   if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Camera permission is required for KYC.')),
+                  GoOutsSheet.warning(context,
+                    title: 'Permission Required',
+                    message: 'Camera permission is required for KYC.',
                   );
                 }
               }),
@@ -1225,4 +1223,5 @@ class _OvalOverlay extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter old) => false;
+import '../widgets/goouts_sheet.dart';
 }

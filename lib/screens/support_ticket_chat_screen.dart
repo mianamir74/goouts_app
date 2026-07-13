@@ -1,11 +1,7 @@
-import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:image_picker/image_picker.dart';
 import '../services/support_ticket_service.dart';
 
+import '../services/support_ticket_service.dart';
+import '../widgets/goouts_sheet.dart';
 class SupportTicketChatScreen extends StatefulWidget {
   final String ticketId;
   final String subject;
@@ -86,10 +82,10 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
       _scrollToBottom();
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Failed to send. Please try again.'),
-          behavior: SnackBarBehavior.floating,
-        ));
+        GoOutsSheet.error(context,
+          title: 'Send Failed',
+          message: 'Failed to send. Please try again.',
+        );
       }
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -112,10 +108,10 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
       _scrollToBottom();
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Failed to upload image. Please try again.'),
-          behavior: SnackBarBehavior.floating,
-        ));
+        GoOutsSheet.info(context,
+          title: 'Failed to upload image',
+          message: 'Failed to upload image. Please try again.',
+        );
       }
     } finally {
       if (mounted) setState(() => _uploading = false);
@@ -132,11 +128,10 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
         comment:  _ratingCtrl.text.trim(),
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Thank you for your feedback!'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Color(0xFF16A34A),
-        ));
+        GoOutsSheet.info(context,
+          title: 'Thank you for your',
+          message: 'Thank you for your feedback!',
+        );
       }
     } finally {
       if (mounted) setState(() => _submittingRating = false);
@@ -752,4 +747,5 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
       ),
     );
   }
+import '../widgets/goouts_sheet.dart';
 }

@@ -1,10 +1,9 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'support_ticket_chat_screen.dart';
 
+import 'support_ticket_chat_screen.dart';
 // ─── Design tokens (Stitch) ───────────────────────────────────────────────────
+import 'support_ticket_chat_screen.dart';
+import '../widgets/goouts_sheet.dart';
 const Color _primary          = Color(0xFF0392CA);
 const Color _surfaceColor     = Color(0xFFF9F9FC);
 const Color _onSurface        = Color(0xFF191C1E);
@@ -294,18 +293,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           ],
         ),
       ),
+      confirmDismiss: (_) async {
+        return await GoOutsSheet.confirm(
+          context,
+          title: 'Delete Notification?',
+          message: 'This notification will be permanently removed.',
+        );
+      },
       onDismissed: (_) async {
         await _delete(doc.id);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Notification deleted',
-                style: GoogleFonts.inter()),
-            backgroundColor: const Color(0xFFDC2626),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
-          ));
-        }
       },
       child: _buildNotificationCard(doc),
     );
@@ -463,4 +459,5 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       ]),
     );
   }
+import '../widgets/goouts_sheet.dart';
 }
