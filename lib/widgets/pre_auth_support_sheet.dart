@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'goouts_sheet.dart';
 
 /// Standalone pre-authentication support bottom sheet.
 /// Used on Login and Signup screens — no uid required.
