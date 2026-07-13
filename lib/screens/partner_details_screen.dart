@@ -3488,6 +3488,7 @@ class _SocialBoostSheetState extends State<_SocialBoostSheet>
                   style: GoogleFonts.inter(
                       fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
             ),
+          ),
           ],
         ),
       );

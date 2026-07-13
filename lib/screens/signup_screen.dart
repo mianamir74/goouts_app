@@ -432,3 +432,5 @@ For questions: legal@goouts.co.uk''',
       ),
     ),
     );
+  }
+}
