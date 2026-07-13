@@ -1,9 +1,10 @@
-import 'support_ticket_chat_screen.dart';
-
-import 'support_ticket_chat_screen.dart';
-// ─── Design tokens (Stitch) ───────────────────────────────────────────────────
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'support_ticket_chat_screen.dart';
 import '../widgets/goouts_sheet.dart';
+
 const Color _primary          = Color(0xFF0392CA);
 const Color _surfaceColor     = Color(0xFFF9F9FC);
 const Color _onSurface        = Color(0xFF191C1E);
@@ -456,8 +457,4 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         const SizedBox(height: 4),
         Text(label, style: GoogleFonts.inter(
             color: _onSurfaceVariant, fontSize: 11)),
-      ]),
-    );
-  }
-import '../widgets/goouts_sheet.dart';
-}
+      ])

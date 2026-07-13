@@ -1,17 +1,12 @@
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
-import 'food_order_tracking_screen.dart';
-
-import 'food_order_tracking_screen.dart';
-// ─────────────────────────────────────────────────────────────────────────────
-import 'food_order_tracking_screen.dart';
-//  CheckoutScreen  —  Task #73
-import 'food_order_tracking_screen.dart';
-//  Auto-detects Social Boost free delivery code and shows popup before payment
-import 'food_order_tracking_screen.dart';
-// ─────────────────────────────────────────────────────────────────────────────
+import '../services/cart_service.dart';
+import '../services/delivery_address_service.dart';
 import 'food_order_tracking_screen.dart';
 import '../widgets/goouts_sheet.dart';
+
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
 
@@ -964,5 +959,4 @@ class _AddressPickerSheetState extends State<_AddressPickerSheet> {
       ),
     );
   }
-import '../widgets/goouts_sheet.dart';
 }

@@ -1,7 +1,14 @@
-import '../services/referral_service.dart';
-
+import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/user_service.dart';
+import '../services/address_lookup_service.dart';
 import '../services/referral_service.dart';
 import '../widgets/goouts_sheet.dart';
+
 class CreateProfileExpandedScreen extends StatefulWidget {
   const CreateProfileExpandedScreen({super.key});
 
@@ -1621,5 +1628,4 @@ Last updated: May 2025
           ],
         ),
       );
-import '../widgets/goouts_sheet.dart';
 }

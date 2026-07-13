@@ -1,7 +1,10 @@
-import '../services/user_service.dart';
-
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:shimmer/shimmer.dart';
+import '../services/transaction_service.dart';
 import '../services/user_service.dart';
 import '../widgets/goouts_sheet.dart';
+
 class ActivityScreen extends StatefulWidget {
   const ActivityScreen({super.key});
 
@@ -2231,5 +2234,4 @@ class _ActivityScreenState extends State<ActivityScreen> {
       ],
     );
   }
-import '../widgets/goouts_sheet.dart';
 }
