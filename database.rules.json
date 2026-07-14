@@ -1,0 +1,14 @@
+{
+  "rules": {
+    "active_deliveries": {
+      "$orderId": {
+        "driver_location": {
+          // Only the assigned driver can write their location
+          ".write": "auth != null",
+          // Any authenticated user can read (consumer watching their order)
+          ".read": "auth != null"
+        }
+      }
+    }
+  }
+}

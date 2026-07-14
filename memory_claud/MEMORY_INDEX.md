@@ -1,0 +1,30 @@
+# Memory Index — GoOuts Project
+
+- user_flutter_goouts — Non-developer, step-by-step, wait for done-next
+- project_goouts — Full app structure, 35 screens, routes, colors, Firebase
+- project_goouts_user_app — Flutter app at goouts_app/, Firebase backend
+- project_goouts_admin_panel — Web dashboard, Super Admin + Partner Admin
+- project_admin_panel_built — Flutter Web admin, Firebase auth/roles working
+- project_goouts_live_status — App ready, blocked on Modulr/Stripe/VRP
+- project_live_todo — Location permission, Google/Apple sign-in, validation restore
+- project_firebase — goouts-f16db, collections, OTP, user_service
+- project_payment_architecture — JIT-VRP V4, Stripe Issuing, Open Banking VRP
+- project_jit_vrp_spec — Full engineering detail, webhook flow, ledger rules
+- project_escrow_cashback — 14-day hold, day 15 auto-credit, 25% advance
+- project_panel_structure — User/Merchant/Admin checklist built vs not built
+- project_partner_billing — Transaction mirrors to partner app, transactionId link
+- project_driver_residual — Drivers earn residual from referred partners
+- project_goouts_plus — £10/year, £100 family trigger, 2 members, discounts
+- project_session_june2026 — Payment arch, GoOuts Plus design, Flutter screens
+- project_session_june2026b — Ticket system, User Mgmt, sidebar DnD, idle timeout
+- project_demo_removals — Demo QR, PIN bypass, validation bypass to remove before live
+- project_claude_desktop_issue — Pinned session crash fix
+- session_june8_2026 — User inbox rebuild, broadcast to users, promo overlay, CF fixes
+- session_june9_2026 — Biometric login, FAQ+Content Pages admin+user, admin panel blank fix, Firestore rules
+- session_june28_2026 — Stitch rebuild: buy_credits, local_reach, campaign_creator, sponsored_listing. Full inspection: 9 screens, const bugs fixed, mounted guards added. All clean.
+- session_july1_2026 — DAPP: 13 driver app screens built (onboarding→earnings→profile), ThemeProvider, main.dart auth gate. Pending: maps, FCM, 6 Stitch screens.
+- session_july2_2026 — Food image library picker (merchant terminal), campaign pricing system, Firestore rules fixes, VAT on credits, VAT receipt PDF service, billing history screen, admin credit sales ledger. PENDING: Training manual (big job), Stripe integration, DAPP maps/FCM, consumer app hardcoded screens, admin food orders/driver/menu screens, website virtual card section.
+- session_july4_2026 — Food Orders screen, User Mgmt Load More, Driver Referral field on partner form, em-dash fix, memory update.
+- session_july9_2026 — Support ticket chat full rewrite (WhatsApp-style, white bg, blue/gray bubbles). Fixed compile error (2 unclosed braces). Rating sheet after close. Notification tap → direct to ticket chat. Inbox support message → direct to ticket chat. Promotions still use MessageDetailScreen.
+- session_july10_2026 — Swipe delete on closed tickets, swipe archive/delete on business messages inbox, removed dev test entries from all home screens, new GoOuts app icon (blue gradient + white cloud/G) across all 3 apps.
+- session_july12_2026 — MAJOR: First successful TestFlight build of goouts_app. Fixed food_menu_screen type inference (expand<_MenuItem>), contact_support_screen apostrophe/newline errors, driver_app iOS bundle ID (com.example.driverApp→com.goouts.driverapp), rewrote all 3 codemagic.yaml files with explicit code signing. Registered com.goouts.driverapp + com.goouts.driver in Apple Dev Portal. Created GoOuts Cashback App in App Store Connect, build uploaded, encryption compliance done, internal tester added. Pending: TestFlight invite, Investors group, App Store Connect apps for other 2 apps, GoogleService-Info.plist.
