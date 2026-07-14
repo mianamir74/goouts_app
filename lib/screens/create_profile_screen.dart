@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -21,6 +22,10 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
   // KYC doc type pre-selection ('driving_licence' | 'passport' | null)
   String? _selectedDocType;
 
+  // KYC document images
+  File? _kycFrontImage;   // front of driving licence OR main passport page
+  File? _kycBackImage;    // back of driving licence (not used for passport)
+
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final picked =
@@ -33,41 +38,57 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
     }
   }
 
+  Future<void> _pickKycImage(bool isFront) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
+    if (picked != null) {
+      setState(() {
+        if (isFront) {
+          _kycFrontImage = File(picked.path);
+        } else {
+          _kycBackImage = File(picked.path);
+        }
+      });
+    }
+  }
+
   Future<void> _handleContinue() async {
-    if (_profileImage != null) {
-      setState(() => _isUploading = true);
-      try {
-        final uid = FirebaseAuth.instance.currentUser?.uid;
-        if (uid != null) {
-          final ref = FirebaseStorage.instance
-              .ref()
-              .child('users/$uid/profile_photo.jpg');
+    setState(() => _isUploading = true);
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        // Upload profile photo
+        if (_profileImage != null) {
+          final ref = FirebaseStorage.instance.ref().child('users/$uid/profile_photo.jpg');
           await ref.putFile(_profileImage!);
           final url = await ref.getDownloadURL();
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(uid)
+          await FirebaseFirestore.instance.collection('users').doc(uid)
               .set({'photoUrl': url}, SetOptions(merge: true));
         }
-      } catch (_) {
-        // Photo can be added later from profile
-      } finally {
-        if (mounted) setState(() => _isUploading = false);
-      }
-    }
 
-    // Store pre-selected KYC doc type so KYC screen can pre-fill later
-    if (_selectedDocType != null) {
-      try {
-        final uid = FirebaseAuth.instance.currentUser?.uid;
-        if (uid != null) {
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(uid)
-              .set({'preferredKycDocType': _selectedDocType},
-                  SetOptions(merge: true));
+        // Upload KYC documents
+        final Map<String, dynamic> kycData = {};
+        if (_selectedDocType != null) kycData['kycDocType'] = _selectedDocType;
+        if (_kycFrontImage != null) {
+          final ref = FirebaseStorage.instance.ref('kyc/$uid/id_front.jpg');
+          await ref.putFile(_kycFrontImage!);
+          kycData['kycIdFrontUrl'] = await ref.getDownloadURL();
+          kycData['kycStatus'] = 'pending';
         }
-      } catch (_) {}
+        if (_kycBackImage != null) {
+          final ref = FirebaseStorage.instance.ref('kyc/$uid/id_back.jpg');
+          await ref.putFile(_kycBackImage!);
+          kycData['kycIdBackUrl'] = await ref.getDownloadURL();
+        }
+        if (kycData.isNotEmpty) {
+          await FirebaseFirestore.instance.collection('users').doc(uid)
+              .set(kycData, SetOptions(merge: true));
+        }
+      }
+    } catch (_) {
+      // Non-fatal — continue to next step
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
     }
 
     if (mounted) Navigator.pushNamed(context, '/create-profile-expanded');
@@ -248,6 +269,130 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                 ],
               ),
 
+              // ── KYC Document Upload (appears after doc type selected) ──
+              if (_selectedDocType != null) ...[
+                const SizedBox(height: 20),
+                Text(
+                  _selectedDocType == 'driving_licence'
+                      ? 'Upload Driving Licence'
+                      : 'Upload Passport',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _selectedDocType == 'driving_licence'
+                      ? 'Upload front and back of your driving licence.'
+                      : 'Upload the main photo page of your passport.',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: Colors.white.withOpacity(0.7),
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Front upload slot
+                GestureDetector(
+                  onTap: () => _pickKycImage(true),
+                  child: _DashedBorderContainer(
+                    height: 110,
+                    highlighted: _kycFrontImage != null,
+                    child: _kycFrontImage != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(13),
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                Image.file(_kycFrontImage!, fit: BoxFit.cover),
+                                Container(color: Colors.black.withOpacity(0.2)),
+                                Align(
+                                  alignment: Alignment.bottomLeft,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(8),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF0A7A3E),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text('✓ Front uploaded',
+                                          style: GoogleFonts.inter(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600)),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.upload_file_rounded, color: Colors.white, size: 28),
+                              const SizedBox(height: 8),
+                              Text(
+                                _selectedDocType == 'driving_licence' ? 'Front of Licence' : 'Main Passport Page',
+                                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white),
+                              ),
+                              Text('Tap to upload from gallery',
+                                  style: GoogleFonts.inter(fontSize: 11, color: Colors.white.withOpacity(0.65))),
+                            ],
+                          ),
+                  ),
+                ),
+
+                // Back slot (driving licence only)
+                if (_selectedDocType == 'driving_licence') ...[
+                  const SizedBox(height: 10),
+                  GestureDetector(
+                    onTap: () => _pickKycImage(false),
+                    child: _DashedBorderContainer(
+                      height: 110,
+                      highlighted: _kycBackImage != null,
+                      child: _kycBackImage != null
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(13),
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  Image.file(_kycBackImage!, fit: BoxFit.cover),
+                                  Container(color: Colors.black.withOpacity(0.2)),
+                                  Align(
+                                    alignment: Alignment.bottomLeft,
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(8),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF0A7A3E),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text('✓ Back uploaded',
+                                            style: GoogleFonts.inter(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600)),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.upload_file_rounded, color: Colors.white, size: 28),
+                                const SizedBox(height: 8),
+                                Text('Back of Licence',
+                                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+                                Text('Tap to upload from gallery',
+                                    style: GoogleFonts.inter(fontSize: 11, color: Colors.white.withOpacity(0.65))),
+                              ],
+                            ),
+                    ),
+                  ),
+                ],
+              ],
+
               const SizedBox(height: 32),
 
               // ── Continue button ────────────────────────────────────────
@@ -299,6 +444,8 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                       const TextSpan(text: 'By continuing, you agree to our '),
                       TextSpan(
                         text: 'Terms and Conditions',
+                        recognizer: TapGestureRecognizer()
+                          ..onTap = _showTermsSheet,
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -329,6 +476,89 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
           color: Colors.white,
         ),
       );
+
+  void _showTermsSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        maxChildSize: 0.95,
+        minChildSize: 0.5,
+        builder: (_, ctrl) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text('Terms & Conditions',
+                          style: GoogleFonts.inter(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFF0D1B3E))),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Colors.grey, size: 22),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: ctrl,
+                  padding: const EdgeInsets.all(20),
+                  child: Text(
+                    'By continuing with GoOuts, you agree to our full Terms & Conditions and Privacy Policy. KYC (identity verification) is mandatory under the UK Money Laundering, Terrorist Financing and Transfer of Funds Regulations 2017 (SI 2017/692). You can read the full terms during registration.',
+                    style: GoogleFonts.inter(
+                        fontSize: 13, color: Colors.grey[700], height: 1.7),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0392CA),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                      elevation: 0,
+                    ),
+                    child: Text('Close',
+                        style: GoogleFonts.inter(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // ── Dashed border container ─────────────────────────────────────────────────

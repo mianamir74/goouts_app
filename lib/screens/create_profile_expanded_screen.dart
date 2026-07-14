@@ -298,6 +298,13 @@ class _CreateProfileExpandedScreenState
 
   // ── Register account → save to Firestore ──────────────────────────────────
   Future<void> _registerAccount() async {
+    if (!_termsAccepted) {
+      GoOutsSheet.warning(context,
+        title: 'Agreement Required',
+        message: 'Please accept the Terms & Conditions and Privacy Policy to continue.',
+      );
+      return;
+    }
     setState(() => _isSubmitting = true);
     try {
       await _userService.createUser(
@@ -798,6 +805,23 @@ class _CreateProfileExpandedScreenState
                               fontWeight: FontWeight.w600),
                         ),
                       ],
+                    ),
+                  ],
+
+                  // Always-visible manual entry link
+                  if (!_isPostcodeVerified) ...[
+                    const SizedBox(height: 6),
+                    GestureDetector(
+                      onTap: _activateManualMode,
+                      child: Text(
+                        "Can't find your address? Enter manually",
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: _primary.withOpacity(0.75),
+                          decoration: TextDecoration.underline,
+                          decorationColor: _primary.withOpacity(0.5),
+                        ),
+                      ),
                     ),
                   ],
 

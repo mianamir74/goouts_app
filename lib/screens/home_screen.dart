@@ -153,7 +153,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final List<Map<String, dynamic>> _services = [
     {'icon': Icons.coffee_rounded, 'label': 'Cafes', 'route': 'Cafes'},
-    {'icon': Icons.restaurant_rounded, 'label': 'Restaurants', 'route': 'Restaurants'},
+    {'icon': Icons.restaurant_rounded, 'label': 'Restaurant', 'route': 'Restaurants'},
     {'icon': Icons.fastfood_rounded, 'label': 'Fast Food', 'route': 'Fast Food'},
     {'icon': Icons.sports_bar_rounded, 'label': 'Pubs', 'route': 'Pubs'},
     {'icon': Icons.nightlife_rounded, 'label': 'Clubs', 'route': 'Clubs'},

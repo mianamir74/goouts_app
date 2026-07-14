@@ -173,7 +173,7 @@ class _FoodAddressPickerScreenState extends State<FoodAddressPickerScreen> {
     final houseNo = addr.houseNumber ?? '';
     final street  = addr.street ?? '';
     final line1   = houseNo.isNotEmpty
-        ? '\$houseNo \$street'.trim()
+        ? '$houseNo $street'.trim()
         : addr.fullAddress.split(',').first.trim();
 
     final delivery = DeliveryAddress(
