@@ -274,7 +274,7 @@ class _BonusAddedScreenState extends State<BonusAddedScreen> {
                           child: Padding(
                             padding: const EdgeInsets.all(26),
                             child: Image.asset(
-                              'assets/images/goouts_logo_white.webp',
+                              'assets/images/goouts_logo_white.png',
                               fit: BoxFit.contain,
                               filterQuality: FilterQuality.high,
                               errorBuilder: (ctx, err, st) => const Icon(
