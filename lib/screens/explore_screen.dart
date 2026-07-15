@@ -24,6 +24,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
   final PageController _catPageController = PageController();
   int _catPage = 0;
 
+  // ── Normalise Firestore category names for display (singular/short form) ──
+  static const _labelMap = <String, String>{
+    'Restaurants': 'Restaurant',
+    'Cafes':       'Cafe',
+    'Clubs':       'Club',
+    'Pubs':        'Pub',
+    'Bars':        'Bar',
+  };
+  static String _normLabel(String raw) => _labelMap[raw] ?? raw;
+
   // ── Category icon / colour lookup (covers all known names + any new ones fall back) ──
   static const _catColors = <String, Color>{
     'Cafes':       Color(0xFF5C3D1E),
@@ -89,7 +99,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
           if (status == 'hold') continue;
           cats.add({
             'icon':  _catIcons[name]  ?? _defaultCatIcon,
-            'label': name,
+            'label': _normLabel(name),
             'route': name,
             'color': _catColors[name] ?? _defaultCatColor,
           });
@@ -383,14 +393,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: List.generate(itemsPerPage, (i) {
                     if (i >= pageItems.length) {
-                      return const SizedBox(width: 72); // empty slot
+                      return const SizedBox(width: 78); // empty slot
                     }
                     final c = pageItems[i];
                     return GestureDetector(
                       onTap: () => Navigator.pushNamed(context, '/nearby',
                           arguments: {'category': c['route'] as String}),
                       child: SizedBox(
-                        width: 72,
+                        width: 78,
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.start,
                           crossAxisAlignment: CrossAxisAlignment.center,
@@ -419,10 +429,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                 child: Text(
                                   c['label'] as String,
                                   textAlign: TextAlign.center,
-                                  maxLines: 2,
+                                  maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: GoogleFonts.inter(
-                                      fontSize: 11,
+                                      fontSize: 10,
                                       fontWeight: FontWeight.w600,
                                       color: _dark),
                                 ),
