@@ -40,7 +40,9 @@ class _CreateProfileExpandedScreenState
   bool _isLookingUp = false;
   bool _isPostcodeVerified = false;
   bool _showManualEntryHint = false;
-  List<MapboxAddressResult> _addressSuggestions = [];
+  bool _isLookingUpAddress = false;
+  List<MapboxSuggestResult> _addressSuggestions = [];
+  String _mapboxSessionToken = AddressLookupService.generateSessionToken();
   String _selectedCountry = 'United Kingdom';
   String _selectedPrefix = 'Mr';
 
@@ -212,6 +214,10 @@ class _CreateProfileExpandedScreenState
   }
 
   // ── Postcode lookup → address dropdown ────────────────────────────────────
+  //
+  // Mapbox reliably matches a SPECIFIC building when given
+  // "{house/business no} {postcode}" together — a bare postcode alone only
+  // ever resolves to the postcode's centroid, never a per-building list.
   Future<void> _lookupPostcode() async {
     final postcode = _postcodeController.text.trim();
     if (postcode.isEmpty) {
@@ -221,9 +227,20 @@ class _CreateProfileExpandedScreenState
       );
       return;
     }
+    final houseNo = _houseNoController.text.trim();
+    if (houseNo.isEmpty) {
+      GoOutsSheet.warning(context,
+        title: 'Missing House / Business No',
+        message: 'Please enter your House / Business No or Name first, then look up your address.',
+      );
+      return;
+    }
     setState(() { _isLookingUp = true; _addressSuggestions = []; });
 
-    final results = await _addressService.validatePostcode(postcode);
+    final results = await _addressService.suggest(
+      '$houseNo $postcode',
+      _mapboxSessionToken,
+    );
     setState(() => _isLookingUp = false);
 
     if (!mounted) return;
@@ -234,8 +251,8 @@ class _CreateProfileExpandedScreenState
         _showManualEntryHint = true;
       });
       GoOutsSheet.warning(context,
-        title: 'Postcode Not Found',
-        message: 'No addresses found for this postcode. Please check and try again, or enter your address manually.',
+        title: 'Address Not Found',
+        message: 'No matching address found. Please check and try again, or enter your address manually.',
       );
       return;
     }
@@ -247,7 +264,36 @@ class _CreateProfileExpandedScreenState
     });
   }
 
-  // ── User picks address from dropdown ────────────────────────────────────────
+  // ── User picks a suggestion from the dropdown ───────────────────────────
+  Future<void> _onSuggestionSelected(MapboxSuggestResult suggestion) async {
+    setState(() {
+      _isLookingUpAddress = true;
+      _addressSuggestions = [];
+    });
+    final MapboxAddressResult? address = await _addressService.retrieve(
+      suggestion.mapboxId,
+      _mapboxSessionToken,
+    );
+    // retrieve() is the billed call — rotate the token so the NEXT lookup
+    // starts a fresh free suggest() session.
+    _mapboxSessionToken = AddressLookupService.generateSessionToken();
+
+    if (!mounted) return;
+
+    if (address == null) {
+      setState(() => _isLookingUpAddress = false);
+      GoOutsSheet.warning(context,
+        title: 'Address Error',
+        message: 'Could not load that address — please try again.',
+      );
+      return;
+    }
+
+    _onAddressSelected(address);
+    setState(() => _isLookingUpAddress = false);
+  }
+
+  // ── Fills every address field from a fully-resolved Mapbox result ──────
   void _onAddressSelected(MapboxAddressResult address) {
     final String country = AddressLookupService.isNorthernIrelandPostcode(address.postcode)
         ? 'Northern Ireland'
@@ -255,7 +301,9 @@ class _CreateProfileExpandedScreenState
 
     setState(() {
       _postcodeController.text    = address.postcode;
-      _houseNoController.text     = address.houseNumber ?? '';
+      _houseNoController.text     = address.houseNumber?.isNotEmpty == true
+          ? address.houseNumber!
+          : _houseNoController.text;
       _streetNameController.text  = address.street ?? '';
       _townController.text        = (address.town ?? address.city).toUpperCase();
       _cityController.text        = address.city;
@@ -621,7 +669,30 @@ class _CreateProfileExpandedScreenState
                 title: 'Address Details',
                 icon: Icons.location_on_outlined,
                 children: [
-                  // ── 1. Postcode + Look Up ──────────────────────────────
+                  // ── 1. House / Business No or Name (typed FIRST) ──────
+                  _label('House / Business No or Name *'),
+                  const SizedBox(height: 6),
+                  TextFormField(
+                    controller: _houseNoController,
+                    textCapitalization: TextCapitalization.characters,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9 \-/]')),
+                    ],
+                    onChanged: (_) => setState(() {}),
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? 'House / business number or name is required'
+                        : null,
+                    style: _inputStyle(),
+                    decoration: _fieldDec('e.g. 12 or Flat 3A').copyWith(
+                      suffixIcon: _houseNoController.text.trim().isNotEmpty
+                          ? const Icon(Icons.check_circle_rounded,
+                              color: _green, size: 20)
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // ── 2. Postcode + Look Up ──────────────────────────────
                   _label('Postcode *'),
                   const SizedBox(height: 6),
                   Row(
@@ -650,7 +721,9 @@ class _CreateProfileExpandedScreenState
                       SizedBox(
                         height: 50,
                         child: ElevatedButton.icon(
-                          onPressed: _isLookingUp ? null : _lookupPostcode,
+                          onPressed: (_isLookingUp || _isLookingUpAddress)
+                              ? null
+                              : _lookupPostcode,
                           icon: _isLookingUp
                               ? const SizedBox(
                                   width: 16, height: 16,
@@ -711,8 +784,8 @@ class _CreateProfileExpandedScreenState
                               ),
                             ),
                           ),
-                          ..._addressSuggestions.map((addr) => InkWell(
-                            onTap: () => _onAddressSelected(addr),
+                          ..._addressSuggestions.map((s) => InkWell(
+                            onTap: () => _onSuggestionSelected(s),
                             borderRadius: BorderRadius.circular(8),
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
@@ -728,10 +801,7 @@ class _CreateProfileExpandedScreenState
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          addr.fullAddress
-                                              .split(',')
-                                              .take(2)
-                                              .join(','),
+                                          s.name,
                                           style: GoogleFonts.inter(
                                             fontSize: 13,
                                             fontWeight: FontWeight.w600,
@@ -739,7 +809,7 @@ class _CreateProfileExpandedScreenState
                                           ),
                                         ),
                                         Text(
-                                          addr.postcode,
+                                          s.placeFormatted,
                                           style: GoogleFonts.inter(
                                             fontSize: 11,
                                             color: Colors.grey[500],
@@ -757,6 +827,20 @@ class _CreateProfileExpandedScreenState
                           const SizedBox(height: 4),
                         ],
                       ),
+                    ),
+                  ],
+                  if (_isLookingUpAddress) ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        const SizedBox(
+                          width: 14, height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        const SizedBox(width: 8),
+                        Text('Loading address…',
+                            style: GoogleFonts.inter(fontSize: 12)),
+                      ],
                     ),
                   ],
 
@@ -824,30 +908,6 @@ class _CreateProfileExpandedScreenState
                       ),
                     ),
                   ],
-
-                  const SizedBox(height: 14),
-
-                  // ── 2. House / Business No or Name ────────────────────
-                  _label('House / Business No or Name *'),
-                  const SizedBox(height: 6),
-                  TextFormField(
-                    controller: _houseNoController,
-                    textCapitalization: TextCapitalization.characters,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9 \-/]')),
-                    ],
-                    onChanged: (_) => setState(() {}),
-                    validator: (v) => v == null || v.trim().isEmpty
-                        ? 'House / business number or name is required'
-                        : null,
-                    style: _inputStyle(),
-                    decoration: _fieldDec('e.g. 12 or Flat 3A').copyWith(
-                      suffixIcon: _houseNoController.text.trim().isNotEmpty
-                          ? const Icon(Icons.check_circle_rounded,
-                              color: _green, size: 20)
-                          : null,
-                    ),
-                  ),
 
                   const SizedBox(height: 14),
 
