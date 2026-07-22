@@ -123,14 +123,6 @@ class _OtpScreenState extends State<OtpScreen>
       return;
     }
 
-    // Backspace on empty box → move to previous box
-    if (value.isEmpty && index > 0) {
-      _focusNodes[index - 1].requestFocus();
-      _controllers[index - 1].clear();
-      setState(() {});
-      return;
-    }
-
     if (value.isNotEmpty && index < 5) {
       _focusNodes[index + 1].requestFocus();
     }
@@ -373,7 +365,10 @@ class _OtpScreenState extends State<OtpScreen>
                     return SizedBox(
                       width: 48,
                       height: 56,
-                      child: TextField(
+                      child: KeyboardListener(
+                        focusNode: _focusNodes[index],
+                        onKeyEvent: (event) => _onKeyEvent(event, index),
+                        child: TextField(
                           controller: _controllers[index],
                           focusNode: _focusNodes[index],
                           autofillHints: index == 0
@@ -433,6 +428,7 @@ class _OtpScreenState extends State<OtpScreen>
                             ),
                           ),
                         ),
+                      ),
                     );
                   }),
                 ),
