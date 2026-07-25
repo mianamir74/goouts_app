@@ -28,6 +28,19 @@ class _OtpScreenState extends State<OtpScreen>
       List.generate(6, (_) => TextEditingController());
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
 
+  // CRITICAL FIX: separate FocusNodes for the KeyboardListener wrappers.
+  // A FocusNode can only be attached to one widget at a time. Previously
+  // _focusNodes[index] was passed to BOTH the KeyboardListener and the
+  // TextField it wraps, so the two fought over attaching the same node in
+  // the focus tree — each reattach fired a notification, rebuilt, and
+  // reattached again, unbounded. With 6 boxes built at once this allocated
+  // GBs within seconds and got the app killed by iOS as out-of-memory (an
+  // uncatchable kernel SIGKILL — no try/catch or timeout can stop it).
+  // This is the same bug that crashed driver_app's OTP flow.
+  // skipTraversal keeps these out of tab order so they never steal focus.
+  final List<FocusNode> _keyEventFocusNodes =
+      List.generate(6, (_) => FocusNode(skipTraversal: true));
+
   // ── State ──────────────────────────────────────────────────────────────────
   bool _isLoading = false;
   bool _canResend = false;
@@ -91,6 +104,7 @@ class _OtpScreenState extends State<OtpScreen>
     _shakeCtrl.dispose();
     for (final c in _controllers) c.dispose();
     for (final f in _focusNodes) f.dispose();
+    for (final f in _keyEventFocusNodes) f.dispose();
     super.dispose();
   }
 
@@ -366,7 +380,7 @@ class _OtpScreenState extends State<OtpScreen>
                       width: 48,
                       height: 56,
                       child: KeyboardListener(
-                        focusNode: _focusNodes[index],
+                        focusNode: _keyEventFocusNodes[index],
                         onKeyEvent: (event) => _onKeyEvent(event, index),
                         child: TextField(
                           controller: _controllers[index],
