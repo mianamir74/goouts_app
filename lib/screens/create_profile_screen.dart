@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../widgets/goouts_sheet.dart';
 
 class CreateProfileScreen extends StatefulWidget {
   const CreateProfileScreen({super.key});
@@ -54,6 +55,9 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
 
   Future<void> _handleContinue() async {
     setState(() => _isUploading = true);
+    // Tracks whether any upload failed, so the user is told instead of
+    // silently continuing with nothing saved (see the catch block below).
+    bool uploadFailed = false;
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid != null) {
@@ -86,9 +90,24 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
         }
       }
     } catch (_) {
-      // Non-fatal — continue to next step
+      // Still non-fatal — the photo and documents can be added later from the
+      // profile screen, so we don't block signup. But this used to swallow the
+      // error entirely, so a failed upload looked identical to a successful
+      // one: the user carried on believing their photo was saved when nothing
+      // had been stored. Flag it and tell them below.
+      uploadFailed = true;
     } finally {
       if (mounted) setState(() => _isUploading = false);
+    }
+
+    if (!mounted) return;
+
+    if (uploadFailed) {
+      GoOutsSheet.warning(context,
+        title: 'Photo Not Saved',
+        message: 'We could not upload your photo or documents right now. '
+            'You can continue and add them later from your profile.',
+      );
     }
 
     if (mounted) Navigator.pushNamed(context, '/create-profile-expanded');

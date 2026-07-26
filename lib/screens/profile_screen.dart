@@ -255,7 +255,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             width: 14, height: 14,
                             decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
                             child: Center(
-                              child: Text(count > 9 ? '9+' : '\$count',
+                              child: Text(count > 9 ? '9+' : '$count',
                                 style: const TextStyle(fontSize: 8, fontWeight: FontWeight.w800, color: Colors.white)),
                             ),
                           ),
@@ -311,16 +311,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     strokeWidth: 2.5,
                                     color: _primary),
                               ))
-                          : _photoUrl != null
-                              ? Image.network(_photoUrl!,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Container(
-                                      color: const Color(0xFFE8F4FB),
-                                      child: const Icon(Icons.person_rounded,
-                                          color: _primary, size: 40)))
-                              : _profileImage != null
-                                  ? Image.file(_profileImage!,
-                                      fit: BoxFit.cover)
+                          // FIX: photoUrl is stored as an EMPTY STRING (see
+                          // user_service.dart: 'photoUrl': existingPhotoUrl ?? '')
+                          // when the user has no photo, so the old
+                          // `_photoUrl != null` test was always true. That
+                          // called Image.network('') — which always fails — and
+                          // made the _profileImage branch below unreachable, so
+                          // a freshly picked photo never previewed. Check for a
+                          // non-empty string, and show the locally picked file
+                          // first so the new photo appears immediately.
+                          : _profileImage != null
+                              ? Image.file(_profileImage!, fit: BoxFit.cover)
+                              : (_photoUrl != null && _photoUrl!.isNotEmpty)
+                                  ? Image.network(_photoUrl!,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => Container(
+                                          color: const Color(0xFFE8F4FB),
+                                          child: const Icon(
+                                              Icons.person_rounded,
+                                              color: _primary,
+                                              size: 40)))
                                   : Container(
                                       color: const Color(0xFFE8F4FB),
                                       child: const Icon(Icons.person_rounded,
@@ -828,7 +838,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
-                            unread > 9 ? '9+' : '\$unread',
+                            unread > 9 ? '9+' : '$unread',
                             style: const TextStyle(
                                 fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white),
                           ),

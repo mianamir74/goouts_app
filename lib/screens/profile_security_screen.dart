@@ -311,7 +311,10 @@ class _ProfileSecurityScreenState extends State<ProfileSecurityScreen> {
                               color: Colors.grey[300]!, width: 2),
                         ),
                         child: ClipOval(
-                          child: _photoUrl != null
+                          // FIX: photoUrl is stored as an empty string when the
+                          // user has no photo, so `!= null` was always true and
+                          // this called Image.network('') on every load.
+                          child: (_photoUrl != null && _photoUrl!.isNotEmpty)
                               ? Image.network(
                                   _photoUrl!,
                                   fit: BoxFit.cover,
