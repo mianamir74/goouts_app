@@ -21,6 +21,10 @@ class _CreateProfileExpandedScreenState
     extends State<CreateProfileExpandedScreen> {
   // ── Controllers ────────────────────────────────────────────────────────────
   final _formKey = GlobalKey<FormState>();
+
+  // Off until the first failed Continue, so the form doesn't show red errors
+  // on fields the user hasn't reached yet. After that, errors update live.
+  bool _autoValidate = false;
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _dobController = TextEditingController();
@@ -346,6 +350,25 @@ class _CreateProfileExpandedScreenState
 
   // ── Register account → save to Firestore ──────────────────────────────────
   Future<void> _registerAccount() async {
+    // BUG FIX: the form's nine validators (full name, email, date of birth,
+    // PIN, house number, street, town, city) were defined but never run —
+    // _formKey.currentState.validate() was never called anywhere in this
+    // file. That let someone fill in only the address, tap Continue, and land
+    // straight on the success screen with an empty profile written to
+    // Firestore. Validate first, and turn on live re-validation so the errors
+    // stay visible and clear themselves as the fields are corrected.
+    final FormState? form = _formKey.currentState;
+    if (form == null || !form.validate()) {
+      if (!_autoValidate) {
+        setState(() => _autoValidate = true);
+      }
+      GoOutsSheet.warning(context,
+        title: 'Details Required',
+        message: 'Please complete all required fields before continuing.',
+      );
+      return;
+    }
+
     if (!_termsAccepted) {
       GoOutsSheet.warning(context,
         title: 'Agreement Required',
@@ -433,6 +456,9 @@ class _CreateProfileExpandedScreenState
       ),
       body: Form(
         key: _formKey,
+        autovalidateMode: _autoValidate
+            ? AutovalidateMode.onUserInteraction
+            : AutovalidateMode.disabled,
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
