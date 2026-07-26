@@ -566,7 +566,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             decoration: BoxDecoration(
               color: Colors.white,
               boxShadow: [BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
+                  color: Colors.black.withValues(alpha: 0.08),
                   blurRadius: 20, offset: const Offset(0, -4))],
             ),
             child: Column(
@@ -612,7 +612,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     onPressed: _placing ? null : _placeOrder,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _primary,
-                      disabledBackgroundColor: _primary.withOpacity(0.6),
+                      disabledBackgroundColor: _primary.withValues(alpha: 0.6),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14)),
@@ -670,7 +670,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.2),
+            color: Colors.white.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Text('FREE',
@@ -731,7 +731,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             width: 26, height: 26,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: _primary.withOpacity(0.1),
+              color: _primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text('${item.quantity}x',
@@ -760,7 +760,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: selected ? _blue.withOpacity(0.05) : Colors.white,
+          color: selected ? _blue.withValues(alpha: 0.05) : Colors.white,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
               color: selected ? _blue : _border,
@@ -857,7 +857,7 @@ class _AddressPickerSheetState extends State<_AddressPickerSheet> {
   Future<void> _load() async {
     try {
       final saved = await widget.addressService.getSavedAddresses();
-      if (mounted) setState(() => _saved = saved ?? []);
+      if (mounted) setState(() => _saved = saved);
     } catch (_) {}
   }
 

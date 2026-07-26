@@ -231,7 +231,7 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
                 ),
                 boxShadow: [
                   BoxShadow(
-                      color: _primary.withOpacity(0.3),
+                      color: _primary.withValues(alpha: 0.3),
                       blurRadius: 6,
                       offset: const Offset(0, 2))
                 ],
@@ -277,8 +277,8 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
                     boxShadow: [
                       BoxShadow(
                           color: isUser
-                              ? _primary.withOpacity(0.25)
-                              : Colors.black.withOpacity(0.07),
+                              ? _primary.withValues(alpha: 0.25)
+                              : Colors.black.withValues(alpha: 0.07),
                           blurRadius: 8,
                           offset: const Offset(0, 3))
                     ],
@@ -317,7 +317,7 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
                     if (isUser) ...[
                       const SizedBox(width: 3),
                       Icon(Icons.done_all_rounded,
-                          size: 13, color: _primary.withOpacity(0.7)),
+                          size: 13, color: _primary.withValues(alpha: 0.7)),
                     ],
                   ],
                 ),
@@ -341,7 +341,7 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
         border: Border.all(color: const Color(0xFFE8EEF3)),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 12,
               offset: const Offset(0, 4))
         ],
@@ -352,7 +352,7 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: _green.withOpacity(0.1),
+              color: _green.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.check_circle_rounded, color: _green, size: 28),
@@ -576,9 +576,9 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
                   height: 40,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     border: Border.all(
-                        color: Colors.white.withOpacity(0.4), width: 1.5),
+                        color: Colors.white.withValues(alpha: 0.4), width: 1.5),
                   ),
                   child: const Icon(Icons.support_agent_rounded,
                       size: 22, color: Colors.white),
@@ -607,7 +607,7 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
                         Text('Online  ·  ${widget.ticketNumber}',
                             style: GoogleFonts.inter(
                                 fontSize: 11,
-                                color: Colors.white.withOpacity(0.85))),
+                                color: Colors.white.withValues(alpha: 0.85))),
                       ]),
                     ],
                   ),
@@ -623,10 +623,10 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
                           horizontal: 10, vertical: 5),
                       margin: const EdgeInsets.only(right: 8),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                            color: Colors.white.withOpacity(0.35), width: 1),
+                            color: Colors.white.withValues(alpha: 0.35), width: 1),
                       ),
                       child: Text(
                         SupportTicketService.statusStyle(status)['label']
@@ -654,7 +654,7 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.07),
+              color: Colors.black.withValues(alpha: 0.07),
               blurRadius: 12,
               offset: const Offset(0, -3))
         ],
@@ -678,7 +678,7 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
               height: 42,
               margin: const EdgeInsets.only(bottom: 1),
               decoration: BoxDecoration(
-                color: _primary.withOpacity(0.08),
+                color: _primary.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
               child: _uploading
@@ -734,7 +734,7 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                      color: _primary.withOpacity(0.4),
+                      color: _primary.withValues(alpha: 0.4),
                       blurRadius: 8,
                       offset: const Offset(0, 3))
                 ],

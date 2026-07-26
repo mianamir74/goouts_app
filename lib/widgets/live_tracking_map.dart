@@ -180,9 +180,11 @@ class _LiveTrackingMapState extends State<LiveTrackingMap> {
               zoomControlsEnabled: false,
               mapToolbarEnabled: false,
               compassEnabled: false,
+              // controller.setMapStyle() is deprecated — the style is now
+              // passed declaratively via GoogleMap.style.
+              style: _lightMapStyle,
               onMapCreated: (ctrl) {
                 _mapController = ctrl;
-                ctrl.setMapStyle(_lightMapStyle);
               },
             ),
 

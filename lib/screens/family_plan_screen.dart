@@ -123,20 +123,27 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
 
   Future<void> _acceptRequest(String requestId) async {
     final error = await _familyService.acceptLinkRequest(requestId);
-    if (mounted) {
-      if (error != null) {
-        GoOutsSheet.error(context,
-          title: 'Error',
-          message: 'error',
-        );
-      } else {
-        await _loadAll();
-        GoOutsSheet.success(context,
-          title: 'Family member added successf…',
-          message: 'Family member added successfully!',
-        );
-      }
+    if (!mounted) return;
+    if (error != null) {
+      // BUG FIX: this passed the literal string 'error' instead of the error
+      // variable, so the user always saw the word "error" rather than what
+      // actually went wrong. (This is also why the analyzer flagged 'error'
+      // as an unused local variable.)
+      GoOutsSheet.error(context,
+        title: 'Error',
+        message: error,
+      );
+      return;
     }
+
+    await _loadAll();
+    // Re-check after the second await — the widget may have been disposed
+    // while _loadAll() was running.
+    if (!mounted) return;
+    GoOutsSheet.success(context,
+      title: 'Family Member Added',
+      message: 'Family member added successfully.',
+    );
   }
 
   Future<void> _declineRequest(String requestId) async {
@@ -179,7 +186,7 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
               padding:
                   const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: _gold.withOpacity(0.2),
+                color: _gold.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: _gold, width: 1),
               ),
@@ -293,10 +300,10 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _primary.withOpacity(0.3), width: 1.5),
+          border: Border.all(color: _primary.withValues(alpha: 0.3), width: 1.5),
           boxShadow: [
             BoxShadow(
-                color: _primary.withOpacity(0.08),
+                color: _primary.withValues(alpha: 0.08),
                 blurRadius: 8,
                 offset: const Offset(0, 2))
           ],
@@ -382,7 +389,7 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF0D1B3E).withOpacity(0.3),
+              color: const Color(0xFF0D1B3E).withValues(alpha: 0.3),
               blurRadius: 16,
               offset: const Offset(0, 6),
             ),
@@ -399,7 +406,7 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
                 Text('Family Cashback Progress',
                     style: GoogleFonts.inter(
                         fontSize: 14,
-                        color: Colors.white.withOpacity(0.85))),
+                        color: Colors.white.withValues(alpha: 0.85))),
                 const Spacer(),
                 if (milestoneReached)
                   Container(
@@ -431,7 +438,7 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
                   child: Text(' / £100.00',
                       style: GoogleFonts.inter(
                           fontSize: 16,
-                          color: Colors.white.withOpacity(0.55))),
+                          color: Colors.white.withValues(alpha: 0.55))),
                 ),
               ],
             ),
@@ -442,14 +449,14 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
                   : 'Just £${remaining.toStringAsFixed(2)} more to unlock GoOuts Plus',
               style: GoogleFonts.inter(
                   fontSize: 12,
-                  color: Colors.white.withOpacity(0.7)),
+                  color: Colors.white.withValues(alpha: 0.7)),
             ),
             const SizedBox(height: 14),
             ClipRRect(
               borderRadius: BorderRadius.circular(6),
               child: LinearProgressIndicator(
                 value: progress,
-                backgroundColor: Colors.white.withOpacity(0.15),
+                backgroundColor: Colors.white.withValues(alpha: 0.15),
                 valueColor: AlwaysStoppedAnimation<Color>(
                     milestoneReached ? _green : _primary),
                 minHeight: 8,
@@ -462,7 +469,7 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
                   : 'Link family members to earn together',
               style: GoogleFonts.inter(
                   fontSize: 11,
-                  color: Colors.white.withOpacity(0.5)),
+                  color: Colors.white.withValues(alpha: 0.5)),
             ),
           ],
         ),
@@ -481,7 +488,7 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 8,
                 offset: const Offset(0, 2))
           ],
@@ -492,7 +499,7 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
               width: 46,
               height: 46,
               decoration: BoxDecoration(
-                color: _primary.withOpacity(0.1),
+                color: _primary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.people_alt_rounded,
@@ -523,7 +530,7 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: const Offset(0, 2))
         ],
@@ -534,7 +541,7 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
             width: 46,
             height: 46,
             decoration: BoxDecoration(
-              color: _primary.withOpacity(0.12),
+              color: _primary.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
             child: Center(
@@ -565,7 +572,7 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 7, vertical: 2),
                         decoration: BoxDecoration(
-                          color: _primary.withOpacity(0.1),
+                          color: _primary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text('You',
@@ -643,7 +650,7 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 8,
                 offset: const Offset(0, 2))
           ],
@@ -735,10 +742,10 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: _green.withOpacity(0.06),
+                    color: _green.withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(12),
                     border:
-                        Border.all(color: _green.withOpacity(0.2)),
+                        Border.all(color: _green.withValues(alpha: 0.2)),
                   ),
                   child: Row(
                     children: [
@@ -746,7 +753,7 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
                         width: 42,
                         height: 42,
                         decoration: BoxDecoration(
-                          color: _green.withOpacity(0.15),
+                          color: _green.withValues(alpha: 0.15),
                           shape: BoxShape.circle,
                         ),
                         child: Center(
@@ -822,7 +829,7 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 8,
                 offset: const Offset(0, 2))
           ],
@@ -854,7 +861,7 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: color, size: 20),
@@ -911,7 +918,7 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                     fontSize: 12,
-                    color: Colors.white.withOpacity(0.85),
+                    color: Colors.white.withValues(alpha: 0.85),
                     height: 1.5),
               ),
             ],
@@ -924,9 +931,9 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
         width: double.infinity,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: _primary.withOpacity(0.06),
+          color: _primary.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _primary.withOpacity(0.15)),
+          border: Border.all(color: _primary.withValues(alpha: 0.15)),
         ),
         child: Row(
           children: [

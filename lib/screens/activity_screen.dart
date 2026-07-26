@@ -331,7 +331,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                                   horizontal: 5, vertical: 1),
                               decoration: BoxDecoration(
                                 color: selected
-                                    ? Colors.white.withOpacity(0.3)
+                                    ? Colors.white.withValues(alpha: 0.3)
                                     : _amber,
                                 borderRadius: BorderRadius.circular(10),
                               ),
@@ -364,7 +364,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                               : Icons.receipt_long_rounded,
                           size: 56,
                           color: _selectedFilter == 'Reviews'
-                              ? _green.withOpacity(0.35)
+                              ? _green.withValues(alpha: 0.35)
                               : Colors.grey[300],
                         ),
                         const SizedBox(height: 12),
@@ -426,8 +426,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
                                         horizontal: 10, vertical: 4),
                                     decoration: BoxDecoration(
                                       color: netPos
-                                          ? _green.withOpacity(0.1)
-                                          : _red.withOpacity(0.08),
+                                          ? _green.withValues(alpha: 0.1)
+                                          : _red.withValues(alpha: 0.08),
                                       borderRadius: BorderRadius.circular(20),
                                     ),
                                     child: Text('$net net',
@@ -441,7 +441,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 10, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: _amber.withOpacity(0.1),
+                                      color: _amber.withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(20),
                                     ),
                                     child: Text('${items.length} pending',
@@ -468,7 +468,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                                 borderRadius: BorderRadius.circular(14),
                                 boxShadow: [
                                   BoxShadow(
-                                      color: Colors.black.withOpacity(0.04),
+                                      color: Colors.black.withValues(alpha: 0.04),
                                       blurRadius: 8,
                                       offset: const Offset(0, 2))
                                 ],
@@ -673,7 +673,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: _primary.withOpacity(0.1),
+                            color: _primary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Icon(Icons.file_download_rounded,
@@ -725,12 +725,12 @@ class _ActivityScreenState extends State<ActivityScreen> {
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
                             color: selected
-                                ? color.withOpacity(0.06)
+                                ? color.withValues(alpha: 0.06)
                                 : const Color(0xFFF8F8F8),
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
                               color: selected
-                                  ? color.withOpacity(0.4)
+                                  ? color.withValues(alpha: 0.4)
                                   : Colors.grey[200]!,
                               width: selected ? 1.5 : 1,
                             ),
@@ -741,7 +741,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                                 width: 42,
                                 height: 42,
                                 decoration: BoxDecoration(
-                                  color: color.withOpacity(0.1),
+                                  color: color.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Icon(f['icon'] as IconData,
@@ -850,7 +850,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
             width: 72,
             height: 72,
             decoration: BoxDecoration(
-              color: _green.withOpacity(0.1),
+              color: _green.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child:
@@ -943,7 +943,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
         decoration: BoxDecoration(
           color: const Color(0xFFF8FFFE),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: _green.withOpacity(0.15)),
+          border: Border.all(color: _green.withValues(alpha: 0.15)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -953,7 +953,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                 Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: _green.withOpacity(0.1),
+                    color: _green.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(Icons.bar_chart_rounded,
@@ -972,7 +972,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: _green.withOpacity(0.1),
+                    color: _green.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -1090,7 +1090,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
+          color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -1149,12 +1149,12 @@ class _ActivityScreenState extends State<ActivityScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isExpanded ? _primary.withOpacity(0.3) : Colors.transparent,
+            color: isExpanded ? _primary.withValues(alpha: 0.3) : Colors.transparent,
             width: 1.5,
           ),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 8,
                 offset: const Offset(0, 2))
           ],
@@ -1170,7 +1170,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   Container(
                     width: 44, height: 44,
                     decoration: BoxDecoration(
-                      color: _red.withOpacity(0.08),
+                      color: _red.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
@@ -1292,7 +1292,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
   Widget _miniTag(String text, Color color) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(text,
@@ -1338,19 +1338,19 @@ class _ActivityScreenState extends State<ActivityScreen> {
     switch (type) {
       case 'Cashback':
         iconColor = _green;
-        iconBg = _green.withOpacity(0.1);
+        iconBg = _green.withValues(alpha: 0.1);
         break;
       case 'Spending':
         iconColor = _red;
-        iconBg = _red.withOpacity(0.08);
+        iconBg = _red.withValues(alpha: 0.08);
         break;
       case 'Top-Up':
         iconColor = _teal;
-        iconBg = _teal.withOpacity(0.1);
+        iconBg = _teal.withValues(alpha: 0.1);
         break;
       default:
         iconColor = _amber;
-        iconBg = _amber.withOpacity(0.1);
+        iconBg = _amber.withValues(alpha: 0.1);
     }
 
     return InkWell(
@@ -1405,7 +1405,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: _green.withOpacity(0.1),
+                          color: _green.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Row(
@@ -1479,7 +1479,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
               Container(
                 width: 48, height: 48,
                 decoration: BoxDecoration(
-                  color: isPositive ? _green.withOpacity(0.1) : _red.withOpacity(0.08),
+                  color: isPositive ? _green.withValues(alpha: 0.1) : _red.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(t['icon'] as IconData,
@@ -1558,22 +1558,22 @@ class _ActivityScreenState extends State<ActivityScreen> {
       case 'Cashback':
         icon = Icons.bolt_rounded;
         color = _green;
-        bg = _green.withOpacity(0.1);
+        bg = _green.withValues(alpha: 0.1);
         break;
       case 'Spending':
         icon = Icons.arrow_outward_rounded;
         color = _red;
-        bg = _red.withOpacity(0.08);
+        bg = _red.withValues(alpha: 0.08);
         break;
       case 'Top-Up':
         icon = Icons.add_circle_rounded;
         color = _teal;
-        bg = _teal.withOpacity(0.1);
+        bg = _teal.withValues(alpha: 0.1);
         break;
       default:
         icon = Icons.card_giftcard_rounded;
         color = _amber;
-        bg = _amber.withOpacity(0.12);
+        bg = _amber.withValues(alpha: 0.12);
     }
 
     return Container(
@@ -1602,8 +1602,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
     final isPending = status == 'Pending';
     final color = isPending ? Colors.orange[700]! : Colors.grey[500]!;
     final bg = isPending
-        ? Colors.orange.withOpacity(0.1)
-        : Colors.grey.withOpacity(0.08);
+        ? Colors.orange.withValues(alpha: 0.1)
+        : Colors.grey.withValues(alpha: 0.08);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
@@ -1639,7 +1639,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.06),
+                color: Colors.black.withValues(alpha: 0.06),
                 blurRadius: 10,
                 offset: const Offset(0, -2))
           ],
@@ -1717,7 +1717,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: _amber.withOpacity(0.12),
+                color: _amber.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(txn['icon'] as IconData, color: _amber, size: 20),
@@ -1750,7 +1750,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 7, vertical: 3),
                         decoration: BoxDecoration(
-                          color: _amber.withOpacity(0.1),
+                          color: _amber.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Row(
@@ -1773,7 +1773,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 6, vertical: 3),
                           decoration: BoxDecoration(
-                            color: _green.withOpacity(0.1),
+                            color: _green.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Row(
@@ -1816,9 +1816,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: _amber.withOpacity(0.12),
+                      color: _amber.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: _amber.withOpacity(0.5)),
+                      border: Border.all(color: _amber.withValues(alpha: 0.5)),
                     ),
                     child: Text('Leave Review',
                         style: GoogleFonts.inter(
@@ -1976,7 +1976,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
             padding:
                 const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
             decoration: BoxDecoration(
-              color: _green.withOpacity(0.1),
+              color: _green.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
@@ -2079,7 +2079,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                     ? Colors.grey[300]
                     : selectedStars > 0
                         ? _primary
-                        : _primary.withOpacity(0.45),
+                        : _primary.withValues(alpha: 0.45),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14)),
                 elevation: 0,
@@ -2126,7 +2126,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
           width: 72,
           height: 72,
           decoration: BoxDecoration(
-              color: _green.withOpacity(0.1), shape: BoxShape.circle),
+              color: _green.withValues(alpha: 0.1), shape: BoxShape.circle),
           child: const Icon(Icons.check_circle_rounded,
               color: _green, size: 38),
         ),
@@ -2145,7 +2145,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
           padding:
               const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           decoration: BoxDecoration(
-              color: _green.withOpacity(0.1),
+              color: _green.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20)),
           child: Row(
             mainAxisSize: MainAxisSize.min,

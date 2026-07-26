@@ -243,7 +243,7 @@ For questions: legal@goouts.co.uk''',
                   "We'll send you a verification code to get you started on your journey.",
                   style: GoogleFonts.inter(
                     fontSize: 14,
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                     height: 1.4,
                   ),
                 ),
@@ -258,10 +258,10 @@ For questions: legal@goouts.co.uk''',
                       height: 64,
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                            color: Colors.white.withOpacity(0.2)),
+                            color: Colors.white.withValues(alpha: 0.2)),
                       ),
                       child: Row(
                         children: [
@@ -329,7 +329,7 @@ For questions: legal@goouts.co.uk''',
                     text: TextSpan(
                       style: GoogleFonts.inter(
                         fontSize: 14,
-                        color: Colors.white.withOpacity(0.7),
+                        color: Colors.white.withValues(alpha: 0.7),
                       ),
                       children: [
                         const TextSpan(

@@ -21,7 +21,6 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
   static const Color _navy    = Color(0xFF0D1B3E);
   static const Color _green   = Color(0xFF10B981);
   static const Color _amber   = Color(0xFFF59E0B);
-  static const Color _blue    = Color(0xFF3B82F6);
   static const Color _red     = Color(0xFFEF4444);
   static const Color _bg      = Color(0xFFF2F4F7);
 
@@ -313,9 +312,9 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: _amber.withOpacity(0.1),
+                color: _amber.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: _amber.withOpacity(0.4)),
+                border: Border.all(color: _amber.withValues(alpha: 0.4)),
               ),
               child: Row(children: [
                 Icon(Icons.info_outline_rounded, color: _amber, size: 16),
@@ -372,14 +371,14 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
     child: Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
+        color: color.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withOpacity(0.25)),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
       ),
       child: Row(children: [
         Container(
           width: 44, height: 44,
-          decoration: BoxDecoration(color: color.withOpacity(0.12), shape: BoxShape.circle),
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
           child: Icon(icon, color: color, size: 22),
         ),
         const SizedBox(width: 14),
@@ -389,7 +388,7 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
             const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-              decoration: BoxDecoration(color: badgeColor.withOpacity(0.12), borderRadius: BorderRadius.circular(20)),
+              decoration: BoxDecoration(color: badgeColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(20)),
               child: Text(badge, style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w800, color: badgeColor)),
             ),
           ]),
@@ -494,7 +493,7 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
                   Container(
                     width: 64, height: 64,
                     decoration: BoxDecoration(
-                      color: _green.withOpacity(0.1),
+                      color: _green.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(Icons.celebration_rounded,
@@ -726,7 +725,7 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
                     Container(
                       width: 44, height: 44,
                       decoration: BoxDecoration(
-                        color: _red.withOpacity(0.1),
+                        color: _red.withValues(alpha: 0.1),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(Icons.sentiment_dissatisfied_rounded,
@@ -756,7 +755,7 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                           decoration: BoxDecoration(
-                            color: isSelected ? _red.withOpacity(0.1) : Colors.white,
+                            color: isSelected ? _red.withValues(alpha: 0.1) : Colors.white,
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
                                 color: isSelected ? _red : Colors.grey.shade300,
@@ -1143,7 +1142,7 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: const Offset(0, 2)),
         ],
@@ -1332,7 +1331,7 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
             child: OutlinedButton(
               style: OutlinedButton.styleFrom(
                 foregroundColor: _red,
-                side: BorderSide(color: _red.withOpacity(0.6)),
+                side: BorderSide(color: _red.withValues(alpha: 0.6)),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
               onPressed: _subResponding ? null : () => _respondToSubstitution('decline'),
@@ -1348,7 +1347,7 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
             child: OutlinedButton(
               style: OutlinedButton.styleFrom(
                 foregroundColor: _red,
-                side: BorderSide(color: _red.withOpacity(0.6)),
+                side: BorderSide(color: _red.withValues(alpha: 0.6)),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
               onPressed: _subResponding ? null : () => _respondToSubstitution('cancel_order'),
@@ -1482,7 +1481,7 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
                 : hasFee
                     ? 'Restaurant has already started your order'
                     : '',
-            style: TextStyle(fontSize: 11, color: textColor.withOpacity(0.8)),
+            style: TextStyle(fontSize: 11, color: textColor.withValues(alpha: 0.8)),
           ),
         ])),
         const SizedBox(width: 10),
@@ -1515,7 +1514,7 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFFFEF2F2),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _red.withOpacity(0.3)),
+        border: Border.all(color: _red.withValues(alpha: 0.3)),
       ),
       padding: const EdgeInsets.all(20),
       child: Row(children: [
@@ -1561,7 +1560,7 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-                color: _amber.withOpacity(0.35),
+                color: _amber.withValues(alpha: 0.35),
                 blurRadius: 12,
                 offset: const Offset(0, 4)),
           ],
@@ -1582,7 +1581,7 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
                         fontSize: 15)),
                 Text('Forgot something? Add it now.',
                     style: GoogleFonts.inter(
-                        color: Colors.white.withOpacity(0.9),
+                        color: Colors.white.withValues(alpha: 0.9),
                         fontSize: 12)),
               ],
             ),
@@ -1598,7 +1597,7 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
                       fontFeatures: [const FontFeature.tabularFigures()])),
               Text('remaining',
                   style: GoogleFonts.inter(
-                      color: Colors.white.withOpacity(0.8),
+                      color: Colors.white.withValues(alpha: 0.8),
                       fontSize: 10)),
             ],
           ),
@@ -1669,9 +1668,9 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                        color: _amber.withOpacity(0.1),
+                        color: _amber.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: _amber.withOpacity(0.4)),
+                        border: Border.all(color: _amber.withValues(alpha: 0.4)),
                       ),
                       child: Row(
                         children: [
@@ -1812,7 +1811,7 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
                                               horizontal: 6, vertical: 2),
                                           decoration: BoxDecoration(
                                               color: _primary
-                                                  .withOpacity(0.1),
+                                                  .withValues(alpha: 0.1),
                                               borderRadius:
                                                   BorderRadius.circular(4)),
                                           child: Text('Pick',
@@ -1920,9 +1919,9 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
       child: Container(
         width: 30, height: 30,
         decoration: BoxDecoration(
-          color: _primary.withOpacity(0.1),
+          color: _primary.withValues(alpha: 0.1),
           shape: BoxShape.circle,
-          border: Border.all(color: _primary.withOpacity(0.4)),
+          border: Border.all(color: _primary.withValues(alpha: 0.4)),
         ),
         child: Icon(icon, size: 16, color: _primary),
       ),
@@ -1940,12 +1939,12 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
               color: qty > 0
-                  ? _primary.withOpacity(0.5)
+                  ? _primary.withValues(alpha: 0.5)
                   : const Color(0xFFE5E7EB),
               width: qty > 0 ? 2 : 1),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 4,
                 offset: const Offset(0, 2)),
           ],
@@ -2032,9 +2031,9 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: statusColor.withOpacity(0.4)),
+        border: Border.all(color: statusColor.withValues(alpha: 0.4)),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 4, offset: const Offset(0, 2)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 4, offset: const Offset(0, 2)),
         ],
       ),
       child: Column(
@@ -2047,7 +2046,7 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
                   style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: _navy)),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
                 child: Text(status.toUpperCase(),
                     style: GoogleFonts.inter(color: statusColor, fontWeight: FontWeight.w700, fontSize: 10)),
               ),
@@ -2082,7 +2081,7 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2)),
         ],
       ),
       child: Column(
@@ -2138,7 +2137,7 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2)),
         ],
       ),
       child: Column(

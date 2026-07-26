@@ -21,8 +21,10 @@ class AppTheme {
         error: AppColors.error,
         onError: AppColors.onError,
         outline: AppColors.outline,
-        background: AppColors.background,
-        onBackground: AppColors.onBackground,
+        // ColorScheme.background / onBackground are deprecated — Material 3
+        // merged them into surface / onSurface (both already set above).
+        // scaffoldBackgroundColor below still applies AppColors.background,
+        // so the app's actual page colour is unchanged.
       ),
       textTheme: GoogleFonts.interTextTheme(),
       scaffoldBackgroundColor: AppColors.background,

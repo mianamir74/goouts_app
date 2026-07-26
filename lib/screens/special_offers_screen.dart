@@ -242,7 +242,7 @@ class SpecialOffersScreen extends StatelessWidget {
         border: Border.all(color: Colors.grey[200]!),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -349,7 +349,7 @@ class SpecialOffersScreen extends StatelessWidget {
                             style: GoogleFonts.inter(
                               fontSize: 9,
                               fontWeight: FontWeight.w700,
-                              color: _rewardText.withOpacity(0.6),
+                              color: _rewardText.withValues(alpha: 0.6),
                               letterSpacing: 0.5,
                             ),
                           ),

@@ -109,7 +109,7 @@ class _GoOutsPlusUnlockedScreenState extends State<GoOutsPlusUnlockedScreen>
                           width: 36,
                           height: 36,
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.1),
+                            color: Colors.white.withValues(alpha: 0.1),
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(
@@ -128,9 +128,9 @@ class _GoOutsPlusUnlockedScreenState extends State<GoOutsPlusUnlockedScreen>
                       width: 90,
                       height: 90,
                       decoration: BoxDecoration(
-                        color: _gold.withOpacity(0.15),
+                        color: _gold.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
-                        border: Border.all(color: _gold.withOpacity(0.4), width: 2),
+                        border: Border.all(color: _gold.withValues(alpha: 0.4), width: 2),
                       ),
                       child: const Icon(
                         Icons.star_rounded,
@@ -160,7 +160,7 @@ class _GoOutsPlusUnlockedScreenState extends State<GoOutsPlusUnlockedScreen>
                       textAlign: TextAlign.center,
                       style: GoogleFonts.inter(
                         fontSize: 14,
-                        color: Colors.white.withOpacity(0.7),
+                        color: Colors.white.withValues(alpha: 0.7),
                         height: 1.6,
                       ),
                     ),
@@ -209,9 +209,9 @@ class _GoOutsPlusUnlockedScreenState extends State<GoOutsPlusUnlockedScreen>
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.08),
+                        color: Colors.white.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(30),
-                        border: Border.all(color: Colors.white.withOpacity(0.15)),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -220,7 +220,7 @@ class _GoOutsPlusUnlockedScreenState extends State<GoOutsPlusUnlockedScreen>
                             'Everything above, for your whole family ',
                             style: GoogleFonts.inter(
                               fontSize: 13,
-                              color: Colors.white.withOpacity(0.8),
+                              color: Colors.white.withValues(alpha: 0.8),
                             ),
                           ),
                           Text(
@@ -271,9 +271,9 @@ class _GoOutsPlusUnlockedScreenState extends State<GoOutsPlusUnlockedScreen>
                         'Maybe later',
                         style: GoogleFonts.inter(
                           fontSize: 13,
-                          color: Colors.white.withOpacity(0.45),
+                          color: Colors.white.withValues(alpha: 0.45),
                           decoration: TextDecoration.underline,
-                          decorationColor: Colors.white.withOpacity(0.3),
+                          decorationColor: Colors.white.withValues(alpha: 0.3),
                         ),
                       ),
                     ),
@@ -286,7 +286,7 @@ class _GoOutsPlusUnlockedScreenState extends State<GoOutsPlusUnlockedScreen>
                       textAlign: TextAlign.center,
                       style: GoogleFonts.inter(
                         fontSize: 10,
-                        color: Colors.white.withOpacity(0.3),
+                        color: Colors.white.withValues(alpha: 0.3),
                         height: 1.6,
                       ),
                     ),
@@ -339,7 +339,7 @@ class _GoOutsPlusUnlockedScreenState extends State<GoOutsPlusUnlockedScreen>
                   Container(
                     width: 44, height: 44,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFBF00).withOpacity(0.15),
+                      color: const Color(0xFFFFBF00).withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(Icons.star_rounded,
@@ -517,7 +517,7 @@ class _GoOutsPlusUnlockedScreenState extends State<GoOutsPlusUnlockedScreen>
           Container(
             width: 34, height: 34,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, color: color, size: 18),
@@ -566,7 +566,7 @@ class _GoOutsPlusUnlockedScreenState extends State<GoOutsPlusUnlockedScreen>
               Container(
                 width: 72, height: 72,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0A7A3E).withOpacity(0.1),
+                  color: const Color(0xFF0A7A3E).withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.check_circle_rounded,
@@ -638,9 +638,9 @@ class _GoOutsPlusUnlockedScreenState extends State<GoOutsPlusUnlockedScreen>
       Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.06),
+          color: Colors.white.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
         ),
         child: Row(
           children: [
@@ -648,7 +648,7 @@ class _GoOutsPlusUnlockedScreenState extends State<GoOutsPlusUnlockedScreen>
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.15),
+                color: color.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: color, size: 22),
@@ -671,7 +671,7 @@ class _GoOutsPlusUnlockedScreenState extends State<GoOutsPlusUnlockedScreen>
                     subtitle,
                     style: GoogleFonts.inter(
                       fontSize: 12,
-                      color: Colors.white.withOpacity(0.6),
+                      color: Colors.white.withValues(alpha: 0.6),
                       height: 1.4,
                     ),
                   ),

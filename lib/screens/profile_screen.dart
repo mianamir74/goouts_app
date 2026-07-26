@@ -280,7 +280,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 8,
                 offset: const Offset(0, 2))
           ],
@@ -417,10 +417,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ? const Color(0xFFE8F4FB)
             : const Color(0xFFFFF8E7);
     final Color borderColor = _kycSubmitted
-        ? _green.withOpacity(0.4)
+        ? _green.withValues(alpha: 0.4)
         : _kycPending
-            ? _primary.withOpacity(0.4)
-            : const Color(0xFFF59E0B).withOpacity(0.5);
+            ? _primary.withValues(alpha: 0.4)
+            : const Color(0xFFF59E0B).withValues(alpha: 0.5);
     final Color iconColor = _kycSubmitted
         ? _green
         : _kycPending
@@ -462,7 +462,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               width: 42,
               height: 42,
               decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.12),
+                color: iconColor.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
               child: Icon(iconData, color: iconColor, size: 22),
@@ -611,7 +611,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0A7A3E).withOpacity(0.1),
+                      color: const Color(0xFF0A7A3E).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
@@ -861,7 +861,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFBF00).withOpacity(0.15),
+                    color: const Color(0xFFFFBF00).withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -884,7 +884,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               trailing: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withOpacity(0.12),
+                  color: const Color(0xFF10B981).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text('£2 Reward',
@@ -955,7 +955,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 6,
                 offset: const Offset(0, 2))
           ],
@@ -1042,7 +1042,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     counterText: '',
                     filled: true,
                     fillColor: hasError
-                        ? Colors.red.withOpacity(0.05)
+                        ? Colors.red.withValues(alpha: 0.05)
                         : const Color(0xFFF0F6FA),
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -1178,7 +1178,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       'email': newEmail,
                       'phone': newPhone,
                     });
-                    if (mounted) {
+                    // Guard the context actually being used, not this State's
+                    // `mounted` — `context` here is the parameter passed into
+                    // _showEditPersonalInfo and the sheet it belonged to has
+                    // already been popped above.
+                    if (context.mounted) {
                       GoOutsSheet.success(context,
                         title: 'Profile Updated',
                         message: 'Profile updated successfully.',
@@ -1405,20 +1409,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   'postcode': '',
                   'country': '',
                 });
-                if (mounted) {
-                  setState(() {
-                    _address1 = '';
-                    _address2 = '';
-                    _city = '';
-                    _postcode = '';
-                    _country = '';
-                    _hasAddress = false;
-                  });
-                  GoOutsSheet.info(context,
-                    title: 'Address Removed',
-                    message: 'Address removed.',
-                  );
-                }
+                if (!mounted) return;
+                setState(() {
+                  _address1 = '';
+                  _address2 = '';
+                  _city = '';
+                  _postcode = '';
+                  _country = '';
+                  _hasAddress = false;
+                });
+                // Guard the dialog context separately — it was popped above.
+                if (!context.mounted) return;
+                GoOutsSheet.info(context,
+                  title: 'Address Removed',
+                  message: 'Address removed.',
+                );
               },
               child: Text('Remove',
                   style: GoogleFonts.inter(
@@ -1467,7 +1472,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         padding:
             const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(label,
@@ -1488,7 +1493,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 8,
                 offset: const Offset(0, 2))
           ],
@@ -1508,8 +1513,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(10),
-          splashColor: _primary.withOpacity(0.08),
-          highlightColor: _primary.withOpacity(0.04),
+          splashColor: _primary.withValues(alpha: 0.08),
+          highlightColor: _primary.withValues(alpha: 0.04),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
             child: Row(
@@ -1520,12 +1525,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (title != null)
-                        Text(title,
-                            style: GoogleFonts.inter(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: _dark)),
+                      // title is a required non-nullable String, so the old
+                      // `if (title != null)` guard was always true.
+                      Text(title,
+                          style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: _dark)),
                       if (subtitle != null) ...[
                         const SizedBox(height: 2),
                         Text(subtitle,
@@ -1551,7 +1557,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 12,
               offset: const Offset(0, -2))
         ],

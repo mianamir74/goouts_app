@@ -71,7 +71,7 @@ class _RegistrationSuccessScreenState extends State<RegistrationSuccessScreen> {
                     width: 72,
                     height: 72,
                     decoration: BoxDecoration(
-                      color: _primary.withOpacity(0.12),
+                      color: _primary.withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
@@ -118,10 +118,10 @@ class _RegistrationSuccessScreenState extends State<RegistrationSuccessScreen> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: Colors.black.withOpacity(0.07)),
+                      border: Border.all(color: Colors.black.withValues(alpha: 0.07)),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
+                          color: Colors.black.withValues(alpha: 0.05),
                           blurRadius: 10,
                           offset: const Offset(0, 3),
                         ),
@@ -338,10 +338,10 @@ class _RegistrationSuccessScreenState extends State<RegistrationSuccessScreen> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.black.withOpacity(0.07)),
+            border: Border.all(color: Colors.black.withValues(alpha: 0.07)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 10,
                 offset: const Offset(0, 3),
               ),
@@ -366,7 +366,7 @@ class _RegistrationSuccessScreenState extends State<RegistrationSuccessScreen> {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: _primary.withOpacity(0.1),
+                      color: _primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(icon, color: _primary, size: 22),

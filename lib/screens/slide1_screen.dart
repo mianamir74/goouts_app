@@ -67,7 +67,7 @@ class Slide1Screen extends StatelessWidget {
                             child: Icon(
                               Icons.contactless_rounded,
                               size: 80,
-                              color: Colors.white.withOpacity(0.3),
+                              color: Colors.white.withValues(alpha: 0.3),
                             ),
                           ),
                         ),
@@ -81,10 +81,10 @@ class Slide1Screen extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 28, vertical: 12),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.18),
+                              color: Colors.white.withValues(alpha: 0.18),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: Colors.white.withOpacity(0.25),
+                                color: Colors.white.withValues(alpha: 0.25),
                                 width: 1,
                               ),
                             ),
@@ -103,7 +103,7 @@ class Slide1Screen extends StatelessWidget {
                                   'Earned',
                                   style: GoogleFonts.inter(
                                     fontSize: 13,
-                                    color: Colors.white.withOpacity(0.85),
+                                    color: Colors.white.withValues(alpha: 0.85),
                                   ),
                                 ),
                               ],
@@ -224,7 +224,7 @@ class Slide1Screen extends StatelessWidget {
         decoration: BoxDecoration(
           color: active
               ? const Color(0xFF0392CA)
-              : Colors.grey.withOpacity(0.35),
+              : Colors.grey.withValues(alpha: 0.35),
           borderRadius: BorderRadius.circular(4),
         ),
       );

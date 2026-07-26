@@ -7,6 +7,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Screens listen via [ChangeNotifier] and rebuild when address changes.
 class DeliveryAddressService extends ChangeNotifier {
   static const _kPrefKey = 'goouts_delivery_address';
+  static const _kSavedKey = 'goouts_saved_addresses';
+
+  /// Most recent addresses kept for quick re-selection at checkout.
+  static const int _maxSaved = 8;
 
   static final DeliveryAddressService _instance =
       DeliveryAddressService._internal();
@@ -31,18 +35,48 @@ class DeliveryAddressService extends ChangeNotifier {
   }
 
   /// Set a new delivery address and persist it.
+  /// Also records it in the saved-address history shown at checkout.
   Future<void> setAddress(DeliveryAddress address) async {
     _current = address;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kPrefKey, jsonEncode(address.toJson()));
+    await _rememberAddress(prefs, address);
     notifyListeners();
   }
 
-  /// Clear the address (e.g., on logout).
+  /// Previously used delivery addresses, newest first.
+  ///
+  /// checkout_screen calls this to offer quick re-selection. It was being
+  /// called but never existed on this class — a compile error
+  /// (undefined_method) that would fail the iOS build outright.
+  Future<List<String>> getSavedAddresses() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList(_kSavedKey) ?? <String>[];
+  }
+
+  /// Adds an address to the front of the history, de-duplicated and capped.
+  Future<void> _rememberAddress(
+      SharedPreferences prefs, DeliveryAddress address) async {
+    final String display = address.fullDisplay.trim();
+    if (display.isEmpty) return;
+
+    final List<String> saved = prefs.getStringList(_kSavedKey) ?? <String>[];
+    saved.removeWhere((s) => s.toLowerCase() == display.toLowerCase());
+    saved.insert(0, display);
+    if (saved.length > _maxSaved) {
+      saved.removeRange(_maxSaved, saved.length);
+    }
+    await prefs.setStringList(_kSavedKey, saved);
+  }
+
+  /// Clear the address (e.g., on logout). Also clears saved history so a
+  /// different user on the same device doesn't see the previous one's
+  /// addresses.
   Future<void> clear() async {
     _current = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kPrefKey);
+    await prefs.remove(_kSavedKey);
     notifyListeners();
   }
 }

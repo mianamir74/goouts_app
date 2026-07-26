@@ -83,7 +83,7 @@ class _FaqScreenState extends State<FaqScreen> {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 6,
                       offset: const Offset(0, 2))
                 ],
@@ -143,7 +143,7 @@ class _FaqScreenState extends State<FaqScreen> {
                       borderRadius: BorderRadius.circular(14),
                       boxShadow: [
                         BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
+                            color: Colors.black.withValues(alpha: 0.04),
                             blurRadius: 6,
                             offset: const Offset(0, 2))
                       ],
@@ -156,7 +156,7 @@ class _FaqScreenState extends State<FaqScreen> {
                           height: 48,
                           decoration: BoxDecoration(
                             color: isActive
-                                ? Colors.white.withOpacity(0.2)
+                                ? Colors.white.withValues(alpha: 0.2)
                                 : const Color(0xFFD6EEF8),
                             shape: BoxShape.circle,
                           ),
@@ -201,7 +201,7 @@ class _FaqScreenState extends State<FaqScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                       decoration: BoxDecoration(
-                        color: _primary.withOpacity(0.12),
+                        color: _primary.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Row(
@@ -295,11 +295,11 @@ class _FaqScreenState extends State<FaqScreen> {
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
                           border: isOpen
-                              ? Border.all(color: _primary.withOpacity(0.25), width: 1)
+                              ? Border.all(color: _primary.withValues(alpha: 0.25), width: 1)
                               : null,
                           boxShadow: [
                             BoxShadow(
-                                color: Colors.black.withOpacity(0.04),
+                                color: Colors.black.withValues(alpha: 0.04),
                                 blurRadius: 6,
                                 offset: const Offset(0, 2))
                           ],
@@ -376,7 +376,7 @@ class _FaqScreenState extends State<FaqScreen> {
                     'Our experts are available 24/7 to assist you with any inquiries.',
                     style: GoogleFonts.inter(
                         fontSize: 13,
-                        color: Colors.white.withOpacity(0.85),
+                        color: Colors.white.withValues(alpha: 0.85),
                         height: 1.5),
                   ),
                   const SizedBox(height: 16),
@@ -438,7 +438,7 @@ class _FaqScreenState extends State<FaqScreen> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.06),
+                color: Colors.black.withValues(alpha: 0.06),
                 blurRadius: 10,
                 offset: const Offset(0, -2))
           ],

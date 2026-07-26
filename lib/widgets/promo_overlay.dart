@@ -169,7 +169,7 @@ class _PromoOverlayState extends State<_PromoOverlay> with SingleTickerProviderS
       child: GestureDetector(
         onTap: ctaValue.isNotEmpty ? _openCta : null,
         child: Container(
-          color: Colors.black.withOpacity(0.85),
+          color: Colors.black.withValues(alpha: 0.85),
           child: SafeArea(
             child: Column(
               children: [

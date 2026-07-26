@@ -103,7 +103,7 @@ class _LinkBankScreenState extends State<LinkBankScreen> {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.06),
+                    color: Colors.black.withValues(alpha: 0.06),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -130,7 +130,7 @@ class _LinkBankScreenState extends State<LinkBankScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: const Color(0xFF0392CA).withOpacity(0.1),
+              color: const Color(0xFF0392CA).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
@@ -194,7 +194,7 @@ class _LinkBankScreenState extends State<LinkBankScreen> {
     Color bg;
     Color textColor;
     if (isDone && !isCurrent) {
-      bg = const Color(0xFF0392CA).withOpacity(0.12);
+      bg = const Color(0xFF0392CA).withValues(alpha: 0.12);
       textColor = const Color(0xFF0392CA);
     } else if (isCurrent) {
       bg = const Color(0xFF0392CA);
@@ -239,7 +239,7 @@ class _LinkBankScreenState extends State<LinkBankScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -255,8 +255,8 @@ class _LinkBankScreenState extends State<LinkBankScreen> {
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  const Color(0xFF0392CA).withOpacity(0.08),
-                  const Color(0xFF0392CA).withOpacity(0.03),
+                  const Color(0xFF0392CA).withValues(alpha: 0.08),
+                  const Color(0xFF0392CA).withValues(alpha: 0.03),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -269,7 +269,7 @@ class _LinkBankScreenState extends State<LinkBankScreen> {
                   width: 60,
                   height: 60,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0392CA).withOpacity(0.12),
+                    color: const Color(0xFF0392CA).withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
@@ -385,8 +385,8 @@ class _LinkBankScreenState extends State<LinkBankScreen> {
               boxShadow: [
                 BoxShadow(
                   color: isSelected
-                      ? const Color(0xFF0392CA).withOpacity(0.1)
-                      : Colors.black.withOpacity(0.03),
+                      ? const Color(0xFF0392CA).withValues(alpha: 0.1)
+                      : Colors.black.withValues(alpha: 0.03),
                   blurRadius: 8,
                   offset: const Offset(0, 3),
                 ),
@@ -398,7 +398,7 @@ class _LinkBankScreenState extends State<LinkBankScreen> {
                   width: 42,
                   height: 42,
                   decoration: BoxDecoration(
-                    color: bank.color.withOpacity(0.12),
+                    color: bank.color.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Center(

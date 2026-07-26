@@ -207,7 +207,7 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 6,
                         offset: const Offset(0, 2))
                   ],
@@ -257,7 +257,7 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 6,
                         offset: const Offset(0, 2))
                   ],
@@ -279,7 +279,7 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 6,
                         offset: const Offset(0, 2))
                   ],
@@ -327,7 +327,7 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
                   boxShadow: selected
                       ? [
                           BoxShadow(
-                              color: _primary.withOpacity(0.25),
+                              color: _primary.withValues(alpha: 0.25),
                               blurRadius: 6,
                               offset: const Offset(0, 2))
                         ]
@@ -393,7 +393,7 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
           margin: const EdgeInsets.only(right: 8),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
           decoration: BoxDecoration(
-            color: selected ? color.withOpacity(0.12) : Colors.white,
+            color: selected ? color.withValues(alpha: 0.12) : Colors.white,
             borderRadius: BorderRadius.circular(24),
             border: Border.all(color: selected ? color : Colors.grey.shade300),
           ),
@@ -465,7 +465,7 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
                   right: -12, top: -12,
                   child: Icon(Icons.campaign_rounded,
                       size: 100,
-                      color: Colors.white.withOpacity(0.08)),
+                      color: Colors.white.withValues(alpha: 0.08)),
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(
@@ -475,7 +475,7 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
                       Container(
                         width: 42, height: 42,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: const Center(
@@ -500,7 +500,7 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 7, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.25),
+                                    color: Colors.white.withValues(alpha: 0.25),
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: Text('FREE DELIVERY',
@@ -516,7 +516,7 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
                                 'Post about your order on Instagram → next delivery free.',
                                 style: GoogleFonts.inter(
                                     fontSize: 11,
-                                    color: Colors.white.withOpacity(0.85))),
+                                    color: Colors.white.withValues(alpha: 0.85))),
                           ],
                         ),
                       ),
@@ -547,7 +547,7 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                    color: _primary.withOpacity(0.12),
+                    color: _primary.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10)),
                 child: Text(
                     '${_selectedDietary.length + (_socialBoostOnly ? 1 : 0)} filter${(_selectedDietary.length + (_socialBoostOnly ? 1 : 0)) > 1 ? 's' : ''} active',
@@ -679,7 +679,7 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 3))
             ],
@@ -711,7 +711,7 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
                             end: Alignment.bottomCenter,
                             colors: [
                               Colors.transparent,
-                              Colors.black.withOpacity(0.4),
+                              Colors.black.withValues(alpha: 0.4),
                             ],
                           ),
                         ),
@@ -740,7 +740,7 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
                         decoration: BoxDecoration(
                           color: r.deliveryFee == 0
                               ? const Color(0xFF10B981)
-                              : Colors.black.withOpacity(0.65),
+                              : Colors.black.withValues(alpha: 0.65),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
@@ -841,8 +841,8 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              _primary.withOpacity(0.08),
-              _primary.withOpacity(0.14),
+              _primary.withValues(alpha: 0.08),
+              _primary.withValues(alpha: 0.14),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -856,7 +856,7 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
             Text(r.name,
                 style: GoogleFonts.inter(
                     fontSize: 13,
-                    color: _primary.withOpacity(0.6),
+                    color: _primary.withValues(alpha: 0.6),
                     fontWeight: FontWeight.w600)),
           ],
         ),

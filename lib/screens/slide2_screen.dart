@@ -68,7 +68,7 @@ class Slide2Screen extends StatelessWidget {
                             child: Icon(
                               Icons.account_balance_wallet_outlined,
                               size: 80,
-                              color: const Color(0xFF0392CA).withOpacity(0.4),
+                              color: const Color(0xFF0392CA).withValues(alpha: 0.4),
                             ),
                           ),
                         ),
@@ -83,10 +83,10 @@ class Slide2Screen extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 20, vertical: 12),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.75),
+                              color: Colors.white.withValues(alpha: 0.75),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: Colors.white.withOpacity(0.9),
+                                color: Colors.white.withValues(alpha: 0.9),
                                 width: 1,
                               ),
                             ),
@@ -97,7 +97,7 @@ class Slide2Screen extends StatelessWidget {
                                   padding: const EdgeInsets.all(6),
                                   decoration: BoxDecoration(
                                     color: const Color(0xFF0392CA)
-                                        .withOpacity(0.15),
+                                        .withValues(alpha: 0.15),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: const Icon(
@@ -170,7 +170,7 @@ class Slide2Screen extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: const Color(0xFF0D1B3E).withOpacity(0.7),
+                  color: const Color(0xFF0D1B3E).withValues(alpha: 0.7),
                   height: 1.55,
                 ),
               ),
@@ -263,7 +263,7 @@ class Slide2Screen extends StatelessWidget {
         decoration: BoxDecoration(
           color: active
               ? const Color(0xFF0392CA)
-              : Colors.grey.withOpacity(0.35),
+              : Colors.grey.withValues(alpha: 0.35),
           borderRadius: BorderRadius.circular(4),
         ),
       );

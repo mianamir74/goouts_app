@@ -158,7 +158,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
                             color: const Color(0xFF5C8FA8),
                             child: Center(
                               child: Icon(Icons.store_rounded,
-                                  color: Colors.white.withOpacity(0.3), size: 64),
+                                  color: Colors.white.withValues(alpha: 0.3), size: 64),
                             ),
                           ),
                         )
@@ -173,7 +173,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
                             color: const Color(0xFF5C8FA8),
                             child: Center(
                               child: Icon(Icons.store_rounded,
-                                  color: Colors.white.withOpacity(0.3), size: 64),
+                                  color: Colors.white.withValues(alpha: 0.3), size: 64),
                             ),
                           ),
                         ),
@@ -420,7 +420,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
                         'When paying with your GoOuts Virtual Debit Card at checkout.',
                         style: GoogleFonts.inter(
                             fontSize: 13,
-                            color: _primary.withOpacity(0.8),
+                            color: _primary.withValues(alpha: 0.8),
                             height: 1.5),
                       ),
                       const SizedBox(height: 12),
@@ -623,7 +623,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                          color: _primary.withOpacity(0.1),
+                          color: _primary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(10)),
                       child: const Icon(Icons.star_rounded,
                           color: _primary, size: 20),
@@ -674,7 +674,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
                             Container(
                               width: 42, height: 42,
                               decoration: BoxDecoration(
-                                  color: _primary.withOpacity(0.08),
+                                  color: _primary.withValues(alpha: 0.08),
                                   shape: BoxShape.circle),
                               child: const Icon(Icons.receipt_long_rounded,
                                   color: _primary, size: 20),
@@ -744,7 +744,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
                                           BorderRadius.circular(8),
                                       side: BorderSide(
                                           color: _primary
-                                              .withOpacity(0.4)))),
+                                              .withValues(alpha: 0.4)))),
                               child: Text('Review',
                                   style: GoogleFonts.inter(
                                       fontSize: 12,
@@ -892,7 +892,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
           Container(
             width: 64, height: 64,
             decoration: BoxDecoration(
-              color: Colors.orange.withOpacity(0.1),
+              color: Colors.orange.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.rate_review_rounded,
@@ -966,7 +966,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
             decoration: BoxDecoration(
-              color: _green.withOpacity(0.1),
+              color: _green.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
@@ -1088,7 +1088,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
                     ? Colors.grey[300]
                     : selectedStars > 0
                         ? _primary
-                        : _primary.withOpacity(0.45),
+                        : _primary.withValues(alpha: 0.45),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14)),
                 elevation: 0,
@@ -1146,7 +1146,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
           width: 72,
           height: 72,
           decoration: BoxDecoration(
-            color: _green.withOpacity(0.1),
+            color: _green.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
           child: const Icon(Icons.check_circle_rounded,
@@ -1171,7 +1171,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           decoration: BoxDecoration(
-            color: _green.withOpacity(0.1),
+            color: _green.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Row(
@@ -1434,7 +1434,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
                         Container(
                           width: 42, height: 42,
                           decoration: BoxDecoration(
-                            color: _primary.withOpacity(0.1),
+                            color: _primary.withValues(alpha: 0.1),
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(Icons.verified_user_rounded,
@@ -1524,7 +1524,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
                                       decoration: BoxDecoration(
                                         color: const Color(0xFFF0F9FF),
                                         borderRadius: BorderRadius.circular(16),
-                                        border: Border.all(color: _primary.withOpacity(0.3)),
+                                        border: Border.all(color: _primary.withValues(alpha: 0.3)),
                                       ),
                                       child: Column(
                                         children: [
@@ -1556,7 +1556,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
                                       decoration: BoxDecoration(
                                         color: const Color(0xFFF8F4FF),
                                         borderRadius: BorderRadius.circular(16),
-                                        border: Border.all(color: Colors.purple.withOpacity(0.3)),
+                                        border: Border.all(color: Colors.purple.withValues(alpha: 0.3)),
                                       ),
                                       child: Column(
                                         children: [
@@ -1593,7 +1593,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
                                 color: const Color(0xFFF0F9FF),
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                    color: _primary.withOpacity(0.3)),
+                                    color: _primary.withValues(alpha: 0.3)),
                               ),
                               child: Column(
                                 children: [
@@ -1601,7 +1601,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 10, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: Colors.orange.withOpacity(0.15),
+                                      color: Colors.orange.withValues(alpha: 0.15),
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text('TEST MODE',
@@ -1619,7 +1619,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
                                       borderRadius: BorderRadius.circular(12),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black.withOpacity(0.06),
+                                          color: Colors.black.withValues(alpha: 0.06),
                                           blurRadius: 8,
                                         ),
                                       ],
@@ -1860,7 +1860,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
             Container(
               width: 64, height: 64,
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.08),
+                color: Colors.red.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.location_off_rounded,
@@ -2161,7 +2161,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
                               color: bankCharge == 0
-                                  ? _green.withOpacity(0.3)
+                                  ? _green.withValues(alpha: 0.3)
                                   : Colors.grey[200]!,
                             ),
                           ),
@@ -2194,7 +2194,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: _green.withOpacity(0.1),
+                                    color: _green.withValues(alpha: 0.1),
                                     shape: BoxShape.circle,
                                   ),
                                   child: Icon(Icons.check_rounded,
@@ -2490,7 +2490,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
                 Container(
                   width: 64, height: 64,
                   decoration: BoxDecoration(
-                    color: _green.withOpacity(0.1),
+                    color: _green.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(Icons.check_circle_rounded,
@@ -2511,7 +2511,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
                   padding: const EdgeInsets.symmetric(
                       horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color: _green.withOpacity(0.1),
+                    color: _green.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
@@ -2685,7 +2685,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
             Text(label,
                 style: GoogleFonts.inter(
                     fontSize: 10,
-                    color: Colors.white.withOpacity(0.75),
+                    color: Colors.white.withValues(alpha: 0.75),
                     fontWeight: FontWeight.w500)),
             const SizedBox(height: 4),
             Text(value,
@@ -2699,7 +2699,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
       );
 
   Widget _balanceDivider() => Container(
-      width: 1, height: 32, color: Colors.white.withOpacity(0.25));
+      width: 1, height: 32, color: Colors.white.withValues(alpha: 0.25));
 
   Widget _inputLabel(String text) => Text(text,
       style: GoogleFonts.inter(
@@ -2795,7 +2795,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 8,
                 offset: const Offset(0, 2)),
           ],
@@ -2945,7 +2945,7 @@ class _PinAuthSheetState extends State<_PinAuthSheet>
           Container(
             width: 64, height: 64,
             decoration: BoxDecoration(
-              color: _primary.withOpacity(0.1),
+              color: _primary.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.lock_rounded, color: _primary, size: 30),
@@ -3089,8 +3089,6 @@ class _SocialBoostSheet extends StatefulWidget {
 
 class _SocialBoostSheetState extends State<_SocialBoostSheet>
     with SingleTickerProviderStateMixin {
-  static const Color _purple   = Color(0xFF8B5CF6);
-  static const Color _pink     = Color(0xFFEC4899);
   static const Color _dark     = Color(0xFF0D1B3E);
   static const Color _green    = Color(0xFF0A7A3E);
 
@@ -3457,7 +3455,7 @@ class _SocialBoostSheetState extends State<_SocialBoostSheet>
           Container(
             width: 72, height: 72,
             decoration: BoxDecoration(
-              color: const Color(0xFF0A7A3E).withOpacity(0.12),
+              color: const Color(0xFF0A7A3E).withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.check_circle_rounded, color: Color(0xFF0A7A3E), size: 40),

@@ -154,15 +154,15 @@ class _SplashScreenState extends State<SplashScreen>
                           padding: const EdgeInsets.symmetric(
                               horizontal: 18, vertical: 22),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.12),
+                            color: Colors.white.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(28),
                             border: Border.all(
-                              color: Colors.white.withOpacity(0.22),
+                              color: Colors.white.withValues(alpha: 0.22),
                               width: 1.2,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.08),
+                                color: Colors.black.withValues(alpha: 0.08),
                                 blurRadius: 24,
                                 offset: const Offset(0, 8),
                               ),
@@ -201,7 +201,7 @@ class _SplashScreenState extends State<SplashScreen>
                                 style: GoogleFonts.inter(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.white.withOpacity(0.95),
+                                  color: Colors.white.withValues(alpha: 0.95),
                                   height: 1.55,
                                 ),
                               ),
@@ -231,7 +231,7 @@ class _SplashScreenState extends State<SplashScreen>
                     style: GoogleFonts.inter(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: Colors.white.withOpacity(0.90),
+                      color: Colors.white.withValues(alpha: 0.90),
                       letterSpacing: 2.0,
                     ),
                   ),
@@ -270,9 +270,9 @@ class _SplashScreenState extends State<SplashScreen>
                         ),
                         style: OutlinedButton.styleFrom(
                           side: BorderSide(
-                              color: Colors.white.withOpacity(0.55),
+                              color: Colors.white.withValues(alpha: 0.55),
                               width: 1.5),
-                          backgroundColor: Colors.white.withOpacity(0.08),
+                          backgroundColor: Colors.white.withValues(alpha: 0.08),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(50),
                           ),
@@ -290,7 +290,7 @@ class _SplashScreenState extends State<SplashScreen>
                         text: 'Already have an account? ',
                         style: GoogleFonts.inter(
                           fontSize: 13,
-                          color: Colors.white.withOpacity(0.75),
+                          color: Colors.white.withValues(alpha: 0.75),
                         ),
                         children: [
                           TextSpan(
@@ -322,7 +322,7 @@ class _SplashScreenState extends State<SplashScreen>
         width: active ? 14 : 8,
         height: 8,
         decoration: BoxDecoration(
-          color: active ? Colors.white : Colors.white.withOpacity(0.35),
+          color: active ? Colors.white : Colors.white.withValues(alpha: 0.35),
           borderRadius: BorderRadius.circular(4),
         ),
       );
@@ -331,7 +331,7 @@ class _SplashScreenState extends State<SplashScreen>
         width: 4,
         height: height,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.25),
+          color: Colors.white.withValues(alpha: 0.25),
           borderRadius: BorderRadius.circular(2),
         ),
       );
@@ -360,7 +360,7 @@ class _DiagonalStreaksPainter extends CustomPainter {
       path.moveTo(w * b[0], h * b[1]);
       path.quadraticBezierTo(w * b[4], h * b[5], w * b[2], h * b[3]);
       bandPaint
-        ..color = Colors.white.withOpacity(b[7])
+        ..color = Colors.white.withValues(alpha: b[7])
         ..strokeWidth = b[6];
       canvas.drawPath(path, bandPaint);
     }
@@ -398,7 +398,7 @@ class _DiagonalStreaksPainter extends CustomPainter {
     ];
 
     for (final b in bubbles) {
-      bubblePaint.color = Colors.white.withOpacity(b[3]);
+      bubblePaint.color = Colors.white.withValues(alpha: b[3]);
       canvas.drawCircle(Offset(w * b[0], h * b[1]), b[2], bubblePaint);
     }
   }

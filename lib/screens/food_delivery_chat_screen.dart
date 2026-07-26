@@ -153,7 +153,7 @@ class _FoodDeliveryChatScreenState extends State<FoodDeliveryChatScreen> {
         title: Row(children: [
           CircleAvatar(
             radius: 18,
-            backgroundColor: _primary.withOpacity(0.15),
+            backgroundColor: _primary.withValues(alpha: 0.15),
             child: const Icon(Icons.delivery_dining_rounded, color: Color(0xFFEA580C), size: 20),
           ),
           const SizedBox(width: 10),
@@ -219,7 +219,7 @@ class _FoodDeliveryChatScreenState extends State<FoodDeliveryChatScreen> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               child: Text(
                 _orderStatus == 'delivered'
                     ? 'Chat closed — 30 min window has passed'
@@ -297,7 +297,7 @@ class _FoodDeliveryChatScreenState extends State<FoodDeliveryChatScreen> {
             bottomLeft: isMe ? const Radius.circular(18) : Radius.zero,
             bottomRight: isMe ? Radius.zero : const Radius.circular(18),
           ),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0,2))],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0,2))],
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Text(text, style: TextStyle(

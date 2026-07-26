@@ -47,7 +47,7 @@ class TransferSuccessScreen extends StatelessWidget {
                   width: 90,
                   height: 90,
                   decoration: BoxDecoration(
-                    color: _primary.withOpacity(0.12),
+                    color: _primary.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -94,7 +94,7 @@ class TransferSuccessScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 8,
                       offset: const Offset(0, 2))
                 ],
@@ -108,7 +108,7 @@ class TransferSuccessScreen extends StatelessWidget {
                       children: [
                         CircleAvatar(
                           radius: 13,
-                          backgroundColor: _primary.withOpacity(0.15),
+                          backgroundColor: _primary.withValues(alpha: 0.15),
                           child: const Icon(Icons.person_rounded,
                               color: _primary, size: 14),
                         ),

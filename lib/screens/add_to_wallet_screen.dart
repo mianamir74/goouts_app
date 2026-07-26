@@ -142,9 +142,9 @@ class _AddToWalletScreenState extends State<AddToWalletScreen>
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: primaryColor.withOpacity(0.08),
+            color: primaryColor.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: primaryColor.withOpacity(0.1)),
+            border: Border.all(color: primaryColor.withValues(alpha: 0.1)),
           ),
           child: Row(
             children: [
@@ -216,12 +216,12 @@ class _AddToWalletScreenState extends State<AddToWalletScreen>
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [primaryColor, primaryColor.withOpacity(0.85)],
+          colors: [primaryColor, primaryColor.withValues(alpha: 0.85)],
         ),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.15),
+            color: Colors.black.withValues(alpha: 0.15),
             blurRadius: 30,
             offset: const Offset(0, 20),
           ),
@@ -269,7 +269,7 @@ class _AddToWalletScreenState extends State<AddToWalletScreen>
                       children: [
                         Text('CARD HOLDER',
                             style: GoogleFonts.inter(
-                                color: Colors.white.withOpacity(0.6),
+                                color: Colors.white.withValues(alpha: 0.6),
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold)),
                         const SizedBox(height: 4),
@@ -285,7 +285,7 @@ class _AddToWalletScreenState extends State<AddToWalletScreen>
                       children: [
                         Text('EXPIRES',
                             style: GoogleFonts.inter(
-                                color: Colors.white.withOpacity(0.6),
+                                color: Colors.white.withValues(alpha: 0.6),
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold)),
                         const SizedBox(height: 4),
@@ -339,7 +339,7 @@ class _AddToWalletScreenState extends State<AddToWalletScreen>
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.06),
+                        color: Colors.black.withValues(alpha: 0.06),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -374,7 +374,7 @@ class _AddToWalletScreenState extends State<AddToWalletScreen>
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF0392CA).withOpacity(0.35),
+              color: const Color(0xFF0392CA).withValues(alpha: 0.35),
               blurRadius: 16,
               offset: const Offset(0, 6),
             ),
@@ -398,7 +398,7 @@ class _AddToWalletScreenState extends State<AddToWalletScreen>
                         style: GoogleFonts.inter(
                             fontSize: 11,
                             fontWeight: FontWeight.w500,
-                            color: Colors.white.withOpacity(0.75),
+                            color: Colors.white.withValues(alpha: 0.75),
                             letterSpacing: 0.5)),
                   ],
                 ),
@@ -409,7 +409,7 @@ class _AddToWalletScreenState extends State<AddToWalletScreen>
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                        color: Colors.white.withOpacity(0.6), width: 1.5),
+                        color: Colors.white.withValues(alpha: 0.6), width: 1.5),
                   ),
                   child: Transform.rotate(
                     angle: 1.5708,
@@ -423,7 +423,7 @@ class _AddToWalletScreenState extends State<AddToWalletScreen>
             Text('CARD NUMBER',
                 style: GoogleFonts.inter(
                     fontSize: 10,
-                    color: Colors.white.withOpacity(0.7),
+                    color: Colors.white.withValues(alpha: 0.7),
                     letterSpacing: 1.2)),
             const SizedBox(height: 4),
             Text('4821  5567  8901  2345',
@@ -441,7 +441,7 @@ class _AddToWalletScreenState extends State<AddToWalletScreen>
                     Text('ALEX STERLING',
                         style: GoogleFonts.inter(
                             fontSize: 11,
-                            color: Colors.white.withOpacity(0.8),
+                            color: Colors.white.withValues(alpha: 0.8),
                             letterSpacing: 0.8)),
                     Text('12/26',
                         style: GoogleFonts.inter(
@@ -582,7 +582,7 @@ class _AddToWalletScreenState extends State<AddToWalletScreen>
         border: Border.all(color: const Color(0xFFE8E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -595,7 +595,7 @@ class _AddToWalletScreenState extends State<AddToWalletScreen>
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: const Color(0xFF4CAF50).withOpacity(0.12),
+              color: const Color(0xFF4CAF50).withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
             child: const Icon(

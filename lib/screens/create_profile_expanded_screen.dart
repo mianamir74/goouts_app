@@ -447,7 +447,7 @@ class _CreateProfileExpandedScreenState
             padding: const EdgeInsets.only(right: 12),
             child: CircleAvatar(
               radius: 18,
-              backgroundColor: _primary.withOpacity(0.12),
+              backgroundColor: _primary.withValues(alpha: 0.12),
               child:
                   const Icon(Icons.person_rounded, color: _primary, size: 20),
             ),
@@ -551,7 +551,7 @@ class _CreateProfileExpandedScreenState
                       color: const Color(0xFFFFFBEB),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                          color: const Color(0xFFF59E0B).withOpacity(0.4)),
+                          color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -787,10 +787,10 @@ class _CreateProfileExpandedScreenState
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: _primary.withOpacity(0.2)),
+                        border: Border.all(color: _primary.withValues(alpha: 0.2)),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
+                            color: Colors.black.withValues(alpha: 0.05),
                             blurRadius: 8,
                             offset: const Offset(0, 3),
                           ),
@@ -877,9 +877,9 @@ class _CreateProfileExpandedScreenState
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 10),
                       decoration: BoxDecoration(
-                        color: _green.withOpacity(0.07),
+                        color: _green.withValues(alpha: 0.07),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: _green.withOpacity(0.3)),
+                        border: Border.all(color: _green.withValues(alpha: 0.3)),
                       ),
                       child: const Row(
                         children: [
@@ -927,9 +927,9 @@ class _CreateProfileExpandedScreenState
                         "Can't find your address? Enter manually",
                         style: GoogleFonts.inter(
                           fontSize: 12,
-                          color: _primary.withOpacity(0.75),
+                          color: _primary.withValues(alpha: 0.75),
                           decoration: TextDecoration.underline,
-                          decorationColor: _primary.withOpacity(0.5),
+                          decorationColor: _primary.withValues(alpha: 0.5),
                         ),
                       ),
                     ),
@@ -1132,13 +1132,13 @@ class _CreateProfileExpandedScreenState
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: _termsAccepted
-                          ? _primary.withOpacity(0.4)
+                          ? _primary.withValues(alpha: 0.4)
                           : Colors.grey[200]!,
                       width: 1.2,
                     ),
                     boxShadow: [
                       BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
+                          color: Colors.black.withValues(alpha: 0.04),
                           blurRadius: 6,
                           offset: const Offset(0, 2))
                     ],
@@ -1241,7 +1241,7 @@ class _CreateProfileExpandedScreenState
                   onPressed: _isSubmitting ? null : _registerAccount,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _primary,
-                    disabledBackgroundColor: _primary.withOpacity(0.4),
+                    disabledBackgroundColor: _primary.withValues(alpha: 0.4),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14)),
                     elevation: 0,
@@ -1836,7 +1836,7 @@ Last updated: May 2025
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),

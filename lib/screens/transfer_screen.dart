@@ -113,7 +113,7 @@ class _TransferScreenState extends State<TransferScreen> {
                                 width: 56,
                                 height: 56,
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
+                                  color: Colors.white.withValues(alpha: 0.2),
                                   shape: BoxShape.circle,
                                 ),
                                 child: const Icon(Icons.person_rounded,
@@ -136,7 +136,7 @@ class _TransferScreenState extends State<TransferScreen> {
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 14, vertical: 6),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.15),
+                                    color: Colors.white.withValues(alpha: 0.15),
                                     borderRadius: BorderRadius.circular(20),
                                   ),
                                   child: Text(
@@ -157,7 +157,7 @@ class _TransferScreenState extends State<TransferScreen> {
                                       padding: const EdgeInsets.only(right: 4),
                                       child: Icon(Icons.arrow_forward_rounded,
                                           color: Colors.white
-                                              .withOpacity(0.4 + i * 0.2),
+                                              .withValues(alpha: 0.4 + i * 0.2),
                                           size: 18),
                                     ),
                                   ),
@@ -172,7 +172,7 @@ class _TransferScreenState extends State<TransferScreen> {
                                 width: 56,
                                 height: 56,
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
+                                  color: Colors.white.withValues(alpha: 0.2),
                                   shape: BoxShape.circle,
                                 ),
                                 child: const Icon(Icons.person_rounded,
@@ -193,7 +193,7 @@ class _TransferScreenState extends State<TransferScreen> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 6),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.15),
+                          color: Colors.white.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Row(
@@ -227,7 +227,7 @@ class _TransferScreenState extends State<TransferScreen> {
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
+                          color: Colors.black.withValues(alpha: 0.05),
                           blurRadius: 8,
                           offset: const Offset(0, 2))
                     ],
@@ -271,7 +271,7 @@ class _TransferScreenState extends State<TransferScreen> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
-                          color: _green.withOpacity(0.1),
+                          color: _green.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -295,7 +295,7 @@ class _TransferScreenState extends State<TransferScreen> {
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                          color: Colors.black.withOpacity(0.06),
+                          color: Colors.black.withValues(alpha: 0.06),
                           blurRadius: 12,
                           offset: const Offset(0, 4))
                     ],
@@ -459,7 +459,7 @@ class _TransferScreenState extends State<TransferScreen> {
                         width: 36,
                         height: 36,
                         decoration: BoxDecoration(
-                          color: _primary.withOpacity(0.15),
+                          color: _primary.withValues(alpha: 0.15),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.notifications_active_rounded,
@@ -531,9 +531,13 @@ class _TransferScreenState extends State<TransferScreen> {
                   setState(() => _isLoading = true);
                   try {
                     await Future.delayed(const Duration(seconds: 1));
-                    if (mounted) Navigator.pushNamed(context, '/transfer-success');
+                    // Guard the context being used rather than this State's
+                    // mounted flag — they are not necessarily the same element.
+                    if (context.mounted) {
+                      Navigator.pushNamed(context, '/transfer-success');
+                    }
                   } catch (e) {
-                    if (mounted) {
+                    if (context.mounted) {
                       GoOutsSheet.error(context,
                         title: 'Transfer Failed',
                         message: 'Something went wrong. Please try again.',
@@ -577,7 +581,7 @@ class _TransferScreenState extends State<TransferScreen> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.06),
+                color: Colors.black.withValues(alpha: 0.06),
                 blurRadius: 10,
                 offset: const Offset(0, -2))
           ],

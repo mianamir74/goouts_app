@@ -842,7 +842,7 @@ class _NearbyScreenState extends State<NearbyScreen> {
                         ),
                         boxShadow: isSelected
                             ? [BoxShadow(
-                                color: _primary.withOpacity(0.25),
+                                color: _primary.withValues(alpha: 0.25),
                                 blurRadius: 6,
                                 offset: const Offset(0, 2),
                               )]
@@ -914,7 +914,7 @@ class _NearbyScreenState extends State<NearbyScreen> {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                  color: Colors.black.withOpacity(0.07),
+                  color: Colors.black.withValues(alpha: 0.07),
                   blurRadius: 10,
                   offset: const Offset(0, 3)),
             ],
@@ -946,14 +946,14 @@ class _NearbyScreenState extends State<NearbyScreen> {
                           placeholder: (_, __) => Center(
                             child: Icon(
                               v['icon'] as IconData? ?? fallbackIcon,
-                              color: Colors.white.withOpacity(0.18),
+                              color: Colors.white.withValues(alpha: 0.18),
                               size: 80,
                             ),
                           ),
                           errorWidget: (_, __, ___) => Center(
                             child: Icon(
                               v['icon'] as IconData? ?? fallbackIcon,
-                              color: Colors.white.withOpacity(0.18),
+                              color: Colors.white.withValues(alpha: 0.18),
                               size: 80,
                             ),
                           ),
@@ -967,7 +967,7 @@ class _NearbyScreenState extends State<NearbyScreen> {
                               end: Alignment.bottomCenter,
                               colors: [
                                 Colors.transparent,
-                                Colors.black.withOpacity(0.25),
+                                Colors.black.withValues(alpha: 0.25),
                               ],
                             ),
                           ),
@@ -981,7 +981,7 @@ class _NearbyScreenState extends State<NearbyScreen> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 10, vertical: 5),
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.45),
+                            color: Colors.black.withValues(alpha: 0.45),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
@@ -1106,7 +1106,7 @@ class _NearbyScreenState extends State<NearbyScreen> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.06),
+                color: Colors.black.withValues(alpha: 0.06),
                 blurRadius: 10,
                 offset: const Offset(0, -2))
           ],

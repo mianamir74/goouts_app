@@ -22,7 +22,7 @@ class _LinkCardScreenState extends State<LinkCardScreen> {
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(
-            color: Colors.black.withOpacity(0.07),
+            color: Colors.black.withValues(alpha: 0.07),
             height: 1,
           ),
         ),
@@ -63,7 +63,7 @@ class _LinkCardScreenState extends State<LinkCardScreen> {
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF0392CA).withOpacity(0.30),
+                            color: const Color(0xFF0392CA).withValues(alpha: 0.30),
                             blurRadius: 16,
                             offset: const Offset(0, 6),
                           ),
@@ -75,7 +75,7 @@ class _LinkCardScreenState extends State<LinkCardScreen> {
                             width: 46,
                             height: 46,
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
+                              color: Colors.white.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: const Icon(Icons.check_circle_rounded,
@@ -99,7 +99,7 @@ class _LinkCardScreenState extends State<LinkCardScreen> {
                                   'Registration Complete!',
                                   style: GoogleFonts.inter(
                                     fontSize: 13,
-                                    color: Colors.white.withOpacity(0.85),
+                                    color: Colors.white.withValues(alpha: 0.85),
                                   ),
                                 ),
                               ],
@@ -109,7 +109,7 @@ class _LinkCardScreenState extends State<LinkCardScreen> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.25),
+                              color: Colors.white.withValues(alpha: 0.25),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
@@ -203,7 +203,7 @@ class _LinkCardScreenState extends State<LinkCardScreen> {
                         color: const Color(0xFFF0F8FF),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: const Color(0xFF0392CA).withOpacity(0.18),
+                          color: const Color(0xFF0392CA).withValues(alpha: 0.18),
                         ),
                       ),
                       child: Column(
@@ -250,23 +250,23 @@ class _LinkCardScreenState extends State<LinkCardScreen> {
                     width: double.infinity,
                     height: 54,
                     child: ElevatedButton(
-                      onPressed: () {
-                        if (_selectedOption == 0) {
-                          Navigator.pushNamed(context, '/link-bank')
-                              .then((result) {
-                            if (result == true) Navigator.pop(context, true);
-                          });
-                        } else if (_selectedOption == 1) {
-                          Navigator.pushNamed(context, '/add-to-wallet')
-                              .then((result) {
-                            if (result == true) Navigator.pop(context, true);
-                          });
-                        } else {
-                          Navigator.pushNamed(context, '/link-card-details')
-                              .then((result) {
-                            if (result == true) Navigator.pop(context, true);
-                          });
-                        }
+                      // Was three copies of pushNamed(...).then(...) that used
+                      // `context` inside the callback without checking the
+                      // widget was still mounted — popping a disposed screen
+                      // throws. Collapsed into one awaited call with a
+                      // context.mounted guard.
+                      onPressed: () async {
+                        final String route = _selectedOption == 0
+                            ? '/link-bank'
+                            : _selectedOption == 1
+                                ? '/add-to-wallet'
+                                : '/link-card-details';
+
+                        final Object? result =
+                            await Navigator.pushNamed(context, route);
+
+                        if (!context.mounted) return;
+                        if (result == true) Navigator.pop(context, true);
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0392CA),
@@ -330,7 +330,7 @@ class _LinkCardScreenState extends State<LinkCardScreen> {
               const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
             color: isActive
-                ? const Color(0xFF0392CA).withOpacity(0.10)
+                ? const Color(0xFF0392CA).withValues(alpha: 0.10)
                 : const Color(0xFFF0F0F8),
             borderRadius: BorderRadius.circular(20),
           ),
@@ -392,15 +392,15 @@ class _PaymentOptionTile extends StatelessWidget {
             color: isSelected
                 ? const Color(0xFF0392CA)
                 : highlight
-                    ? const Color(0xFF0392CA).withOpacity(0.25)
+                    ? const Color(0xFF0392CA).withValues(alpha: 0.25)
                     : const Color(0xFFE8E8F0),
             width: isSelected ? 2 : 1,
           ),
           boxShadow: [
             BoxShadow(
               color: isSelected
-                  ? const Color(0xFF0392CA).withOpacity(0.12)
-                  : Colors.black.withOpacity(0.04),
+                  ? const Color(0xFF0392CA).withValues(alpha: 0.12)
+                  : Colors.black.withValues(alpha: 0.04),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -416,7 +416,7 @@ class _PaymentOptionTile extends StatelessWidget {
                   height: 48,
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? const Color(0xFF0392CA).withOpacity(0.10)
+                        ? const Color(0xFF0392CA).withValues(alpha: 0.10)
                         : const Color(0xFFF0F0F8),
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -446,7 +446,7 @@ class _PaymentOptionTile extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 7, vertical: 2),
                             decoration: BoxDecoration(
-                              color: badgeColor.withOpacity(0.12),
+                              color: badgeColor.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
@@ -503,7 +503,7 @@ class _PaymentOptionTile extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 10),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0392CA).withOpacity(0.06),
+                          color: const Color(0xFF0392CA).withValues(alpha: 0.06),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Row(

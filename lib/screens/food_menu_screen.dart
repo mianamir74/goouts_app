@@ -322,7 +322,7 @@ class _FoodMenuScreenState extends State<FoodMenuScreen> {
         icon: Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.35),
+            color: Colors.black.withValues(alpha: 0.35),
             shape: BoxShape.circle,
           ),
           child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 18),
@@ -334,7 +334,7 @@ class _FoodMenuScreenState extends State<FoodMenuScreen> {
           icon: Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.35),
+              color: Colors.black.withValues(alpha: 0.35),
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.search_rounded, color: Colors.white, size: 18),
@@ -500,7 +500,7 @@ class _FoodMenuScreenState extends State<FoodMenuScreen> {
           border: Border.all(color: const Color(0xFFE5E7EB)),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 6,
                 offset: const Offset(0, 2)),
           ],
@@ -544,7 +544,7 @@ class _FoodMenuScreenState extends State<FoodMenuScreen> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                            color: _primary.withOpacity(0.1),
+                            color: _primary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(4)),
                         child: Text('Chef\'s Pick',
                             style: GoogleFonts.inter(
@@ -587,7 +587,7 @@ class _FoodMenuScreenState extends State<FoodMenuScreen> {
                                 child: Container(
                                   width: 28, height: 28,
                                   decoration: BoxDecoration(
-                                      color: _primary.withOpacity(0.12),
+                                      color: _primary.withValues(alpha: 0.12),
                                       shape: BoxShape.circle),
                                   child: Center(
                                     child: Text('$qty',
@@ -623,7 +623,7 @@ class _FoodMenuScreenState extends State<FoodMenuScreen> {
             borderRadius: BorderRadius.circular(14),
             boxShadow: [
               BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: Colors.black.withValues(alpha: 0.04),
                   blurRadius: 8,
                   offset: const Offset(0, 2)),
             ],
@@ -709,9 +709,9 @@ class _FoodMenuScreenState extends State<FoodMenuScreen> {
   Widget _stepperWidget(_MenuItem item, int qty) => Container(
     width: 90,
     decoration: BoxDecoration(
-      color: _primary.withOpacity(0.08),
+      color: _primary.withValues(alpha: 0.08),
       borderRadius: BorderRadius.circular(10),
-      border: Border.all(color: _primary.withOpacity(0.3)),
+      border: Border.all(color: _primary.withValues(alpha: 0.3)),
     ),
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -947,7 +947,7 @@ class _CartBar extends StatelessWidget {
               backgroundColor: primary,
               foregroundColor: Colors.white,
               elevation: 6,
-              shadowColor: primary.withOpacity(0.4),
+              shadowColor: primary.withValues(alpha: 0.4),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             ),
@@ -956,7 +956,7 @@ class _CartBar extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.25),
+                  color: Colors.white.withValues(alpha: 0.25),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text('${cart.totalItems}',
@@ -1146,7 +1146,7 @@ class _ItemSearchSheetState extends State<_ItemSearchSheet> {
         child: Container(
           padding: const EdgeInsets.all(5),
           decoration: BoxDecoration(
-            color: widget.primary.withOpacity(0.1),
+            color: widget.primary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Icon(icon, size: 16, color: widget.primary),

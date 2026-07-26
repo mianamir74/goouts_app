@@ -120,7 +120,7 @@ class _UserMessageDetailScreenState extends State<UserMessageDetailScreen> {
                 borderRadius: BorderRadius.circular(18),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
+                    color: Colors.black.withValues(alpha: 0.04),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -133,7 +133,7 @@ class _UserMessageDetailScreenState extends State<UserMessageDetailScreen> {
                     width: 52,
                     height: 52,
                     decoration: BoxDecoration(
-                      color: _goOutsBlue.withOpacity(0.10),
+                      color: _goOutsBlue.withValues(alpha: 0.10),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: const Icon(
@@ -192,7 +192,7 @@ class _UserMessageDetailScreenState extends State<UserMessageDetailScreen> {
                 borderRadius: BorderRadius.circular(18),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
+                    color: Colors.black.withValues(alpha: 0.04),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),

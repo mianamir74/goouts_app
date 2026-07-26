@@ -178,7 +178,7 @@ class _FoodOrderHistoryScreenState extends State<FoodOrderHistoryScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Column(children: [
         Text(value, style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: color)),
@@ -215,9 +215,9 @@ class _FoodOrderHistoryScreenState extends State<FoodOrderHistoryScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
           border: isRefundPending
-              ? Border.all(color: _blue.withOpacity(0.4), width: 1.5)
+              ? Border.all(color: _blue.withValues(alpha: 0.4), width: 1.5)
               : null,
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           // Header row
@@ -227,7 +227,7 @@ class _FoodOrderHistoryScreenState extends State<FoodOrderHistoryScreen> {
               Container(
                 width: 42, height: 42,
                 decoration: BoxDecoration(
-                  color: _primary.withOpacity(0.1),
+                  color: _primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(Icons.delivery_dining_rounded, color: _primary, size: 22),
@@ -320,9 +320,9 @@ class _FoodOrderHistoryScreenState extends State<FoodOrderHistoryScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: _blue.withOpacity(0.08),
+                      color: _blue.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: _blue.withOpacity(0.25)),
+                      border: Border.all(color: _blue.withValues(alpha: 0.25)),
                     ),
                     child: Row(children: [
                       const Icon(Icons.hourglass_bottom_rounded, size: 14, color: _blue),
@@ -358,7 +358,7 @@ class _FoodOrderHistoryScreenState extends State<FoodOrderHistoryScreen> {
   Widget _statusBadge(Map<String, dynamic> info) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
     decoration: BoxDecoration(
-      color: (info['color'] as Color).withOpacity(0.12),
+      color: (info['color'] as Color).withValues(alpha: 0.12),
       borderRadius: BorderRadius.circular(20),
     ),
     child: Text(info['label'] as String,

@@ -59,13 +59,19 @@ class _ProfileSecurityScreenState extends State<ProfileSecurityScreen> {
       if (!ok) return;
     }
     await BiometricService.instance.setEnabled(value);
-    if (mounted) setState(() => _biometricEnabled = value);
-    if (mounted) {
-      GoOutsSheet.success(context,
-        title: 'Biometrics Enabled',
-        message: 'value ? \'Biometric login enabled.\' : \'Biometric login disabled.',
-      );
-    }
+    if (!mounted) return;
+    setState(() => _biometricEnabled = value);
+    // BUG FIX: this was a broken string literal — the ternary was inside the
+    // quotes, so the sheet displayed the raw text
+    //   value ? 'Biometric login enabled.' : 'Biometric login disabled.
+    // to the user. The title was also hard-coded to 'Biometrics Enabled' even
+    // when switching the feature off.
+    GoOutsSheet.success(context,
+      title: value ? 'Biometrics Enabled' : 'Biometrics Disabled',
+      message: value
+          ? 'Biometric login enabled.'
+          : 'Biometric login disabled.',
+    );
   }
 
   Future<void> _loadProfile() async {
@@ -293,7 +299,7 @@ class _ProfileSecurityScreenState extends State<ProfileSecurityScreen> {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 8,
                       offset: const Offset(0, 2))
                 ],
@@ -455,7 +461,9 @@ class _ProfileSecurityScreenState extends State<ProfileSecurityScreen> {
                     trailing: Switch(
                       value: _biometricEnabled,
                       onChanged: _biometricSupported ? _toggleBiometric : null,
-                      activeColor: _primary,
+                      // Switch.activeColor is deprecated in favour of the
+                      // more explicit activeThumbColor.
+                      activeThumbColor: _primary,
                     ),
                     onTap: () => _toggleBiometric(!_biometricEnabled),
                   ),
@@ -530,7 +538,7 @@ class _ProfileSecurityScreenState extends State<ProfileSecurityScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 8,
                 offset: const Offset(0, 2))
           ],

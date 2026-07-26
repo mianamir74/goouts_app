@@ -122,7 +122,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
                   right: -10,
                   top: -10,
                   child: Icon(Icons.delivery_dining_rounded,
-                      size: 110, color: Colors.white.withOpacity(0.12)),
+                      size: 110, color: Colors.white.withValues(alpha: 0.12)),
                 ),
                 Row(
                   children: [
@@ -133,7 +133,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.25),
+                              color: Colors.white.withValues(alpha: 0.25),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text('NEW', style: GoogleFonts.inter(
@@ -148,7 +148,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
                           Text('Order from local restaurants.\nFree delivery with Social Boost.',
                               style: GoogleFonts.inter(
                                   fontSize: 12,
-                                  color: Colors.white.withOpacity(0.9),
+                                  color: Colors.white.withValues(alpha: 0.9),
                                   height: 1.5)),
                         ],
                       ),
@@ -179,7 +179,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 6,
                   offset: const Offset(0, 2)),
             ],
@@ -261,7 +261,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -289,7 +289,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
                       width: 220,
                       color: o['color'] as Color,
                       child: Icon(Icons.store_rounded,
-                          color: Colors.white.withOpacity(0.5), size: 40),
+                          color: Colors.white.withValues(alpha: 0.5), size: 40),
                     ),
                   ),
                   // Discount badge
@@ -466,7 +466,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
                 child: Icon(
                   Icons.local_offer_rounded,
                   size: 110,
-                  color: Colors.white.withOpacity(0.1),
+                  color: Colors.white.withValues(alpha: 0.1),
                 ),
               ),
               Column(
@@ -486,7 +486,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
                     'Load £100 and more to your wallet and unlock extra cashback.',
                     style: GoogleFonts.inter(
                         fontSize: 13,
-                        color: Colors.white.withOpacity(0.85),
+                        color: Colors.white.withValues(alpha: 0.85),
                         height: 1.5),
                   ),
                   const SizedBox(height: 16),
@@ -522,7 +522,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.06),
+                color: Colors.black.withValues(alpha: 0.06),
                 blurRadius: 10,
                 offset: const Offset(0, -2))
           ],

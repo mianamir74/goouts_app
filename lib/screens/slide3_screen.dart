@@ -66,7 +66,7 @@ class Slide3Screen extends StatelessWidget {
                         child: Icon(
                           Icons.people_alt_rounded,
                           size: 80,
-                          color: Colors.white.withOpacity(0.4),
+                          color: Colors.white.withValues(alpha: 0.4),
                         ),
                       ),
                     ),
@@ -182,7 +182,7 @@ class Slide3Screen extends StatelessWidget {
         decoration: BoxDecoration(
           color: active
               ? const Color(0xFF0392CA)
-              : Colors.grey.withOpacity(0.35),
+              : Colors.grey.withValues(alpha: 0.35),
           borderRadius: BorderRadius.circular(4),
         ),
       );

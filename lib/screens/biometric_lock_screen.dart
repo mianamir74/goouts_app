@@ -20,7 +20,6 @@ class BiometricLockScreen extends StatefulWidget {
 
 class _BiometricLockScreenState extends State<BiometricLockScreen> {
   static const Color _blue = Color(0xFF0392CA);
-  static const Color _dark = Color(0xFF0D1B3E);
 
   bool _isAuthenticating = false;
   String? _errorMsg;
@@ -87,7 +86,7 @@ class _BiometricLockScreenState extends State<BiometricLockScreen> {
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: _blue.withOpacity(0.15),
+                  color: _blue.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(22),
                 ),
                 child: const Icon(Icons.lock_rounded, color: _blue, size: 38),
@@ -108,7 +107,7 @@ class _BiometricLockScreenState extends State<BiometricLockScreen> {
                 'Verify your identity to continue',
                 style: GoogleFonts.inter(
                   fontSize: 15,
-                  color: Colors.white.withOpacity(0.6),
+                  color: Colors.white.withValues(alpha: 0.6),
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -124,13 +123,13 @@ class _BiometricLockScreenState extends State<BiometricLockScreen> {
                   height: 100,
                   decoration: BoxDecoration(
                     color: _isAuthenticating
-                        ? _blue.withOpacity(0.3)
-                        : _blue.withOpacity(0.15),
+                        ? _blue.withValues(alpha: 0.3)
+                        : _blue.withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: _isAuthenticating
                           ? _blue
-                          : _blue.withOpacity(0.4),
+                          : _blue.withValues(alpha: 0.4),
                       width: 2,
                     ),
                   ),
@@ -162,7 +161,7 @@ class _BiometricLockScreenState extends State<BiometricLockScreen> {
                 style: GoogleFonts.inter(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withValues(alpha: 0.8),
                 ),
               ),
 
@@ -171,9 +170,9 @@ class _BiometricLockScreenState extends State<BiometricLockScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
+                    color: Colors.red.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.red.withOpacity(0.3)),
+                    border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
                   ),
                   child: Text(
                     _errorMsg!,
@@ -196,7 +195,7 @@ class _BiometricLockScreenState extends State<BiometricLockScreen> {
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Colors.white.withOpacity(0.5),
+                    color: Colors.white.withValues(alpha: 0.5),
                   ),
                 ),
               ),

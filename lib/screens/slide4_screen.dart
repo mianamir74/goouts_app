@@ -68,7 +68,7 @@ class Slide4Screen extends StatelessWidget {
                             child: Icon(
                               Icons.explore_rounded,
                               size: 80,
-                              color: Colors.white.withOpacity(0.3),
+                              color: Colors.white.withValues(alpha: 0.3),
                             ),
                           ),
                         ),
@@ -83,10 +83,10 @@ class Slide4Screen extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 20, vertical: 12),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.18),
+                              color: Colors.white.withValues(alpha: 0.18),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: Colors.white.withOpacity(0.25),
+                                color: Colors.white.withValues(alpha: 0.25),
                                 width: 1,
                               ),
                             ),
@@ -164,7 +164,7 @@ class Slide4Screen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0392CA).withOpacity(0.07),
+                  color: const Color(0xFF0392CA).withValues(alpha: 0.07),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -265,7 +265,7 @@ class Slide4Screen extends StatelessWidget {
         decoration: BoxDecoration(
           color: active
               ? const Color(0xFF0392CA)
-              : Colors.grey.withOpacity(0.35),
+              : Colors.grey.withValues(alpha: 0.35),
           borderRadius: BorderRadius.circular(4),
         ),
       );

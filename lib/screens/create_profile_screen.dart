@@ -140,7 +140,7 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
+                      color: Colors.white.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(Icons.cloud_upload_outlined,
@@ -168,7 +168,7 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                 'Complete your registration to join GoOuts.',
                 style: GoogleFonts.inter(
                   fontSize: 14,
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withValues(alpha: 0.8),
                   height: 1.5,
                 ),
               ),
@@ -190,7 +190,7 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                             fit: StackFit.expand,
                             children: [
                               Image.file(_profileImage!, fit: BoxFit.cover),
-                              Container(color: Colors.black.withOpacity(0.25)),
+                              Container(color: Colors.black.withValues(alpha: 0.25)),
                               Center(
                                 child: Text(
                                   'Tap to change',
@@ -211,7 +211,7 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                               width: 56,
                               height: 56,
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
+                                color: Colors.white.withValues(alpha: 0.2),
                                 shape: BoxShape.circle,
                               ),
                               child: const Icon(Icons.person_outline_rounded,
@@ -231,7 +231,7 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                               'Make a great first impression',
                               style: GoogleFonts.inter(
                                 fontSize: 12,
-                                color: Colors.white.withOpacity(0.65),
+                                color: Colors.white.withValues(alpha: 0.65),
                               ),
                             ),
                           ],
@@ -248,7 +248,7 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                 'Required under UK Anti-Money Laundering Regulations. Choose your ID document.',
                 style: GoogleFonts.inter(
                   fontSize: 12,
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withValues(alpha: 0.7),
                   height: 1.4,
                 ),
               ),
@@ -272,7 +272,7 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                       style: GoogleFonts.inter(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: Colors.white.withOpacity(0.7),
+                        color: Colors.white.withValues(alpha: 0.7),
                       ),
                     ),
                   ),
@@ -308,7 +308,7 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                       : 'Upload the main photo page of your passport.',
                   style: GoogleFonts.inter(
                     fontSize: 12,
-                    color: Colors.white.withOpacity(0.7),
+                    color: Colors.white.withValues(alpha: 0.7),
                     height: 1.4,
                   ),
                 ),
@@ -327,7 +327,7 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                               fit: StackFit.expand,
                               children: [
                                 Image.file(_kycFrontImage!, fit: BoxFit.cover),
-                                Container(color: Colors.black.withOpacity(0.2)),
+                                Container(color: Colors.black.withValues(alpha: 0.2)),
                                 Align(
                                   alignment: Alignment.bottomLeft,
                                   child: Padding(
@@ -356,7 +356,7 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                                 style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white),
                               ),
                               Text('Tap to upload from gallery',
-                                  style: GoogleFonts.inter(fontSize: 11, color: Colors.white.withOpacity(0.65))),
+                                  style: GoogleFonts.inter(fontSize: 11, color: Colors.white.withValues(alpha: 0.65))),
                             ],
                           ),
                   ),
@@ -377,7 +377,7 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                                 fit: StackFit.expand,
                                 children: [
                                   Image.file(_kycBackImage!, fit: BoxFit.cover),
-                                  Container(color: Colors.black.withOpacity(0.2)),
+                                  Container(color: Colors.black.withValues(alpha: 0.2)),
                                   Align(
                                     alignment: Alignment.bottomLeft,
                                     child: Padding(
@@ -404,7 +404,7 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                                 Text('Back of Licence',
                                     style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
                                 Text('Tap to upload from gallery',
-                                    style: GoogleFonts.inter(fontSize: 11, color: Colors.white.withOpacity(0.65))),
+                                    style: GoogleFonts.inter(fontSize: 11, color: Colors.white.withValues(alpha: 0.65))),
                               ],
                             ),
                     ),
@@ -457,7 +457,7 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                   text: TextSpan(
                     style: GoogleFonts.inter(
                       fontSize: 12,
-                      color: Colors.white.withOpacity(0.65),
+                      color: Colors.white.withValues(alpha: 0.65),
                     ),
                     children: [
                       const TextSpan(text: 'By continuing, you agree to our '),
@@ -598,7 +598,7 @@ class _DashedBorderContainer extends StatelessWidget {
       painter: _DashedBorderPainter(
         color: highlighted
             ? Colors.white
-            : Colors.white.withOpacity(0.45),
+            : Colors.white.withValues(alpha: 0.45),
         radius: 14,
         dashWidth: 6,
         dashSpace: 5,
@@ -609,8 +609,8 @@ class _DashedBorderContainer extends StatelessWidget {
         height: height,
         decoration: BoxDecoration(
           color: highlighted
-              ? Colors.white.withOpacity(0.15)
-              : Colors.white.withOpacity(0.08),
+              ? Colors.white.withValues(alpha: 0.15)
+              : Colors.white.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(14),
         ),
         child: child,
@@ -689,7 +689,7 @@ class _DocTypeCard extends StatelessWidget {
       onTap: onTap,
       child: CustomPaint(
         painter: _DashedBorderPainter(
-          color: selected ? Colors.white : Colors.white.withOpacity(0.45),
+          color: selected ? Colors.white : Colors.white.withValues(alpha: 0.45),
           radius: 14,
           dashWidth: 6,
           dashSpace: 5,
@@ -699,8 +699,8 @@ class _DocTypeCard extends StatelessWidget {
           height: 100,
           decoration: BoxDecoration(
             color: selected
-                ? Colors.white.withOpacity(0.2)
-                : Colors.white.withOpacity(0.08),
+                ? Colors.white.withValues(alpha: 0.2)
+                : Colors.white.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(14),
           ),
           child: Column(
@@ -710,7 +710,7 @@ class _DocTypeCard extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(selected ? 0.25 : 0.15),
+                  color: Colors.white.withValues(alpha: selected ? 0.25 : 0.15),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(icon,

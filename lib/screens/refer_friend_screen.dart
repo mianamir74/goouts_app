@@ -140,7 +140,7 @@ class _ReferFriendScreenState extends State<ReferFriendScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.15),
+                color: Colors.white.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(100),
               ),
               child: Text('No limits • Invite as many as you like',
@@ -159,7 +159,7 @@ class _ReferFriendScreenState extends State<ReferFriendScreen> {
               'Every time a friend signs up with your code and places their first order, £2 lands in your wallet automatically. You will be notified the moment it arrives.',
               style: GoogleFonts.inter(
                   fontSize: 13,
-                  color: Colors.white.withOpacity(0.85),
+                  color: Colors.white.withValues(alpha: 0.85),
                   height: 1.6),
             ),
           ],
@@ -172,7 +172,7 @@ class _ReferFriendScreenState extends State<ReferFriendScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 2)),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 2)),
           ],
         ),
         padding: const EdgeInsets.all(20),
@@ -187,7 +187,7 @@ class _ReferFriendScreenState extends State<ReferFriendScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               decoration: BoxDecoration(
                 color: const Color(0xFFF0F8FF),
-                border: Border.all(color: _primary.withOpacity(0.3)),
+                border: Border.all(color: _primary.withValues(alpha: 0.3)),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -263,7 +263,7 @@ class _ReferFriendScreenState extends State<ReferFriendScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 2)),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 2)),
           ],
         ),
         padding: const EdgeInsets.all(20),
@@ -311,7 +311,7 @@ class _ReferFriendScreenState extends State<ReferFriendScreen> {
             width: 34,
             height: 34,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
+              color: color.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
@@ -350,7 +350,7 @@ class _ReferFriendScreenState extends State<ReferFriendScreen> {
           height: 20,
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [Colors.grey.withOpacity(0.2), Colors.grey.withOpacity(0.05)],
+              colors: [Colors.grey.withValues(alpha: 0.2), Colors.grey.withValues(alpha: 0.05)],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
@@ -369,7 +369,7 @@ class _ReferFriendScreenState extends State<ReferFriendScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 2)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 2)),
         ],
       ),
       padding: const EdgeInsets.all(20),
@@ -406,7 +406,7 @@ class _ReferFriendScreenState extends State<ReferFriendScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.07),
+            color: color.withValues(alpha: 0.07),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -421,7 +421,7 @@ class _ReferFriendScreenState extends State<ReferFriendScreen> {
                   style: GoogleFonts.inter(
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
-                      color: color.withOpacity(0.7)),
+                      color: color.withValues(alpha: 0.7)),
                   textAlign: TextAlign.center),
             ],
           ),
@@ -437,7 +437,7 @@ class _ReferFriendScreenState extends State<ReferFriendScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10),
           ],
         ),
         padding: const EdgeInsets.all(32),
@@ -463,7 +463,7 @@ class _ReferFriendScreenState extends State<ReferFriendScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10),
         ],
       ),
       padding: const EdgeInsets.all(20),
@@ -488,7 +488,7 @@ class _ReferFriendScreenState extends State<ReferFriendScreen> {
                     children: [
                       CircleAvatar(
                         radius: 18,
-                        backgroundColor: _primary.withOpacity(0.1),
+                        backgroundColor: _primary.withValues(alpha: 0.1),
                         child: Text(
                           name.isNotEmpty ? name[0].toUpperCase() : 'G',
                           style: GoogleFonts.inter(
@@ -519,8 +519,8 @@ class _ReferFriendScreenState extends State<ReferFriendScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
                           color: done
-                              ? _green.withOpacity(0.1)
-                              : Colors.orange.withOpacity(0.1),
+                              ? _green.withValues(alpha: 0.1)
+                              : Colors.orange.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(

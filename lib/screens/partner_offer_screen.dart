@@ -117,7 +117,7 @@ class PartnerOfferScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
+                          color: Colors.black.withValues(alpha: 0.08),
                           blurRadius: 20,
                           offset: const Offset(0, 10),
                         ),
@@ -256,7 +256,7 @@ class PartnerOfferScreen extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(Icons.local_offer_outlined,
@@ -278,7 +278,7 @@ class PartnerOfferScreen extends StatelessWidget {
                           Text(
                             offerTitle,
                             style: GoogleFonts.inter(
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                               fontSize: 14,
                             ),
                           ),
@@ -287,7 +287,7 @@ class PartnerOfferScreen extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.15),
+                              color: Colors.white.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
@@ -502,7 +502,7 @@ class PartnerOfferScreen extends StatelessWidget {
                         Container(
                           width: 42, height: 42,
                           decoration: BoxDecoration(
-                            color: _primary.withOpacity(0.1),
+                            color: _primary.withValues(alpha: 0.1),
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(Icons.verified_user_rounded,
@@ -711,7 +711,7 @@ class PartnerOfferScreen extends StatelessWidget {
           Container(
             width: 38, height: 38,
             decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.15),
+              color: iconColor.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: iconColor, size: 20),
@@ -819,7 +819,7 @@ class PartnerOfferScreen extends StatelessWidget {
                   Container(
                     width: 64, height: 64,
                     decoration: BoxDecoration(
-                      color: _primary.withOpacity(0.1),
+                      color: _primary.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(Icons.local_offer_rounded,
@@ -1056,7 +1056,7 @@ class PartnerOfferScreen extends StatelessWidget {
                             },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _primary,
-                        disabledBackgroundColor: _primary.withOpacity(0.4),
+                        disabledBackgroundColor: _primary.withValues(alpha: 0.4),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14)),
                         elevation: 0,
@@ -1094,7 +1094,7 @@ class PartnerOfferScreen extends StatelessWidget {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: _primary.withOpacity(0.08),
+              color: _primary.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: _primary, size: 18),
@@ -1146,7 +1146,7 @@ class PartnerOfferScreen extends StatelessWidget {
           border: Border.all(color: Colors.grey[200]!),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),

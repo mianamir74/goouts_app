@@ -413,7 +413,7 @@ class _OtpScreenState extends State<OtpScreen>
                             filled: true,
                             // Light blue fill when digit entered, red tint on error
                             fillColor: _hasError
-                                ? _errorRed.withOpacity(0.06)
+                                ? _errorRed.withValues(alpha: 0.06)
                                 : filled
                                     ? const Color(0xFFE8F4FB)
                                     : Colors.white,
@@ -511,7 +511,7 @@ class _OtpScreenState extends State<OtpScreen>
                   onPressed: (_isComplete && !_isLoading) ? _verify : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _primary,
-                    disabledBackgroundColor: _primary.withOpacity(0.4),
+                    disabledBackgroundColor: _primary.withValues(alpha: 0.4),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14)),
                     elevation: 0,

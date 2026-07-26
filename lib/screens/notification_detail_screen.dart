@@ -174,10 +174,10 @@ class NotificationDetailScreen extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 20, offset: const Offset(0, 10)),
         ],
-        border: Border.all(color: Colors.black.withOpacity(0.05)),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
       ),
       child: Column(
         children: [
@@ -220,7 +220,7 @@ class NotificationDetailScreen extends StatelessWidget {
                   Text('TRANSACTION ID',
                     style: GoogleFonts.inter(fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: _onSurfaceVariant.withOpacity(0.6),
+                        color: _onSurfaceVariant.withValues(alpha: 0.6),
                         letterSpacing: 0.5)),
                   const SizedBox(height: 4),
                   Text(transactionId,
@@ -262,7 +262,7 @@ class NotificationDetailScreen extends StatelessWidget {
       children: [
         Text(label,
           style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold,
-              color: _onSurfaceVariant.withOpacity(0.6), letterSpacing: 0.5)),
+              color: _onSurfaceVariant.withValues(alpha: 0.6), letterSpacing: 0.5)),
         const SizedBox(height: 12),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -327,7 +327,7 @@ class NotificationDetailScreen extends StatelessWidget {
     child: OutlinedButton(
       onPressed: onTap,
       style: OutlinedButton.styleFrom(
-        side: BorderSide(color: _onSurface.withOpacity(0.1)),
+        side: BorderSide(color: _onSurface.withValues(alpha: 0.1)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
       child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [

@@ -78,7 +78,7 @@ class FamilyCashbackIntroScreen extends StatelessWidget {
                   aspectRatio: 1 / 1,
                   child: Container(
                     decoration: BoxDecoration(
-                      color: primaryColor.withOpacity(0.1),
+                      color: primaryColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(32),
                       image: const DecorationImage(
                         image: AssetImage(
@@ -87,7 +87,7 @@ class FamilyCashbackIntroScreen extends StatelessWidget {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
+                          color: Colors.black.withValues(alpha: 0.05),
                           blurRadius: 20,
                           offset: const Offset(0, 10),
                         ),
@@ -230,7 +230,7 @@ class FamilyCashbackIntroScreen extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     fontSize: 12,
-                    color: onSurfaceVariant.withOpacity(0.6),
+                    color: onSurfaceVariant.withValues(alpha: 0.6),
                   ),
                 ),
               ),
@@ -250,7 +250,7 @@ class FamilyCashbackIntroScreen extends StatelessWidget {
         decoration: BoxDecoration(
           color: active
               ? const Color(0xFF0392CA)
-              : Colors.grey.withOpacity(0.35),
+              : Colors.grey.withValues(alpha: 0.35),
           borderRadius: BorderRadius.circular(4),
         ),
       );

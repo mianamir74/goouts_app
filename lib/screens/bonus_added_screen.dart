@@ -146,7 +146,7 @@ class _BonusAddedScreenState extends State<BonusAddedScreen> {
                   color: const Color(0xFFF0F9FF),
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: _primary.withOpacity(0.15),
+                    color: _primary.withValues(alpha: 0.15),
                     width: 1,
                   ),
                 ),
@@ -156,7 +156,7 @@ class _BonusAddedScreenState extends State<BonusAddedScreen> {
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    color: const Color(0xFF0D1B3E).withOpacity(0.75),
+                    color: const Color(0xFF0D1B3E).withValues(alpha: 0.75),
                     height: 1.6,
                   ),
                 ),
@@ -230,7 +230,7 @@ class _BonusAddedScreenState extends State<BonusAddedScreen> {
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -264,7 +264,7 @@ class _BonusAddedScreenState extends State<BonusAddedScreen> {
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: _primary.withOpacity(0.2),
+                              color: _primary.withValues(alpha: 0.2),
                               blurRadius: 20,
                               offset: const Offset(0, 8),
                             ),
@@ -332,7 +332,7 @@ class _BonusAddedScreenState extends State<BonusAddedScreen> {
                         borderRadius: BorderRadius.circular(22),
                         boxShadow: [
                           BoxShadow(
-                            color: _primary.withOpacity(0.30),
+                            color: _primary.withValues(alpha: 0.30),
                             blurRadius: 18,
                             offset: const Offset(0, 8),
                           ),
@@ -359,7 +359,7 @@ class _BonusAddedScreenState extends State<BonusAddedScreen> {
                             style: GoogleFonts.inter(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              color: Colors.white.withOpacity(0.90),
+                              color: Colors.white.withValues(alpha: 0.90),
                             ),
                           ),
                           const SizedBox(height: 12),
@@ -367,10 +367,10 @@ class _BonusAddedScreenState extends State<BonusAddedScreen> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 14, vertical: 7),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.15),
+                              color: Colors.white.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
-                                  color: Colors.white.withOpacity(0.30)),
+                                  color: Colors.white.withValues(alpha: 0.30)),
                             ),
                             child: Text(
                               'Wallet balance: £2.00',
@@ -395,7 +395,7 @@ class _BonusAddedScreenState extends State<BonusAddedScreen> {
                         color: const Color(0xFFF0F9FF),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                            color: _primary.withOpacity(0.15)),
+                            color: _primary.withValues(alpha: 0.15)),
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -427,10 +427,10 @@ class _BonusAddedScreenState extends State<BonusAddedScreen> {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(24),
                         border:
-                            Border.all(color: Colors.black.withOpacity(0.05)),
+                            Border.all(color: Colors.black.withValues(alpha: 0.05)),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.03),
+                            color: Colors.black.withValues(alpha: 0.03),
                             blurRadius: 20,
                             offset: const Offset(0, 10),
                           ),
@@ -442,17 +442,17 @@ class _BonusAddedScreenState extends State<BonusAddedScreen> {
                           Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: _primary.withOpacity(0.05),
+                              color: _primary.withValues(alpha: 0.05),
                               borderRadius: BorderRadius.circular(16),
                               border:
-                                  Border.all(color: _primary.withOpacity(0.1)),
+                                  Border.all(color: _primary.withValues(alpha: 0.1)),
                             ),
                             child: Row(
                               children: [
                                 Container(
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
-                                    color: _primary.withOpacity(0.12),
+                                    color: _primary.withValues(alpha: 0.12),
                                     shape: BoxShape.circle,
                                   ),
                                   child: Icon(Icons.rocket_launch_outlined,
@@ -481,7 +481,7 @@ class _BonusAddedScreenState extends State<BonusAddedScreen> {
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
                                   color: const Color(0xFF16A34A)
-                                      .withOpacity(0.2)),
+                                      .withValues(alpha: 0.2)),
                             ),
                             child: Row(
                               children: [

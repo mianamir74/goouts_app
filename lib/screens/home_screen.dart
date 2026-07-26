@@ -381,7 +381,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   shape: BoxShape.circle,
                                   boxShadow: [
                                     BoxShadow(
-                                        color: Colors.black.withOpacity(0.06),
+                                        color: Colors.black.withValues(alpha: 0.06),
                                         blurRadius: 6)
                                   ],
                                 ),
@@ -436,7 +436,7 @@ class _HomeScreenState extends State<HomeScreen> {
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF0392CA).withOpacity(0.35),
+                  color: const Color(0xFF0392CA).withValues(alpha: 0.35),
                   blurRadius: 16,
                   offset: const Offset(0, 6),
                 ),
@@ -460,7 +460,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             style: GoogleFonts.inter(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.white.withOpacity(0.75),
+                                color: Colors.white.withValues(alpha: 0.75),
                                 letterSpacing: 0.5)),
                       ],
                     ),
@@ -471,7 +471,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
-                            color: Colors.white.withOpacity(0.6), width: 1.5),
+                            color: Colors.white.withValues(alpha: 0.6), width: 1.5),
                       ),
                       child: Transform.rotate(
                         angle: 1.5708,
@@ -489,7 +489,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         letterSpacing: 1.2,
                         fontWeight: FontWeight.w600,
                         shadows: [
-                          Shadow(color: Colors.black.withOpacity(0.5), blurRadius: 4, offset: const Offset(0, 1)),
+                          Shadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 4, offset: const Offset(0, 1)),
                         ])),
                 const SizedBox(height: 4),
                 Text('4821  5567  8901  2345',
@@ -499,7 +499,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: Colors.white,
                         letterSpacing: 1.5,
                         shadows: [
-                          Shadow(color: Colors.black.withOpacity(0.4), blurRadius: 6, offset: const Offset(0, 1)),
+                          Shadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 6, offset: const Offset(0, 1)),
                         ])),
                 const SizedBox(height: 12),
                 Row(
@@ -514,7 +514,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 color: Colors.white,
                                 letterSpacing: 0.8,
                                 shadows: [
-                                  Shadow(color: Colors.black.withOpacity(0.5), blurRadius: 4, offset: const Offset(0, 1)),
+                                  Shadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 4, offset: const Offset(0, 1)),
                                 ])),
                         Text('12/26',
                             style: GoogleFonts.inter(
@@ -522,7 +522,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 fontWeight: FontWeight.w600,
                                 color: Colors.white,
                                 shadows: [
-                                  Shadow(color: Colors.black.withOpacity(0.4), blurRadius: 4, offset: const Offset(0, 1)),
+                                  Shadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 4, offset: const Offset(0, 1)),
                                 ])),
                       ],
                     ),
@@ -594,7 +594,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               borderRadius: BorderRadius.circular(16),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.07),
+                                  color: Colors.black.withValues(alpha: 0.07),
                                   blurRadius: 6,
                                   offset: const Offset(0, 2),
                                 ),
@@ -795,7 +795,7 @@ class _HomeScreenState extends State<HomeScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.12),
+                color: Colors.black.withValues(alpha: 0.12),
                 blurRadius: 10,
                 offset: const Offset(0, 4))
           ],
@@ -824,8 +824,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     end: Alignment.bottomCenter,
                     colors: [
                       Colors.transparent,
-                      Colors.black.withOpacity(0.35),
-                      Colors.black.withOpacity(0.80),
+                      Colors.black.withValues(alpha: 0.35),
+                      Colors.black.withValues(alpha: 0.80),
                     ],
                     stops: const [0.0, 0.45, 1.0],
                   ),
@@ -938,7 +938,7 @@ class _HomeScreenState extends State<HomeScreen> {
             borderRadius: BorderRadius.circular(14),
             boxShadow: [
               BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: Colors.black.withValues(alpha: 0.04),
                   blurRadius: 8,
                   offset: const Offset(0, 2))
             ],
@@ -1066,7 +1066,7 @@ class _HomeScreenState extends State<HomeScreen> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.06),
+                color: Colors.black.withValues(alpha: 0.06),
                 blurRadius: 10,
                 offset: const Offset(0, -2))
           ],

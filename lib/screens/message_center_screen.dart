@@ -575,7 +575,7 @@ class _MessageCenterScreenState extends State<MessageCenterScreen> {
           color: isRead ? Colors.white : const Color(0xFFF0F9FF),
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.02),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.02),
                 blurRadius: 10, offset: const Offset(0, 4)),
           ],
         ),

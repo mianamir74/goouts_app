@@ -70,7 +70,7 @@ class Slide2aScreen extends StatelessWidget {
                         child: Icon(
                           Icons.account_balance_rounded,
                           size: 80,
-                          color: _primary.withOpacity(0.3),
+                          color: _primary.withValues(alpha: 0.3),
                         ),
                       ),
                     ),
@@ -110,7 +110,7 @@ class Slide2aScreen extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: _dark.withOpacity(0.7),
+                  color: _dark.withValues(alpha: 0.7),
                   height: 1.55,
                 ),
               ),
@@ -185,7 +185,7 @@ class Slide2aScreen extends StatelessWidget {
         width: active ? 24 : 8,
         height: 8,
         decoration: BoxDecoration(
-          color: active ? _primary : Colors.grey.withOpacity(0.35),
+          color: active ? _primary : Colors.grey.withValues(alpha: 0.35),
           borderRadius: BorderRadius.circular(4),
         ),
       );

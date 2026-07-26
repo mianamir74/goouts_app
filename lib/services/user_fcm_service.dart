@@ -120,7 +120,7 @@ class UserFcmService {
               Container(
                 width: 72, height: 72,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0392CA).withOpacity(0.12),
+                  color: const Color(0xFF0392CA).withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.notifications_rounded,

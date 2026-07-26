@@ -294,7 +294,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   'Welcome back to GoOuts.',
                   style: GoogleFonts.inter(
                     fontSize: 15,
-                    color: textColor.withOpacity(0.9),
+                    color: textColor.withValues(alpha: 0.9),
                   ),
                 ),
 
@@ -322,7 +322,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       decoration: BoxDecoration(
                         color: inputBackgroundColor,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: textColor.withOpacity(0.2)),
+                        border: Border.all(color: textColor.withValues(alpha: 0.2)),
                       ),
                       child: Row(
                         children: [
@@ -349,7 +349,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         decoration: BoxDecoration(
                           color: inputBackgroundColor,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: textColor.withOpacity(0.2)),
+                          border: Border.all(color: textColor.withValues(alpha: 0.2)),
                         ),
                         child: TextField(
                           controller: _phoneController,
@@ -402,7 +402,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   decoration: BoxDecoration(
                     color: inputBackgroundColor,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: textColor.withOpacity(0.2)),
+                    border: Border.all(color: textColor.withValues(alpha: 0.2)),
                   ),
                   child: TextField(
                     controller: _pinController,

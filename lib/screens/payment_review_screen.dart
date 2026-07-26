@@ -112,7 +112,7 @@ class _PaymentReviewScreenState extends State<PaymentReviewScreen> {
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.07),
+                    color: Colors.black.withValues(alpha: 0.07),
                     blurRadius: 16,
                     offset: const Offset(0, 4),
                   ),
@@ -134,7 +134,7 @@ class _PaymentReviewScreenState extends State<PaymentReviewScreen> {
                           width: 60,
                           height: 60,
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
+                            color: Colors.white.withValues(alpha: 0.2),
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(Icons.check_rounded,
@@ -153,7 +153,7 @@ class _PaymentReviewScreenState extends State<PaymentReviewScreen> {
                           merchant,
                           style: GoogleFonts.inter(
                               fontSize: 14,
-                              color: Colors.white.withOpacity(0.85)),
+                              color: Colors.white.withValues(alpha: 0.85)),
                         ),
                       ],
                     ),
@@ -233,7 +233,7 @@ class _PaymentReviewScreenState extends State<PaymentReviewScreen> {
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 10,
                     offset: const Offset(0, 2),
                   ),
@@ -394,7 +394,7 @@ class _PaymentReviewScreenState extends State<PaymentReviewScreen> {
                             : () => _submitReview(merchant, amount, cashback),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _primary,
-                          disabledBackgroundColor: _primary.withOpacity(0.4),
+                          disabledBackgroundColor: _primary.withValues(alpha: 0.4),
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14)),
                           elevation: 0,

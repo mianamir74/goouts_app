@@ -1211,7 +1211,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
             decoration: BoxDecoration(
               color: const Color(0xFFD6EEF8),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: _primary.withOpacity(0.3)),
+              border: Border.all(color: _primary.withValues(alpha: 0.3)),
             ),
             child: Row(children: [
               const Icon(Icons.delivery_dining_rounded, color: _primary, size: 18),
@@ -1277,9 +1277,9 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
         margin: const EdgeInsets.only(bottom: 2),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.06),
+          color: color.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.18)),
+          border: Border.all(color: color.withValues(alpha: 0.18)),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1461,7 +1461,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 8,
                       offset: const Offset(0, 2))
                 ],
@@ -1569,7 +1569,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                                 width: 36, height: 36,
                                 decoration: BoxDecoration(
                                   color: isSelected
-                                      ? _primary.withOpacity(0.15)
+                                      ? _primary.withValues(alpha: 0.15)
                                       : Colors.grey[100],
                                   shape: BoxShape.circle,
                                 ),
@@ -1710,7 +1710,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                 borderRadius: BorderRadius.circular(14),
                 boxShadow: [
                   BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
+                      color: Colors.black.withValues(alpha: 0.04),
                       blurRadius: 6,
                       offset: const Offset(0, 2))
                 ],
@@ -1773,7 +1773,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.06),
+                color: Colors.black.withValues(alpha: 0.06),
                 blurRadius: 10,
                 offset: const Offset(0, -2))
           ],

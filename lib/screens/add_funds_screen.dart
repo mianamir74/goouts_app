@@ -292,7 +292,7 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
               width: 72,
               height: 72,
               decoration: BoxDecoration(
-                color: const Color(0xFF0A7A3E).withOpacity(0.1),
+                color: const Color(0xFF0A7A3E).withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.check_circle_rounded,
@@ -350,7 +350,7 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0A7A3E).withOpacity(0.08),
+                  color: const Color(0xFF0A7A3E).withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
@@ -472,7 +472,7 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
+                          color: Colors.black.withValues(alpha: 0.05),
                           blurRadius: 8,
                           offset: const Offset(0, 2))
                     ],
@@ -512,7 +512,7 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
-                                color: _primary.withOpacity(0.1),
+                                color: _primary.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text('Custom',
@@ -539,7 +539,7 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
-                                color: _green.withOpacity(0.1),
+                                color: _green.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
@@ -560,9 +560,9 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
                           width: double.infinity,
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: _green.withOpacity(0.07),
+                            color: _green.withValues(alpha: 0.07),
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: _green.withOpacity(0.2)),
+                            border: Border.all(color: _green.withValues(alpha: 0.2)),
                           ),
                           child: Column(
                             children: [
@@ -668,7 +668,7 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
                       border: Border.all(
                         color: _isCustom
                             ? _teal
-                            : _primary.withOpacity(0.4),
+                            : _primary.withValues(alpha: 0.4),
                         width: 1.5,
                       ),
                     ),
@@ -736,7 +736,7 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
                         ),
                         boxShadow: [
                           BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
+                              color: Colors.black.withValues(alpha: 0.04),
                               blurRadius: 6,
                               offset: const Offset(0, 2))
                         ],
@@ -748,7 +748,7 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
                             height: 44,
                             decoration: BoxDecoration(
                               color: selected
-                                  ? _primary.withOpacity(0.1)
+                                  ? _primary.withValues(alpha: 0.1)
                                   : Colors.grey[100],
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -776,7 +776,7 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
                                         padding: const EdgeInsets.symmetric(
                                             horizontal: 7, vertical: 2),
                                         decoration: BoxDecoration(
-                                          color: badgeColor.withOpacity(0.12),
+                                          color: badgeColor.withValues(alpha: 0.12),
                                           borderRadius:
                                               BorderRadius.circular(6),
                                         ),
@@ -796,7 +796,7 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
                                         padding: const EdgeInsets.symmetric(
                                             horizontal: 7, vertical: 2),
                                         decoration: BoxDecoration(
-                                          color: _green.withOpacity(0.1),
+                                          color: _green.withValues(alpha: 0.1),
                                           borderRadius:
                                               BorderRadius.circular(6),
                                         ),
@@ -860,7 +860,7 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: _primary.withOpacity(0.12),
+                          color: _primary.withValues(alpha: 0.12),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.trending_up_rounded,
@@ -956,7 +956,7 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
                             color: Colors.white),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _isLoading ? _teal.withOpacity(0.6) : _teal,
+                        backgroundColor: _isLoading ? _teal.withValues(alpha: 0.6) : _teal,
                         minimumSize: const Size(double.infinity, 54),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14)),

@@ -236,7 +236,7 @@ class _FoodAddressPickerScreenState extends State<FoodAddressPickerScreen> {
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 6,
                     offset: const Offset(0, 2))
               ],
@@ -298,7 +298,7 @@ class _FoodAddressPickerScreenState extends State<FoodAddressPickerScreen> {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                      color: Colors.black.withOpacity(0.06),
+                      color: Colors.black.withValues(alpha: 0.06),
                       blurRadius: 8,
                       offset: const Offset(0, 3))
                 ],
@@ -376,10 +376,10 @@ class _FoodAddressPickerScreenState extends State<FoodAddressPickerScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: _green.withOpacity(0.3)),
+                border: Border.all(color: _green.withValues(alpha: 0.3)),
                 boxShadow: [
                   BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
+                      color: Colors.black.withValues(alpha: 0.04),
                       blurRadius: 8,
                       offset: const Offset(0, 2))
                 ],
@@ -524,10 +524,10 @@ class _GpsButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFF0392CA).withOpacity(0.3)),
+          border: Border.all(color: const Color(0xFF0392CA).withValues(alpha: 0.3)),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 8,
                 offset: const Offset(0, 2))
           ],
@@ -585,13 +585,13 @@ class _CurrentAddressTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: primaryColor.withOpacity(0.3)),
+        border: Border.all(color: primaryColor.withValues(alpha: 0.3)),
       ),
       child: Row(children: [
         Container(
           width: 36, height: 36,
           decoration: BoxDecoration(
-              color: primaryColor.withOpacity(0.1), shape: BoxShape.circle),
+              color: primaryColor.withValues(alpha: 0.1), shape: BoxShape.circle),
           child: Icon(Icons.check_circle_rounded, color: primaryColor, size: 20),
         ),
         const SizedBox(width: 12),
@@ -617,7 +617,7 @@ class _CurrentAddressTile extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: primaryColor.withOpacity(0.1),
+            color: primaryColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Text('Active',

@@ -597,7 +597,7 @@ class _KycScreenState extends State<KycScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 12),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.75),
+                        color: Colors.black.withValues(alpha: 0.75),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -763,7 +763,7 @@ class _KycScreenState extends State<KycScreen> {
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 6,
                 offset: const Offset(0, 2))
           ],
@@ -805,7 +805,7 @@ class _KycScreenState extends State<KycScreen> {
               color: isValid ? _green : Colors.grey[300]!, width: 1.5),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 6,
                 offset: const Offset(0, 2))
           ],
@@ -838,7 +838,7 @@ class _KycScreenState extends State<KycScreen> {
                 left: 0,
                 right: 0,
                 child: Container(
-                  color: Colors.black.withOpacity(0.45),
+                  color: Colors.black.withValues(alpha: 0.45),
                   padding: const EdgeInsets.symmetric(vertical: 5),
                   child: Text(label,
                       textAlign: TextAlign.center,
@@ -860,7 +860,7 @@ class _KycScreenState extends State<KycScreen> {
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 6,
                 offset: const Offset(0, 2))
           ],
@@ -916,7 +916,7 @@ class _KycScreenState extends State<KycScreen> {
               Container(
                 width: 90, height: 90,
                 decoration: BoxDecoration(
-                    color: _green.withOpacity(0.12), shape: BoxShape.circle),
+                    color: _green.withValues(alpha: 0.12), shape: BoxShape.circle),
                 child: const Icon(Icons.verified_rounded, color: _green, size: 48),
               ),
               const SizedBox(height: 28),
@@ -1179,7 +1179,7 @@ class _RoundedRectOverlay extends CustomPainter {
       ..addRRect(rrect)
       ..fillType = PathFillType.evenOdd;
 
-    canvas.drawPath(path, Paint()..color = Colors.black.withOpacity(0.55));
+    canvas.drawPath(path, Paint()..color = Colors.black.withValues(alpha: 0.55));
 
     // Frame border
     canvas.drawRRect(
@@ -1237,7 +1237,7 @@ class _OvalOverlay extends CustomPainter {
       ..addOval(ovalRect)
       ..fillType = PathFillType.evenOdd;
 
-    canvas.drawPath(path, Paint()..color = Colors.black.withOpacity(0.55));
+    canvas.drawPath(path, Paint()..color = Colors.black.withValues(alpha: 0.55));
 
     // Oval border
     canvas.drawOval(

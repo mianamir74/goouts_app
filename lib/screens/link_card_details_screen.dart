@@ -132,7 +132,7 @@ class _LinkCardDetailsScreenState extends State<LinkCardDetailsScreen> {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.06),
+                    color: Colors.black.withValues(alpha: 0.06),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -210,7 +210,7 @@ class _LinkCardDetailsScreenState extends State<LinkCardDetailsScreen> {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF0392CA).withOpacity(0.35),
+                color: const Color(0xFF0392CA).withValues(alpha: 0.35),
                 blurRadius: 20,
                 offset: const Offset(0, 8),
               ),
@@ -226,7 +226,7 @@ class _LinkCardDetailsScreenState extends State<LinkCardDetailsScreen> {
                   height: 120,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white.withOpacity(0.06),
+                    color: Colors.white.withValues(alpha: 0.06),
                   ),
                 ),
               ),
@@ -238,7 +238,7 @@ class _LinkCardDetailsScreenState extends State<LinkCardDetailsScreen> {
                   height: 100,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white.withOpacity(0.06),
+                    color: Colors.white.withValues(alpha: 0.06),
                   ),
                 ),
               ),
@@ -276,7 +276,7 @@ class _LinkCardDetailsScreenState extends State<LinkCardDetailsScreen> {
                               'CARDHOLDER',
                               style: GoogleFonts.inter(
                                 fontSize: 9,
-                                color: Colors.white.withOpacity(0.7),
+                                color: Colors.white.withValues(alpha: 0.7),
                                 letterSpacing: 1,
                               ),
                             ),
@@ -297,7 +297,7 @@ class _LinkCardDetailsScreenState extends State<LinkCardDetailsScreen> {
                               'EXPIRES',
                               style: GoogleFonts.inter(
                                 fontSize: 9,
-                                color: Colors.white.withOpacity(0.7),
+                                color: Colors.white.withValues(alpha: 0.7),
                                 letterSpacing: 1,
                               ),
                             ),

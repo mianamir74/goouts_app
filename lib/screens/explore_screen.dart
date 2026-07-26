@@ -270,7 +270,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                                color: Colors.black.withOpacity(0.06),
+                                color: Colors.black.withValues(alpha: 0.06),
                                 blurRadius: 6)
                           ],
                         ),
@@ -316,7 +316,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
             borderRadius: BorderRadius.circular(14),
             boxShadow: [
               BoxShadow(
-                  color: Colors.black.withOpacity(0.06),
+                  color: Colors.black.withValues(alpha: 0.06),
                   blurRadius: 10,
                   offset: const Offset(0, 3))
             ],
@@ -413,7 +413,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                 borderRadius: BorderRadius.circular(16),
                                 boxShadow: [
                                   BoxShadow(
-                                      color: Colors.black.withOpacity(0.07),
+                                      color: Colors.black.withValues(alpha: 0.07),
                                       blurRadius: 6,
                                       offset: const Offset(0, 2))
                                 ],
@@ -543,7 +543,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
+                  color: Colors.black.withValues(alpha: 0.08),
                   blurRadius: 10,
                   offset: const Offset(0, 3))
             ],
@@ -674,7 +674,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
             borderRadius: BorderRadius.circular(14),
             boxShadow: [
               BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: Colors.black.withValues(alpha: 0.04),
                   blurRadius: 8,
                   offset: const Offset(0, 2))
             ],
@@ -741,7 +741,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: _green.withOpacity(0.1),
+                  color: _green.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
@@ -765,7 +765,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.06),
+                color: Colors.black.withValues(alpha: 0.06),
                 blurRadius: 10,
                 offset: const Offset(0, -2))
           ],
