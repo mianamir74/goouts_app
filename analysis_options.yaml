@@ -9,6 +9,19 @@
 # packages, and plugins designed to encourage good coding practices.
 include: package:flutter_lints/flutter.yaml
 
+analyzer:
+  # Never analyse backup copies, archived folders or duplicated files. These
+  # are snapshots, not live code — they have no proper project setup, so the
+  # analyzer reports thousands of meaningless errors from them (7,820 in one
+  # run) which drown out the real issues in lib/.
+  exclude:
+    - "backups/**"
+    - "**/backups/**"
+    - "**/*backup*/**"
+    - "**/*- Copy*.dart"
+    - "**/*_old.dart"
+    - "build/**"
+
 linter:
   # The lint rules applied to this project can be customized in the
   # section below to disable rules from the `package:flutter_lints/flutter.yaml`
