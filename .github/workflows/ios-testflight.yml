@@ -51,7 +51,13 @@ jobs:
 
       - name: Set build number
         run: |
-          BUILD_NUM=$((100 + $GITHUB_RUN_NUMBER))
+          # Unix epoch seconds — matches the numbering this app's earlier
+          # Codemagic pipeline used (e.g. 1784346687). TestFlight always shows
+          # the HIGHEST build number as the latest build, so a small counter
+          # (100 + run number) sorted BELOW the existing builds and the new
+          # upload never appeared as the newest one. Epoch time is always
+          # larger than the previous value and always increases.
+          BUILD_NUM=$(date +%s)
           echo "iOS build number -> $BUILD_NUM"
           cd ios && agvtool new-version -all "$BUILD_NUM"
 
