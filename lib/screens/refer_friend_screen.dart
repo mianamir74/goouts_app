@@ -156,7 +156,12 @@ class _ReferFriendScreenState extends State<ReferFriendScreen> {
                     height: 1.2)),
             const SizedBox(height: 10),
             Text(
-              'Every time a friend signs up with your code and places their first order, £2 lands in your wallet automatically. You will be notified the moment it arrives.',
+              // Wording matches onFoodOrderReferralHooks in the Cloud
+              // Functions: the £2 is released when the first order is
+              // DELIVERED, not when it is placed, so a cancelled order never
+              // pays out. Do not soften this back to "places" without changing
+              // the trigger too.
+              'Every time a friend signs up with your code and their first order is delivered, £2 lands in your wallet automatically. You will be notified the moment it arrives.',
               style: GoogleFonts.inter(
                   fontSize: 13,
                   color: Colors.white.withValues(alpha: 0.85),
