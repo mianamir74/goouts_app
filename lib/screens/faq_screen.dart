@@ -24,13 +24,29 @@ class _FaqScreenState extends State<FaqScreen> {
   final Set<String> _expanded = {};
   String? _selectedCategory; // null = show all
 
-  // Maps Quick Help label → FAQ category field value
+  // Live search
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _query = '';
+
+  // Maps Quick Help label → FAQ category field value.
+  //
+  // These values MUST match the `category` written by Admin Panel →
+  // FAQ Management. Until July 2026 'Account Security' was mapped to a
+  // category of that exact name, but the seed data uses 'Security', so
+  // tapping the tile always showed an empty list. 'Food Orders' had the
+  // same problem because no seeded FAQ used that category at all.
   static const Map<String, String> _categoryMap = {
     'My Wallet':        'Wallet',
     'Cashback':         'Cashback',
     'Food Orders':      'Food Orders',
-    'Account Security': 'Account Security',
+    'Account Security': 'Security',
   };
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -75,7 +91,7 @@ class _FaqScreenState extends State<FaqScreen> {
 
             const SizedBox(height: 14),
 
-            // Search bar
+            // Search bar (live filter over question and answer text)
             Container(
               height: 48,
               decoration: BoxDecoration(
@@ -94,11 +110,37 @@ class _FaqScreenState extends State<FaqScreen> {
                   Icon(Icons.search_rounded,
                       color: Colors.grey[400], size: 20),
                   const SizedBox(width: 10),
-                  Text(
-                    'Search for articles, guides...',
-                    style: GoogleFonts.inter(
-                        fontSize: 14, color: Colors.grey[400]),
+                  Expanded(
+                    child: TextField(
+                      controller: _searchCtrl,
+                      onChanged: (value) => setState(() {
+                        _query = value.trim().toLowerCase();
+                        _expanded.clear();
+                      }),
+                      textInputAction: TextInputAction.search,
+                      style: GoogleFonts.inter(
+                          fontSize: 14, color: _dark),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        border: InputBorder.none,
+                        hintText: 'Search questions and answers',
+                        hintStyle: GoogleFonts.inter(
+                            fontSize: 14, color: Colors.grey[400]),
+                      ),
+                    ),
                   ),
+                  if (_query.isNotEmpty)
+                    IconButton(
+                      icon: Icon(Icons.close_rounded,
+                          size: 18, color: Colors.grey[500]),
+                      onPressed: () => setState(() {
+                        _searchCtrl.clear();
+                        _query = '';
+                        _expanded.clear();
+                      }),
+                    )
+                  else
+                    const SizedBox(width: 8),
                 ],
               ),
             ),
@@ -253,20 +295,35 @@ class _FaqScreenState extends State<FaqScreen> {
                   );
                 }
                 final allDocs = snap.data!.docs;
-                final docs = _selectedCategory == null
-                    ? allDocs
-                    : allDocs.where((d) {
-                        final data = d.data() as Map<String, dynamic>;
-                        return (data['category'] as String?) == _selectedCategory;
-                      }).toList();
+                final docs = allDocs.where((d) {
+                  final data = d.data() as Map<String, dynamic>;
+
+                  if (_selectedCategory != null &&
+                      (data['category'] as String?) != _selectedCategory) {
+                    return false;
+                  }
+
+                  if (_query.isEmpty) return true;
+
+                  final question =
+                      (data['question'] as String? ?? '').toLowerCase();
+                  final answer =
+                      (data['answer'] as String? ?? '').toLowerCase();
+                  return question.contains(_query) || answer.contains(_query);
+                }).toList();
 
                 if (docs.isEmpty) {
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24),
                       child: Text(
-                        'No FAQs in this category yet.',
-                        style: GoogleFonts.inter(fontSize: 14, color: Colors.grey[400]),
+                        _query.isNotEmpty
+                            ? 'Nothing matched that search. Try a different '
+                                'word, or start a live chat below and we will '
+                                'answer it for you.'
+                            : 'No questions in this section yet.',
+                        style: GoogleFonts.inter(
+                            fontSize: 14, color: Colors.grey[500], height: 1.5),
                         textAlign: TextAlign.center,
                       ),
                     ),
@@ -373,7 +430,9 @@ class _FaqScreenState extends State<FaqScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Our experts are available 24/7 to assist you with any inquiries.',
+                    'Start a chat with our support team and we will come back '
+                    'to you within 24 hours. You can also email us at '
+                    'support@goouts.co.uk.',
                     style: GoogleFonts.inter(
                         fontSize: 13,
                         color: Colors.white.withValues(alpha: 0.85),
@@ -403,12 +462,17 @@ class _FaqScreenState extends State<FaqScreen> {
 
                   const SizedBox(height: 10),
 
+                  // Previously a "Call Support" button with an empty onPressed.
+                  // GoOuts has no published support telephone line, so the
+                  // button could never do anything. Replaced with a route to
+                  // the ticket history, which is real.
                   OutlinedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.phone_rounded,
+                    onPressed: () =>
+                        Navigator.pushNamed(context, '/support-tickets'),
+                    icon: const Icon(Icons.confirmation_number_outlined,
                         color: Colors.white, size: 18),
                     label: Text(
-                      'Call Support',
+                      'My Support Tickets',
                       style: GoogleFonts.inter(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
