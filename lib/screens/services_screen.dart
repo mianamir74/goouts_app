@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../features/short_stay/stay_routes.dart';
 
 class ServicesScreen extends StatefulWidget {
   const ServicesScreen({super.key});
@@ -87,6 +88,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
             _buildSearchBar(),
             const SizedBox(height: 20),
             _buildFoodDeliveryBanner(context),
+            const SizedBox(height: 14),
+            _buildShortStayBanner(context),
             const SizedBox(height: 20),
             _buildSpecialOffers(context),
             const SizedBox(height: 20),
@@ -161,6 +164,92 @@ class _ServicesScreenState extends State<ServicesScreen> {
                       ),
                       child: const Icon(Icons.delivery_dining_rounded,
                           color: Color(0xFFEA580C), size: 36),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+  /// Short Stay entry point, added 4 August 2026.
+  ///
+  /// Deliberately the same shape as the Food Delivery banner above, because
+  /// they are peers: two services under one cashback account, not a main
+  /// product and a side feature.
+  ///
+  /// Routing goes through StayRoutes.home rather than a literal '/stay'
+  /// string, so a renamed route is a compile error here instead of a blank
+  /// screen at runtime.
+  Widget _buildShortStayBanner(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: GestureDetector(
+          onTap: () => Navigator.pushNamed(context, StayRoutes.home),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF0F766E), Color(0xFF14B8A6)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Stack(
+              children: [
+                Positioned(
+                  right: -10,
+                  top: -10,
+                  child: Icon(Icons.night_shelter_rounded,
+                      size: 110, color: Colors.white.withValues(alpha: 0.12)),
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.25),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text('NEW',
+                                style: GoogleFonts.inter(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white)),
+                          ),
+                          const SizedBox(height: 8),
+                          Text('GoOuts\nShort Stay',
+                              style: GoogleFonts.inter(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  height: 1.2)),
+                          const SizedBox(height: 8),
+                          Text(
+                              'Places to stay, with what is nearby.\n'
+                              'Earn cashback on every night.',
+                              style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                  height: 1.5)),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(Icons.night_shelter_rounded,
+                          color: Color(0xFF0F766E), size: 36),
                     ),
                   ],
                 ),

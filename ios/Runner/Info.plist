@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>NSCameraUsageDescription</key>
-	<string>GoOuts needs camera access to verify your identity and take your profile photo.</string>
+	<string>GoOuts needs camera access to verify your identity, take your profile photo, and let you photograph a property at check in and check out.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>GoOuts needs access to your photo library so you can choose a profile picture.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

@@ -314,11 +314,28 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
+  // ── ⚠ THIS IGNORED ITS OWN ARGUMENT ────────────────────────────────────
+  //
+  // FIXED 14 August 2026. It read:
+  //
+  //   GoOutsSheet.error(context, title: 'msg', message: 'msg');
+  //
+  // QUOTED. During the snackbar-to-GoOutsSheet migration the parameter name
+  // was swallowed into a string literal, so every message this method was ever
+  // asked to show was replaced by the three characters "msg".
+  //
+  // Two of the three call sites are in the checkout path — "Please add a
+  // delivery address first" and "Failed to place order. Please try again."
+  // A customer whose order failed was shown a box saying "msg".
+  //
+  // The `error` flag was ignored too: everything came out as an error sheet,
+  // including confirmations.
   void _showSnack(String msg, {bool error = false}) {
-    GoOutsSheet.error(context,
-      title: 'msg',
-      message: 'msg',
-    );
+    if (error) {
+      GoOutsSheet.error(context, title: 'Something went wrong', message: msg);
+    } else {
+      GoOutsSheet.info(context, title: 'GoOuts', message: msg);
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════

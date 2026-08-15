@@ -366,43 +366,23 @@ class _WalletScreenState extends State<WalletScreen> {
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () async {
-                      final result = await Navigator.pushNamed(context, '/add-funds');
-                      if (result != null && result is Map) {
-                        final total = (result['total'] as num).toDouble();
-                        final bonus = (result['bonus'] as num).toDouble();
-                        final hasBonus = result['hasBonus'] as bool;
-                        final newBalance = _balance + total;
-                        final txTitle = hasBonus
-                            ? 'Wallet Top-Up (+£${bonus.toStringAsFixed(2)} bonus)'
-                            : 'Wallet Top-Up';
-
-                        // Save balance to Firestore
-                        await UserService().updateUser({'walletBalance': newBalance});
-
-                        // Save transaction to Firestore
-                        await TransactionService().addTransaction(
-                          title: txTitle,
-                          amount: total,
-                          amountFormatted: '+£${total.toStringAsFixed(2)}',
-                          type: 'Top-Up',
-                          iconKey: 'topup',
-                          positive: true,
-                          status: 'Completed',
-                        );
-
-                        setState(() {
-                          _balance = newBalance;
-                          _transactions.insert(0, {
-                            'title': txTitle,
-                            'date': 'Just now',
-                            'amount': '+£${total.toStringAsFixed(2)}',
-                            'category': 'Top-Up',
-                            'icon': Icons.add_circle_outline_rounded,
-                            'positive': true,
-                            'cashback': false,
-                          });
-                        });
-                      }
+                      // ── DOUBLE CREDIT BUG, fixed 4 August 2026 ──────────
+                      //
+                      // This block used to take the result map returned by
+                      // AddFundsScreen and write walletBalance AND a Top-Up
+                      // transaction. But AddFundsScreen._confirmTopUp has
+                      // ALREADY done both before it pops.
+                      //
+                      // So a £50 top-up started from this screen credited
+                      // £100 and showed the top-up twice in the activity
+                      // list. Starting the same top-up from services_screen
+                      // credited £50, because that screen ignores the result.
+                      //
+                      // The money is written in exactly one place now.
+                      // This screen just reloads what the server holds.
+                      await Navigator.pushNamed(context, '/add-funds');
+                      if (!mounted) return;
+                      await _loadAllData();
                     },
                     icon: const Icon(Icons.add_circle_outline_rounded,
                         color: _primary, size: 18),

@@ -1,4 +1,6 @@
+import 'dart:async';   // TimeoutException, for the top-up timeout below
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';   // FieldValue.increment
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -227,46 +229,88 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
     );
   }
 
-  Future<void> _confirmTopUp(double totalAmount, double bonusAmount, bool hasBonus) async {
+  /// How long to wait on any single Firestore call before giving up.
+  ///
+  /// This is the fix for the frozen sheet. A Firestore write future does NOT
+  /// complete until the server acknowledges it. On a dropped or flaky
+  /// connection it neither completes nor throws — it simply hangs forever. So
+  /// `_isLoading` stayed true, the Confirm button stayed disabled, the spinner
+  /// stayed up, and nothing ever reached Crashlytics because nothing crashed.
+  static const Duration _netTimeout = Duration(seconds: 20);
+
+  Future<void> _confirmTopUp(
+      double totalAmount, double bonusAmount, bool hasBonus) async {
     setState(() => _isLoading = true);
+
+    // Declared out here so `finally` can always clear the loading state,
+    // whatever happens in between.
+    bool succeeded = false;
+    double newBalance = 0.0;
+    String? errorTitle;
+    String? errorMessage;
+
     try {
-      // 1. Get current wallet balance from Firestore
-      final userData = await UserService().getCurrentUser();
-      final double currentBalance = (userData?['walletBalance'] as num?)?.toDouble() ?? 0.0;
-      final double newBalance = currentBalance + totalAmount;
+      final userData =
+          await UserService().getCurrentUser().timeout(_netTimeout);
+      final double currentBalance =
+          (userData?['walletBalance'] as num?)?.toDouble() ?? 0.0;
+      newBalance = currentBalance + totalAmount;
 
-      // 2. Update wallet balance in Firestore
-      await UserService().updateUser({'walletBalance': newBalance});
+      // FieldValue.increment, NOT `currentBalance + totalAmount` written back.
+      //
+      // The old code read the balance, added to it, and wrote the result. If
+      // cashback landed in the gap between the read and the write, the write
+      // overwrote it and that cashback was gone with no trace. increment is
+      // applied by the server against whatever the balance is at that moment.
+      //
+      // newBalance above is now only used to show a figure on the success
+      // sheet. It is an estimate, not the source of truth.
+      await UserService()
+          .updateUser({'walletBalance': FieldValue.increment(totalAmount)})
+          .timeout(_netTimeout);
 
-      // 3. Record top-up transaction in Firestore
-      final String label = hasBonus
-          ? 'Wallet Top-Up (+2% bonus)'
-          : 'Wallet Top-Up';
-      final String formatted = '+£${totalAmount.toStringAsFixed(2)}';
+      final String label =
+          hasBonus ? 'Wallet Top-Up (+2% bonus)' : 'Wallet Top-Up';
       await TransactionService().addTransaction(
         title: label,
         amount: totalAmount,
-        amountFormatted: formatted,
+        amountFormatted: '+£${totalAmount.toStringAsFixed(2)}',
         type: 'Top-Up',
         iconKey: 'topup',
         positive: true,
         status: 'Completed',
+      ).timeout(_netTimeout);
+
+      succeeded = true;
+    } on TimeoutException {
+      // A timeout does NOT mean the top-up failed. Firestore may still deliver
+      // the write once the connection recovers, so telling the user "Payment
+      // Failed" here would be a lie that could make them top up twice.
+      errorTitle = 'Taking Longer Than Expected';
+      errorMessage = 'We could not confirm your top-up. Check your wallet '
+          'balance before trying again — it may already have gone through.';
+    } catch (_) {
+      errorTitle = 'Payment Failed';
+      errorMessage = 'Something went wrong. Please try again.';
+    } finally {
+      // ALWAYS clears the button, on every path.
+      //
+      // The old code called setState in both the try and the catch with no
+      // mounted guard. If the State was disposed mid-await, the setState in
+      // the try threw, the catch caught it, and the setState in the catch
+      // threw again — that second one uncaught.
+      if (mounted) setState(() => _isLoading = false);
+    }
+
+    if (!mounted) return;
+
+    if (succeeded) {
+      await _showSuccessSheet(totalAmount, bonusAmount, hasBonus, newBalance);
+    } else {
+      GoOutsSheet.error(context,
+        title: errorTitle ?? 'Payment Failed',
+        message: errorMessage ?? 'Something went wrong. Please try again.',
       );
-
-      setState(() => _isLoading = false);
-
-      // 4. Show success bottom sheet
-      if (mounted) {
-        await _showSuccessSheet(totalAmount, bonusAmount, hasBonus, newBalance);
-      }
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        GoOutsSheet.error(context,
-          title: 'Payment Failed',
-          message: 'Something went wrong. Please try again.',
-        );
-      }
     }
   }
 

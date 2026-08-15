@@ -268,15 +268,21 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
         'refundMethod' : refundMethod,
       });
       if (!mounted) return;
+      // Same mangled-interpolation bug as family_plan_screen — see the note
+      // there. This showed the literal text "res.data['message'] as String? ??
+      // 'Order cancelled." to anyone who cancelled a food order.
+      final String serverMessage =
+          (res.data is Map ? res.data['message'] as String? : null) ??
+              'Your order has been cancelled.';
       GoOutsSheet.info(context,
-        title: 'Order Cancelled',
-        message: 'res.data[\'message\'] as String? ?? \'Order cancelled.',
+        title: 'Order cancelled',
+        message: serverMessage,
       );
     } catch (e) {
       if (!mounted) return;
       GoOutsSheet.error(context,
-        title: 'Cancellation failed: $e',
-        message: 'Cancellation failed: $e',
+        title: 'Cancellation failed',
+        message: 'We could not cancel this order. $e',
       );
     } finally {
       if (mounted) setState(() => _cancelling = false);
@@ -439,6 +445,10 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
                 tipAmount = (tipOptions[selectedTipIdx]['amount'] as double);
               }
 
+              // Suppressed 14 August 2026, not deleted. Read alongside
+              // driverId below; the rating write does not use it today but the
+              // pair is what the next revision needs.
+              // ignore: unused_local_variable
               final uid = _order?['userId'] as String?;
               final driverId = _order?['driverId'] as String?;
 
@@ -969,6 +979,10 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
   String _fmt(dynamic v) =>
       '£${((v as num?)?.toDouble() ?? 0).toStringAsFixed(2)}';
 
+  // Suppressed 14 August 2026, not deleted.
+  // Timestamp formatter, no current caller. Kept — the tracking timeline will
+  // need it and rewriting it is pure waste.
+  // ignore: unused_element
   String _fmtTime(dynamic ts) {
     if (ts == null) return '';
     final dt = ts is Timestamp ? ts.toDate() : ts as DateTime;
@@ -1422,9 +1436,11 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
       });
       final msg = (res.data as Map?)?['message'] as String?;
       if (mounted && msg != null) {
+        // Same mangled-interpolation bug — msg was quoted into a literal, so
+        // the server's reply to a substitution was shown as the word "msg".
         GoOutsSheet.success(context,
-          title: 'msg',
-          message: 'msg',
+          title: 'Substitution updated',
+          message: msg,
         );
       }
     } catch (e) {

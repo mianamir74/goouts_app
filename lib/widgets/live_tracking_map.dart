@@ -46,6 +46,11 @@ class _LiveTrackingMapState extends State<LiveTrackingMap> {
 
   StreamSubscription? _rtdbSub;
   LatLng? _driverLatLng;
+  // Suppressed 14 August 2026, not deleted.
+  // Read from the realtime database on every location update, but the driver
+  // marker is not rotated by it yet. The data is arriving; the rotation is the
+  // missing part.
+  // ignore: unused_field
   double  _driverBearing = 0;
   bool    _driverOnline  = false;
 

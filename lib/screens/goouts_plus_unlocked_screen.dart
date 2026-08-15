@@ -3,7 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:confetti/confetti.dart';
 import 'dart:math';
 import '../services/user_service.dart';
-import '../services/family_service.dart';
+// family_service import removed 4 August 2026. The family group is activated
+// inside purchaseGoOutsPlus now, in the same transaction as the payment.
 import '../widgets/goouts_sheet.dart';
 
 class GoOutsPlusUnlockedScreen extends StatefulWidget {
@@ -451,20 +452,15 @@ class _GoOutsPlusUnlockedScreenState extends State<GoOutsPlusUnlockedScreen>
                           : () async {
                               setSheet(() => _activating = true);
 
+                              // The charge, the activation and the family
+                              // group are ONE server side transaction now, so
+                              // the follow up activatePlusForGroup call that
+                              // used to be here has gone. It was a second
+                              // round trip that could fail on its own and
+                              // leave a paid up member whose family never got
+                              // access, with nothing recording why.
                               final result =
                                   await UserService().chargeGoOutsPlus();
-
-                              // If user is in a family group, activate for all
-                              if (result['success'] == true) {
-                                final userData =
-                                    await UserService().getCurrentUser();
-                                final groupId =
-                                    userData?['familyGroupId'] as String?;
-                                if (groupId != null) {
-                                  await FamilyService()
-                                      .activatePlusForGroup(groupId);
-                                }
-                              }
 
                               if (!ctx.mounted) return;
                               Navigator.pop(ctx); // close sheet
@@ -472,9 +468,17 @@ class _GoOutsPlusUnlockedScreenState extends State<GoOutsPlusUnlockedScreen>
                               if (result['success'] == true) {
                                 _showActivationSuccess(context, result);
                               } else {
+                                // This was a STRING LITERAL containing Dart
+                                // source, not an interpolation, so the user
+                                // was shown the characters
+                                //   result['error'] ?? 'Something went wrong.
+                                // instead of the actual message. It matters
+                                // now, because the server returns a real one:
+                                // "You need £10.00 in your GoOuts Wallet".
                                 GoOutsSheet.error(context,
-                                  title: 'Something Went Wrong',
-                                  message: 'result[\'error\'] ?? \'Something went wrong. Please try again.',
+                                  title: 'Could Not Start GoOuts Plus',
+                                  message: result['error'] as String? ??
+                                      'Something went wrong. Please try again.',
                                 );
                               }
                             },

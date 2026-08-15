@@ -1,12 +1,19 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../utils/pin_hasher.dart';
 import 'transaction_service.dart';
-import 'referral_service.dart';
+// referral_service import removed 3 August 2026: the only use was
+// ReferralService.generateInviteCode() at registration, which allocated an
+// invite code with no uniqueness check. Codes now come from ensureInviteCode.
 
 class UserService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  // europe-west1 to match every other function in this project.
+  final FirebaseFunctions _fn =
+      FirebaseFunctions.instanceFor(region: 'europe-west1');
 
   /// Delete all documents in a sub-collection for the current user.
   /// Firestore .set() on a parent doc does NOT clear sub-collections,
@@ -95,7 +102,19 @@ class UserService {
       'gooutsPlusRenewalDate': null,
       'firstYearEnd': DateTime.now().add(const Duration(days: 365)),
       'onboardingComplete': false,
-      'inviteCode': ReferralService.generateInviteCode(), // unique invite code
+      // inviteCode is deliberately NOT set here any more.
+      //
+      // This line used to call ReferralService.generateInviteCode(), which
+      // picked six random characters with NO uniqueness check of any kind.
+      // (ReferralService.saveInviteCode did check, but nothing ever called it,
+      // so the check was dead code and this was the real path.) Two people
+      // registering could be issued the same code, and the referral lookup
+      // would then credit whichever account the query happened to return.
+      //
+      // The code is now allocated by ensureInviteCode, which reserves it as a
+      // document ID under /invite_codes so uniqueness is atomic.
+      // ReferralService.getMyInviteCode allocates on first read, so a user who
+      // never opens the refer screen never needs one.
       'referredByUid': null,
       'referralRewarded': false,
       'photoUrl': existingPhotoUrl ?? '',
@@ -212,103 +231,70 @@ class UserService {
     return data?['gooutsPlusMember'] as bool? ?? false;
   }
 
-  /// Activate GoOuts Plus — sets gooutsPlusMember to true and records dates.
+  /// Activate GoOuts Plus.
+  ///
+  /// Kept only so nothing that called it breaks. The charge and the activation
+  /// are now ONE server side transaction, so activating without paying is no
+  /// longer a separate thing a caller can do. Use [chargeGoOutsPlus].
+  @Deprecated('Use chargeGoOutsPlus. Activation is part of the payment now.')
   Future<void> activateGoOutsPlus() async {
-    final User? user = _auth.currentUser;
-    if (user == null) return;
-    final now = DateTime.now();
-    await _db.collection('users').doc(user.uid).update({
-      'gooutsPlusMember': true,
-      'gooutsPlusActivatedAt': now,
-      'gooutsPlusRenewalDate': DateTime(now.year + 1, now.month, now.day),
-    });
+    await chargeGoOutsPlus();
   }
 
-  /// Charge £10 for GoOuts Plus activation.
-  /// Deducts from wallet first. If wallet is insufficient,
-  /// the remainder is flagged for Open Banking charge (backend phase).
-  /// Records the transaction in Activity screen.
-  /// Returns a result map: { 'success': bool, 'chargedFromWallet': double,
-  /// 'chargedFromBank': double, 'error': String? }
+  /// Charge £10 for GoOuts Plus and activate it. ONE server side transaction.
+  ///
+  /// This used to do three things from the client, back to back: read the
+  /// wallet balance and subtract the fee, set gooutsPlusMember, then activate
+  /// for the family group. Four problems, all now fixed server side.
+  ///
+  /// ⚠ A SHORT WALLET USED TO GIVE PLUS AWAY FREE. If the balance was under
+  ///   £10 the old code set walletBalance to 0, wrote a transaction line
+  ///   saying "Bank: £X", activated Plus and returned success: true. The bank
+  ///   charge was a TODO that never ran, so a user with £0 got a year of
+  ///   GoOuts Plus for nothing.
+  ///
+  ///   IT NOW FAILS with a "top up first" message. That is a deliberate
+  ///   behaviour change, and the only honest one available until the Open
+  ///   Banking charge exists.
+  ///
+  /// `walletBalance - fee` was also read-modify-write, so a cashback credit
+  /// landing at the same moment was erased. And the dates came from the DEVICE
+  /// clock, so a phone with its clock moved forward set its own renewal date.
+  ///
+  /// Same return shape as before:
+  /// { 'success': bool, 'chargedFromWallet': double,
+  ///   'chargedFromBank': double, 'error': String? }
   Future<Map<String, dynamic>> chargeGoOutsPlus() async {
-    final User? user = _auth.currentUser;
-    if (user == null) {
+    if (_auth.currentUser == null) {
       return {'success': false, 'error': 'Not logged in.'};
     }
-
     try {
-      const double fee = 10.0;
-      final data = await getCurrentUser();
-      if (data == null) {
-        return {'success': false, 'error': 'Could not load account.'};
-      }
-
-      final double walletBalance =
-          (data['walletBalance'] as num?)?.toDouble() ?? 0.0;
-
-      double chargedFromWallet = 0.0;
-      double chargedFromBank = 0.0;
-
-      if (walletBalance >= fee) {
-        // Full £10 from wallet
-        chargedFromWallet = fee;
-        await _db.collection('users').doc(user.uid).update({
-          'walletBalance': walletBalance - fee,
-        });
-      } else {
-        // Partial or full from bank
-        chargedFromWallet = walletBalance;
-        chargedFromBank = fee - walletBalance;
-        await _db.collection('users').doc(user.uid).update({
-          'walletBalance': 0.0,
-        });
-        // TODO: trigger Open Banking VRP charge of chargedFromBank
-        // when Stripe/VRP integration is live
-      }
-
-      // Record transaction in Activity screen
-      final DateTime dt = DateTime.now();
-      const months = [
-        'January','February','March','April','May','June',
-        'July','August','September','October','November','December'
-      ];
-      final String month = '${months[dt.month - 1]} ${dt.year}';
-      final int h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
-      final String min = dt.minute.toString().padLeft(2, '0');
-      final String ampm = dt.hour < 12 ? 'AM' : 'PM';
-      final String dateFormatted = 'Today, $h:$min $ampm';
-
-      await _db
-          .collection('users')
-          .doc(user.uid)
-          .collection('transactions')
-          .add({
-        'title': 'GoOuts Plus — Annual Membership',
-        'amount': fee,
-        'amountFormatted': '-£10.00',
-        'dateFormatted': dateFormatted,
-        'month': month,
-        'type': 'Membership',
-        'iconKey': 'star',
-        'positive': false,
-        'status': 'Completed',
-        'note': chargedFromBank > 0
-            ? 'Wallet: £${chargedFromWallet.toStringAsFixed(2)} + Bank: £${chargedFromBank.toStringAsFixed(2)}'
-            : 'Charged from GoOuts Wallet',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
-      // Activate Plus on user document
-      await activateGoOutsPlus();
+      final res = await _fn
+          .httpsCallable('purchaseGoOutsPlus')
+          .call<Map<String, dynamic>>(<String, dynamic>{});
 
       return {
         'success': true,
-        'chargedFromWallet': chargedFromWallet,
-        'chargedFromBank': chargedFromBank,
+        'chargedFromWallet':
+            (res.data['chargedFromWallet'] as num?)?.toDouble() ?? 0.0,
+        'chargedFromBank':
+            (res.data['chargedFromBank'] as num?)?.toDouble() ?? 0.0,
+        'alreadyMember': res.data['alreadyMember'] == true,
+        // The family group is activated inside the same call now. The caller
+        // no longer needs to follow up with activatePlusForGroup.
+        'familyMembers': res.data['familyMembers'] ?? 0,
         'error': null,
       };
-    } catch (e) {
-      return {'success': false, 'error': 'Something went wrong. Please try again.'};
+    } on FirebaseFunctionsException catch (e) {
+      // failed-precondition carries the "top up first" message, which is
+      // worth showing to the user verbatim rather than replacing with
+      // something generic.
+      return {'success': false, 'error': e.message ?? 'Could not start GoOuts Plus.'};
+    } catch (_) {
+      return {
+        'success': false,
+        'error': 'Could not start GoOuts Plus. Check your connection.'
+      };
     }
   }
 }

@@ -560,7 +560,52 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
         ),
       );
 
-  // ── Restaurant list (Firestore stream + placeholder fallback) ───────────────
+  /// One shared empty/error state, so a failure and an empty result LOOK
+  /// different and neither looks like a working list.
+  Widget _listMessage({
+    required IconData icon,
+    required String title,
+    required String body,
+  }) =>
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 56),
+        child: Column(
+          children: [
+            Icon(icon, size: 40, color: Colors.grey.shade400),
+            const SizedBox(height: 14),
+            Text(title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 6),
+            Text(body,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+          ],
+        ),
+      );
+
+  // ── Restaurant list ─────────────────────────────────────────────────────────
+  //
+  // THIS USED TO SHOW FAKE RESTAURANTS WHEN THE QUERY FAILED. Audited 4 Aug
+  // 2026. The old code was:
+  //
+  //     final restaurants = snapshot.hasData && snapshot.data!.docs.isNotEmpty
+  //         ? snapshot.data!.docs.map(...).toList()
+  //         : _placeholders;
+  //
+  // `snapshot.hasError` was never checked, so a permission-denied error was
+  // indistinguishable from "still loading" — and both fell through to
+  // `_placeholders`, three hardcoded restaurants that render as tappable and
+  // orderable.
+  //
+  // That is exactly what was happening: /restaurants had NO security rule, so
+  // Firestore refused every read, and this screen quietly showed Spice Garden,
+  // Pizza Palace and Dragon Wok to everybody. A customer could open one and
+  // try to order from a restaurant that does not exist. Nobody could see the
+  // problem by looking at the app, which is why it survived.
+  //
+  // The three states are now distinct, and a failure says so.
   Widget _buildRestaurantList() => StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('restaurants')
@@ -568,12 +613,32 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
             .where('isApproved', isEqualTo: true)
             .snapshots(),
         builder: (context, snapshot) {
-          final restaurants =
-              snapshot.hasData && snapshot.data!.docs.isNotEmpty
-                  ? snapshot.data!.docs
-                      .map((d) => _RestaurantItem.fromDoc(d))
-                      .toList()
-                  : _placeholders;
+          if (snapshot.hasError) {
+            return _listMessage(
+              icon: Icons.wifi_off_rounded,
+              title: 'Could not load restaurants',
+              body: 'Please check your connection and try again.',
+            );
+          }
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 48),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          final restaurants = (snapshot.data?.docs ?? const [])
+              .map((d) => _RestaurantItem.fromDoc(d))
+              .toList();
+
+          if (restaurants.isEmpty) {
+            return _listMessage(
+              icon: Icons.storefront_outlined,
+              title: 'No restaurants available yet',
+              body: 'We are adding partners in your area. Please check back '
+                  'soon.',
+            );
+          }
 
           // ── Apply filters ──────────────────────────────────────────────────
           var filtered = restaurants.where((r) {
@@ -935,49 +1000,16 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
     );
   }
 
-  // ── Placeholder data ─────────────────────────────────────────────────────────
-  static final _placeholders = [
-    _RestaurantItem(
-        id: 'p1', name: 'Spice Garden', cuisineType: 'Indian · Curry · Biryani',
-        rating: 4.8, reviewCount: 312, deliveryMins: 25, deliveryFee: 1.99,
-        minOrder: 12, isBusy: false, socialBoostEnabled: true,
-        tags: ['halal'], coverImageUrl: null),
-    _RestaurantItem(
-        id: 'p2', name: 'Pizza Palace', cuisineType: 'Pizza · Italian · Pasta',
-        rating: 4.6, reviewCount: 198, deliveryMins: 30, deliveryFee: 2.49,
-        minOrder: 10, isBusy: true, socialBoostEnabled: false,
-        tags: ['vegetarian'], coverImageUrl: null),
-    _RestaurantItem(
-        id: 'p3', name: 'Dragon Wok', cuisineType: 'Chinese · Noodles · Dim Sum',
-        rating: 4.5, reviewCount: 267, deliveryMins: 20, deliveryFee: 0,
-        minOrder: 15, isBusy: false, socialBoostEnabled: true,
-        tags: ['halal'], coverImageUrl: null),
-    _RestaurantItem(
-        id: 'p4', name: 'Burger Bros', cuisineType: 'Burgers · American · Fries',
-        rating: 4.7, reviewCount: 445, deliveryMins: 15, deliveryFee: 1.49,
-        minOrder: 8, isBusy: false, socialBoostEnabled: true,
-        tags: [], coverImageUrl: null),
-    _RestaurantItem(
-        id: 'p5', name: 'Sushi Zen', cuisineType: 'Sushi · Japanese · Ramen',
-        rating: 4.9, reviewCount: 156, deliveryMins: 35, deliveryFee: 2.99,
-        minOrder: 20, isBusy: false, socialBoostEnabled: false,
-        tags: [], coverImageUrl: null),
-    _RestaurantItem(
-        id: 'p6', name: 'Thai Orchid', cuisineType: 'Thai · Noodles · Curry',
-        rating: 4.7, reviewCount: 203, deliveryMins: 28, deliveryFee: 1.99,
-        minOrder: 12, isBusy: false, socialBoostEnabled: true,
-        tags: ['vegetarian', 'halal'], coverImageUrl: null),
-    _RestaurantItem(
-        id: 'p7', name: 'The Greek Kitchen', cuisineType: 'Greek · Mediterranean',
-        rating: 4.6, reviewCount: 87, deliveryMins: 32, deliveryFee: 2.49,
-        minOrder: 15, isBusy: false, socialBoostEnabled: false,
-        tags: [], coverImageUrl: null),
-    _RestaurantItem(
-        id: 'p8', name: 'Lagos Kitchen', cuisineType: 'Nigerian · African',
-        rating: 4.8, reviewCount: 124, deliveryMins: 40, deliveryFee: 2.99,
-        minOrder: 18, isBusy: false, socialBoostEnabled: true,
-        tags: ['halal'], coverImageUrl: null),
-  ];
+  // ── Placeholder data — DELETED 4 August 2026 ────────────────────────────────
+  //
+  // Eight hardcoded restaurants (Spice Garden, Pizza Palace, Dragon Wok and
+  // five more) used to render whenever the Firestore query returned no data —
+  // including when it FAILED. They were tappable and orderable.
+  //
+  // Deleted rather than kept behind a debug flag. A fake restaurant that can be
+  // opened and ordered from is not a useful development aid, and leaving the
+  // list here is an invitation to wire it back up the next time the real query
+  // looks empty.
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

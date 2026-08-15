@@ -200,6 +200,9 @@ class _CreateProfileExpandedScreenState
       ),
     );
     if (picked != null) {
+      // showDatePicker is a route of its own. The user can dismiss the whole
+      // screen from behind it, or the app can be backgrounded while it is up.
+      if (!mounted) return;
       _dobController.text =
           '${picked.day.toString().padLeft(2, '0')} / ${picked.month.toString().padLeft(2, '0')} / ${picked.year}';
       setState(() {});
@@ -245,9 +248,11 @@ class _CreateProfileExpandedScreenState
       '$houseNo $postcode',
       _mapboxSessionToken,
     );
-    setState(() => _isLookingUp = false);
-
+    // The mounted check used to sit AFTER this setState, one line too late to
+    // do the job it was there for. A postcode lookup is a network round trip
+    // and the user can leave the screen during it.
     if (!mounted) return;
+    setState(() => _isLookingUp = false);
 
     if (results.isEmpty) {
       setState(() {

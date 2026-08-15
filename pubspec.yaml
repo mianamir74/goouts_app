@@ -25,6 +25,12 @@ dependencies:
   cached_network_image: ^3.3.1
   camera: ^0.12.0+1
   image: ^4.1.7
+  # Face checks on the KYC selfie — presence, eye closure, head pose, occlusion.
+  # Free, on-device, offline, no licence key and no per-package binding, which
+  # is why this rather than KBY-AI or Onfido: GoOuts has five bundle IDs and
+  # every commercial SDK licences per bundle ID.
+  # NOT liveness and NOT face recognition — see services/face_check_service.dart.
+  google_mlkit_face_detection: ^0.13.2
   image_picker: ^1.1.2
   http: ^1.2.0
   geolocator: ^14.0.3
@@ -38,6 +44,18 @@ dependencies:
   url_launcher: ^6.3.0
   mobile_scanner: ^7.2.0
   qr_flutter: ^4.1.0
+
+  # ── Short Stay ──────────────────────────────────────────────────────────
+  # path_provider: temp files for evidence photo compression. Compressing to a
+  # temp file and uploading FROM the file is what keeps one image in memory at
+  # a time. This app has been killed by iOS Jetsam before.
+  path_provider: ^2.1.4
+  # share_plus: the share button on a listing.
+  # ^13 not ^10: share_plus 10 pins win32 ^5.5.3 which collides with
+  # geolocator 14 via package_info_plus needing win32 ^6.
+  share_plus: ^13.3.0
+  # table_calendar: the booking date range picker, screen 11.
+  table_calendar: ^3.1.2
 
 dev_dependencies:
   flutter_test:

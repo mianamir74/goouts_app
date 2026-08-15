@@ -11,7 +11,9 @@ import 'package:image_picker/image_picker.dart';
 import '../services/id_quality_inspector.dart';
 import '../services/biometric_selfie_inspector.dart';
 import '../services/document_quality_inspector.dart';
-import '../services/user_service.dart';
+// user_service import removed 4 August 2026. Both uses were
+// UserService().updateUser({'kycStatus': 'pending'}), which is now the
+// markKycSubmitted Cloud Function — kycStatus is no longer client writable.
 import '../widgets/goouts_sheet.dart';
 
 class KycScreen extends StatefulWidget {
@@ -143,6 +145,12 @@ class _KycScreenState extends State<KycScreen> {
     // Stop camera when leaving camera steps
     if (_step == 1 || _step == 2) await _stopCamera();
 
+    // Releasing a camera is slow, and this screen is one a user commonly
+    // leaves mid-flow: they back out to fetch their passport, or the app is
+    // pushed to the background. If that happens while _stopCamera is still
+    // running, this State is disposed and setState throws.
+    if (!mounted) return;
+
     setState(() {
       _step = step;
       _cameraReady = false;
@@ -168,6 +176,12 @@ class _KycScreenState extends State<KycScreen> {
       final file = await _cameraCtrl!.takePicture();
       final result = await _idInspector.inspectDocument(file.path);
 
+      // Taking a photograph and running the document inspector together take
+      // seconds, and a user who gets bored or takes a call in that window
+      // leaves the screen. Without this guard setState throws on a disposed
+      // State, and on iOS that surfaces as a crash with no useful stack.
+      if (!mounted) return;
+
       if (result['isValid'] == true) {
         setState(() {
           _idImagePath = file.path;
@@ -177,12 +191,14 @@ class _KycScreenState extends State<KycScreen> {
         });
         await _goTo(2);
       } else {
+        // crash_scan: ok - sibling branch of the await above, cannot both run
         setState(() {
           _feedbackMsg = result['errorMessage'] ?? 'Please retake.';
           _checking = false;
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _feedbackMsg = 'Capture failed. Please try again.';
         _checking = false;
@@ -199,12 +215,19 @@ class _KycScreenState extends State<KycScreen> {
       );
       if (picked == null) return;
 
+      // The gallery picker is a separate system UI. On iOS, presenting it can
+      // push this app into the background, and a low memory device may unload
+      // the screen behind it entirely. So the State can already be gone by the
+      // time the user has chosen a photograph.
+      if (!mounted) return;
+
       setState(() {
         _checking    = true;
         _feedbackMsg = 'Analysing document…';
       });
 
       final result = await _idInspector.inspectDocument(picked.path);
+      if (!mounted) return;
 
       if (result['isValid'] == true) {
         setState(() {
@@ -215,6 +238,7 @@ class _KycScreenState extends State<KycScreen> {
         });
         await _goTo(2);
       } else {
+        // crash_scan: ok - sibling branch of the await above, cannot both run
         setState(() {
           _feedbackMsg = result['errorMessage'] ??
               'Could not verify this image. Please ensure all text on your ID is clearly visible and try again.';
@@ -222,6 +246,7 @@ class _KycScreenState extends State<KycScreen> {
         });
       }
     } catch (_) {
+      if (!mounted) return;
       setState(() {
         _feedbackMsg = 'Could not open gallery. Please try again.';
         _checking    = false;
@@ -239,6 +264,7 @@ class _KycScreenState extends State<KycScreen> {
     try {
       final file = await _cameraCtrl!.takePicture();
       final result = await _selfieInspector.inspectSelfie(file.path);
+      if (!mounted) return;
 
       if (result['isValid'] == true) {
         setState(() {
@@ -249,12 +275,14 @@ class _KycScreenState extends State<KycScreen> {
         });
         await _goTo(3);
       } else {
+        // crash_scan: ok - sibling branch of the await above, cannot both run
         setState(() {
           _feedbackMsg = result['errorMessage'] ?? 'Please retake.';
           _checking = false;
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _feedbackMsg = 'Capture failed. Please try again.';
         _checking = false;
@@ -313,11 +341,22 @@ class _KycScreenState extends State<KycScreen> {
             await selfieRef.putFile(File(_selfieImagePath!));
             selfieUrl = await selfieRef.getDownloadURL();
           }
-          // Save URLs to Firestore immediately so admin can see them
-          await UserService().updateUser({
-            if (idFrontUrl.isNotEmpty) 'kycIdFrontUrl': idFrontUrl,
-            if (selfieUrl.isNotEmpty)  'kycSelfieUrl': selfieUrl,
-            'kycStatus': 'pending',
+          // Save URLs to Firestore immediately so admin can see them.
+          //
+          // Via a Cloud Function now, not updateUser. kycStatus was writable
+          // by the client, and while THIS call only ever wrote 'pending', the
+          // rule that allowed it allowed 'approved' too — so a user could
+          // pass their own identity check. For a business moving money that
+          // is an AML control failure, not just a bug.
+          //
+          // markKycSubmitted also checks the URLs point at this user's own
+          // kyc/{uid}/ folder, so nobody can attach someone else's verified
+          // documents to their application.
+          await FirebaseFunctions.instanceFor(region: 'europe-west1')
+              .httpsCallable('markKycSubmitted')
+              .call(<String, dynamic>{
+            'idFrontUrl': idFrontUrl,
+            'selfieUrl': selfieUrl,
           });
         } catch (_) {
           // Upload failed — continue anyway, CF will still run
@@ -347,7 +386,12 @@ class _KycScreenState extends State<KycScreen> {
     } catch (e) {
       // Fallback: set pending and show success UI — admin reviews manually
       try {
-        await UserService().updateUser({'kycStatus': 'pending'});
+        // Same reason as above: kycStatus is not client writable any more.
+        // markKycSubmitted is idempotent and will not walk an already
+        // approved or rejected application backwards.
+        await FirebaseFunctions.instanceFor(region: 'europe-west1')
+            .httpsCallable('markKycSubmitted')
+            .call(<String, dynamic>{});
       } catch (_) {}
       if (mounted) {
         setState(() {

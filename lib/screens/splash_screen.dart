@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/user_service.dart';
 import '../services/biometric_service.dart';
+import '../services/fresh_install_guard.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -38,6 +39,21 @@ class _SplashScreenState extends State<SplashScreen>
 
     // Auth gate — check login state after animation starts
     Future.delayed(const Duration(milliseconds: 1200), () async {
+      if (!mounted) return;
+
+      // ── SIGN OUT A SESSION THAT SURVIVED A REINSTALL ────────────────────
+      //
+      // Moved here from main() on 14 August 2026. It was awaited before
+      // runApp, which meant the app painted nothing at all until it finished
+      // — and it can wait up to five seconds for Firebase to restore a
+      // Keychain session. Running it here does the same work while the splash
+      // animation is already on screen.
+      //
+      // MUST be awaited BEFORE the currentUser read below. On iOS the
+      // Keychain survives app deletion, so without this a reinstalled app
+      // would read the previous owner's session and route straight into their
+      // account. See services/fresh_install_guard.dart.
+      await enforceFreshInstallSignOut();
       if (!mounted) return;
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {

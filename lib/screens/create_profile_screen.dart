@@ -32,6 +32,10 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
     final picked =
         await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
     if (picked != null) {
+      // The gallery is a separate system UI. Presenting it can push this app
+      // to the background, and a low memory device may unload the screen
+      // behind it, so this State can be gone by the time the user has picked.
+      if (!mounted) return;
       setState(() {
         _profileImage = File(picked.path);
         _hasPhoto = true;
@@ -43,6 +47,7 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
     if (picked != null) {
+      if (!mounted) return;   // see _pickImage above
       setState(() {
         if (isFront) {
           _kycFrontImage = File(picked.path);

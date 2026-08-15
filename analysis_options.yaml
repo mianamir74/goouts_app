@@ -34,6 +34,20 @@ linter:
   # `// ignore_for_file: name_of_lint` syntax on the line or in the file
   # producing the lint.
   rules:
+    # ── file_names, disabled deliberately on 3 August 2026 ──────────────────
+    # The Short Stay screens are named 01_..., 02_... through 29_... The lint
+    # dislikes a leading digit because a file name maps to a library name and
+    # a Dart identifier cannot start with one.
+    #
+    # We keep the numbers anyway. They line up with the Stitch source folders,
+    # with the screen numbering in design/SHORT_STAY_WIRING_PLAN.md, and with
+    # the order a reviewer walks the flow in. Renaming 29 files to satisfy an
+    # `info` level lint would cost that traceability for nothing.
+    #
+    # It is a naming preference, not a correctness rule. Nothing imports these
+    # files as libraries by name.
+    file_names: false
+
     # avoid_print: false  # Uncomment to disable the `avoid_print` rule
     # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
 

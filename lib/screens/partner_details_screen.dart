@@ -43,6 +43,10 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
 
   /// Returns true if the category is counter-service (QR scan required).
   /// Returns false for table-service categories (GPS only).
+  // Suppressed 14 August 2026, not deleted.
+  // Counter-service vs table-service branching is not wired on this screen yet.
+  // partner_offer_screen has its own copy of the same helper.
+  // ignore: unused_element
   static bool _isCounterService(String category) {
     final c = category.toLowerCase();
     const counterKeywords = [
@@ -1384,6 +1388,10 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
           }
 
           // Handle QR scan result — matches stored code OR master override
+          // Suppressed 14 August 2026, not deleted.
+          // QR scanning is built but not attached to a scanner widget yet. This is the
+          // handler it will attach to.
+          // ignore: unused_element
           void onQrDetect(BarcodeCapture capture) {
             final raw = capture.barcodes.firstOrNull?.rawValue ?? '';
             final scanned = raw.toUpperCase().trim();
@@ -1842,6 +1850,10 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
   }
 
   // ── Not at location error sheet ─────────────────────────────────────────────
+  // Suppressed 14 August 2026, not deleted.
+  // Written for the geofence check that has not shipped. Kept whole rather than
+  // rebuilt later.
+  // ignore: unused_element
   void _showNotAtLocationSheet(
       BuildContext context, String merchant, String distance) {
     showModalBottomSheet(
@@ -2844,6 +2856,10 @@ class _PinAuthSheetState extends State<_PinAuthSheet>
 
   final List<String> _digits = [];
   bool _checking  = false;
+  // Suppressed 14 August 2026, not deleted.
+  // Set on a failed PIN but never read — the shake animation was never bound to
+  // it.
+  // ignore: unused_field
   bool _shake     = false;
   int  _attempts  = 0;
   String? _error;
@@ -2898,6 +2914,9 @@ class _PinAuthSheetState extends State<_PinAuthSheet>
       } else {
         _attempts++;
         await _shakeCtrl.forward(from: 0);
+        // The shake animation is awaited, so this is a real gap. The sheet can
+        // also be dismissed by the user during it.
+        if (!mounted) return;
         setState(() {
           _digits.clear();
           _checking = false;
@@ -3090,15 +3109,29 @@ class _SocialBoostSheet extends StatefulWidget {
 class _SocialBoostSheetState extends State<_SocialBoostSheet>
     with SingleTickerProviderStateMixin {
   static const Color _dark     = Color(0xFF0D1B3E);
+  // Suppressed 14 August 2026, not deleted.
+  // Duplicate of _green at the top of this file. Left in place rather than
+  // removed blind, because the two constants are in different classes.
+  // ignore: unused_field
   static const Color _green    = Color(0xFF0A7A3E);
 
   // States: idle | handle_input | pending | verified
   String _state = 'idle';
+  // Suppressed 14 August 2026, not deleted.
+  // Written from the verification response, never displayed. The status UI is
+  // the missing half.
+  // ignore: unused_field
   String? _verificationStatus;
   final _handleCtrl = TextEditingController();
+  // Suppressed 14 August 2026, not deleted.
+  // Toggled three times but never read — no spinner is bound to it.
+  // ignore: unused_field
   bool _submitting  = false;
 
   late AnimationController _pulseCtrl;
+  // Suppressed 14 August 2026, not deleted.
+  // Created in initState, never applied to a widget.
+  // ignore: unused_field
   late Animation<double>   _pulseAnim;
 
   @override
@@ -3139,6 +3172,7 @@ class _SocialBoostSheetState extends State<_SocialBoostSheet>
     // Check if handle is stored
     final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
     final storedHandle = userDoc.data()?['instagramHandle'] as String?;
+    if (!mounted) return;
 
     if (storedHandle == null || storedHandle.isEmpty) {
       setState(() => _state = 'handle_input');

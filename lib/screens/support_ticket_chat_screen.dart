@@ -102,6 +102,7 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
     final picked = await _picker.pickImage(
         source: ImageSource.gallery, imageQuality: 70);
     if (picked == null) return;
+    if (!mounted) return;   // gallery is a separate system UI, see profile_screen
     setState(() => _uploading = true);
     try {
       final file = File(picked.path);
@@ -144,6 +145,9 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
   }
 
   // ── Status chip ────────────────────────────────────────────────────────────
+  // Suppressed 14 August 2026, not deleted.
+  // Built for the ticket header, not placed there yet.
+  // ignore: unused_element
   Widget _statusChip(String status) {
     final s     = SupportTicketService.statusStyle(status);
     final color = Color(s['color'] as int);

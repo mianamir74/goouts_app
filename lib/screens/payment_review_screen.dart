@@ -47,6 +47,7 @@ class _PaymentReviewScreenState extends State<PaymentReviewScreen> {
         cashback: cashback,
         transactionId: '',
       );
+      if (!mounted) return;
       setState(() {
         _reviewSubmitted = true;
         _isEditing = false;

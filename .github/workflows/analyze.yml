@@ -1,0 +1,33 @@
+# Fast static analysis on every push. No build, no signing, no secrets.
+#
+# Exists because flutter analyze cannot be run in some environments, and a red
+# tick on a pull request is faster feedback than waiting for a TestFlight build.
+name: analyze
+
+on:
+  push:
+    branches: [ main, develop, 'feature/**' ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+
+      - name: Formatting
+        run: dart format --output=none --set-exit-if-changed lib/
+        continue-on-error: true

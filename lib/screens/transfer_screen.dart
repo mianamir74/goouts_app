@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -17,10 +19,65 @@ class _TransferScreenState extends State<TransferScreen> {
   double _amount = 0;
   bool _isLoading = false;
 
+  // ───────────────────────────────────────────────────────────────────────────
+  //  THE BALANCE IS LOADED HERE, NOT PASSED IN. Fixed 6 August 2026.
+  //
+  //  It used to come only from the constructor, and there are two ways into
+  //  this screen:
+  //
+  //    wallet_screen.dart:410   TransferScreen(availableBalance: _balance)  ok
+  //    main.dart:213            '/transfer': const TransferScreen()         NO
+  //
+  //  Via the named route no balance was passed at all, so `available` fell to
+  //  0.0 and EVERY transfer was rejected — while the screen displayed £247.60,
+  //  because that figure was hardcoded. A user saw a balance, typed an amount,
+  //  and was told they had insufficient funds.
+  //
+  //  Loading it here rather than trusting the caller removes the whole class
+  //  of bug. The constructor value is still honoured as a first paint so the
+  //  wallet route shows a figure immediately instead of flickering through
+  //  zero.
+  // ───────────────────────────────────────────────────────────────────────────
+  double _available = 0;
+  bool _balanceLoading = true;
+
   static const Color _primary = Color(0xFF0392CA);
   static const Color _dark = Color(0xFF0D1B3E);
   static const Color _teal = Color(0xFF0A6E8A);
   static const Color _green = Color(0xFF0A7A3E);
+
+  @override
+  void initState() {
+    super.initState();
+    _available = widget.availableBalance ?? 0;
+    _loadBalance();
+  }
+
+  Future<void> _loadBalance() async {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) {
+        if (mounted) setState(() => _balanceLoading = false);
+        return;
+      }
+      final snap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get();
+      if (!mounted) return;
+      final raw = snap.data()?['walletBalance'];
+      setState(() {
+        _available = raw is num ? raw.toDouble() : 0.0;
+        _balanceLoading = false;
+      });
+    } catch (_) {
+      // Leave whatever was passed in, and stop showing the spinner. A failed
+      // read must not leave the screen looking like the balance is zero — the
+      // send button validates against _available anyway, so the worst case is
+      // a rejected transfer rather than an overspend.
+      if (mounted) setState(() => _balanceLoading = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -257,8 +314,13 @@ class _TransferScreenState extends State<TransferScreen> {
                                   fontSize: 14, color: Colors.grey[500]),
                             ),
                             const SizedBox(height: 2),
+                            // Was the literal string '£247.60'. It survived
+                            // deleting the app AND wiping Firebase, because it
+                            // was never a balance — it was text.
                             Text(
-                              '£247.60',
+                              _balanceLoading
+                                  ? '£--.--'
+                                  : '£${_available.toStringAsFixed(2)}',
                               style: GoogleFonts.inter(
                                   fontSize: 28,
                                   fontWeight: FontWeight.w800,
@@ -402,9 +464,26 @@ class _TransferScreenState extends State<TransferScreen> {
                                 Expanded(
                                   child: TextField(
                                     controller: _amountController,
-                                    keyboardType: TextInputType.number,
+                                    // decimal: true, or the iOS number pad has
+                                    // no decimal point key at all.
+                                    keyboardType: const TextInputType
+                                        .numberWithOptions(decimal: true),
                                     inputFormatters: [
-                                      FilteringTextInputFormatter.digitsOnly
+                                      // WAS FilteringTextInputFormatter
+                                      // .digitsOnly.
+                                      //
+                                      // That strips the decimal point SILENTLY,
+                                      // so typing 10.50 left "1050" in the
+                                      // field and the screen read it as
+                                      // £1050 — one hundred times the intended
+                                      // amount, on a money transfer, under a
+                                      // hint that said "0.00" and invited
+                                      // exactly that input.
+                                      //
+                                      // Digits, at most one point, at most two
+                                      // places after it.
+                                      FilteringTextInputFormatter.allow(
+                                          RegExp(r'^\d*\.?\d{0,2}')),
                                     ],
                                     onChanged: (v) => setState(
                                         () => _amount = double.tryParse(v) ?? 0),
@@ -520,7 +599,7 @@ class _TransferScreenState extends State<TransferScreen> {
                     );
                     return;
                   }
-                  final available = widget.availableBalance ?? 0.0;
+                  final available = _available;
                   if (_amount > available) {
                     GoOutsSheet.warning(context,
                       title: 'Insufficient Balance',

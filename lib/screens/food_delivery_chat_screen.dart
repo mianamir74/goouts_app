@@ -42,6 +42,11 @@ class _FoodDeliveryChatScreenState extends State<FoodDeliveryChatScreen> {
   // Live order sub for status + deliveredAt
   StreamSubscription? _orderSub;
   String   _orderStatus  = '';
+  // Suppressed 14 August 2026, not deleted.
+  // ASSIGNED but never read — the chat lock-out after delivery is half wired.
+  // Deleting the field means deleting the write too, and the write is the part
+  // worth keeping.
+  // ignore: unused_field
   DateTime? _deliveredAt;
 
   Timer? _lockTimer;

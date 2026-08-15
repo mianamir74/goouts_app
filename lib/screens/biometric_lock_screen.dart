@@ -62,6 +62,11 @@ class _BiometricLockScreenState extends State<BiometricLockScreen> {
   }
 
   bool get _hasFace => _types.contains(BiometricType.face);
+  // Suppressed 14 August 2026, not deleted.
+  // Pairs with _hasFace above, which IS used. Kept so the capability set reads
+  // as a whole — a device with strong biometrics but no face unlock is a case
+  // this screen will need.
+  // ignore: unused_element
   bool get _hasStrong => _types.contains(BiometricType.strong);
 
   IconData get _biometricIcon =>

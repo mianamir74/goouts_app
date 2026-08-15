@@ -1,14 +1,43 @@
 import 'dart:io';
 import 'package:image/image.dart' as img;
 
-/// GoOuts Biometric Selfie Inspector — v2.0 (Confidence Scoring Engine)
+import 'face_check_service.dart';
+
+/// GoOuts Selfie Inspector — v3.0
 ///
-/// R&D Classification: Proprietary on-device image quality assessment.
-/// Replaces third-party identity verification services (Sumsub/Onfido)
-/// with a zero-cost, zero-latency, privacy-preserving local analysis engine.
+/// On-device selfie assessment. Two layers:
 ///
-/// Output: Granular confidence scores (0.0–1.0) per signal, fed into the
-/// server-side KYC Auto-Decision Engine (kycAutoDecision Cloud Function).
+///   IMAGE QUALITY  file size, brightness, sharpness. Is the photograph
+///                  technically usable?
+///   FACE           is there one person in it, facing the camera, eyes open,
+///                  face unobstructed? Google ML Kit, on-device, free.
+///
+/// Emits confidence scores 0.0–1.0 which the caller passes to the server-side
+/// KYC Auto-Decision Engine (kycAutoDecision).
+///
+/// ── ⚠ WHAT CHANGED IN v3, AND WHY IT MATTERS ────────────────────────────
+///
+/// v2 carried this header: "Replaces third-party identity verification
+/// services (Sumsub/Onfido) with a zero-cost, zero-latency, privacy-
+/// preserving local analysis engine."
+///
+/// That was not true and it was dangerous, because it was believed. v2
+/// imported one package — image — and measured file size, brightness and blur.
+/// It never looked for a face. A bright, sharp photograph of a wall, a shoe or
+/// a magazine scored above the 0.85 auto-approve threshold and was verified
+/// without a human ever seeing it.
+///
+/// v3 adds the face layer. It still does NOT replace Sumsub or Onfido:
+///
+///   NO liveness      a printed photo or a face on another screen passes
+///   NO recognition   nothing checks the selfie is the person on the ID
+///   NO age or gender estimation
+///
+/// Those are Stage 2 and need TFLite models. Please do not restore a sentence
+/// to this header that claims otherwise.
+///
+/// Nothing biometric is stored. The detector returns numbers; the face data is
+/// discarded. See face_check_service.dart for the GDPR note.
 class BiometricSelfieInspector {
   // ── Calibrated thresholds (R&D iteration v2) ──────────────────────────────
   static const double _blurThreshold    = 60.0;
@@ -90,14 +119,68 @@ class BiometricSelfieInspector {
     }
     scores['sharpness'] = sharpnessResult['score'] as double;
 
+    // ── Signal 4: FACE ─────────────────────────────────────────────────────
+    //
+    // Runs last, and only once the image is known to be technically usable.
+    // ML Kit on a photograph already established as pitch black or badly out
+    // of focus tells you nothing you did not know, and costs a model load.
+    //
+    // Dimensions come from the decode above rather than being read again
+    // inside the service — a second decode of a 12-megapixel selfie is about
+    // 48 MB, and this app has a history of out-of-memory kills on iOS.
+    final FaceCheckResult faceResult = await FaceCheckService().inspectFace(
+      imagePath,
+      imageWidth: original.width,
+      imageHeight: original.height,
+    );
+
+    if (faceResult.available) {
+      scores['face'] = faceResult.overall;
+      scores['faceSize'] = faceResult.scores['faceSize'] ?? 0.0;
+      scores['facePose'] = faceResult.scores['pose'] ?? 0.0;
+      scores['eyesOpen'] = faceResult.scores['eyesOpen'] ?? 0.0;
+      scores['faceOcclusion'] = faceResult.scores['occlusion'] ?? 0.0;
+
+      // A face failure is a HARD stop. Unlike the quality gates above, "there
+      // is no face here" is not a lighting problem the applicant can be scored
+      // down for — it means this is not a selfie.
+      if (!faceResult.isValid) {
+        scores['overall'] = 0.0;
+        return {
+          'isValid': false,
+          'errorMessage': faceResult.errorMessage ??
+              'We could not verify your face in that photo. Please retake it.',
+          'scores': scores,
+        };
+      }
+    }
+
     // ── Weighted composite score ───────────────────────────────────────────
-    // Weights reflect R&D calibration: sharpness most critical for OCR
-    scores['overall'] = (scores['fileQuality']! * 0.20) +
-                        (scores['brightness']!  * 0.35) +
-                        (scores['sharpness']!   * 0.45);
+    //
+    // The face carries 45% when it was measured. That is deliberate: the
+    // technical signals answer "is this a good photograph", and only the face
+    // signal answers "is this a photograph of the applicant". A very sharp,
+    // well-lit picture of a wall now tops out at 0.55 and lands in manual
+    // review instead of being auto-approved at 0.85.
+    //
+    // When ML Kit could not run at all — Play Services missing, model not
+    // downloaded, unsupported device — we fall back to the v2 weights rather
+    // than punishing the applicant for their handset. See the failure policy
+    // in face_check_service.dart.
+    if (faceResult.available) {
+      scores['overall'] = (scores['fileQuality']! * 0.10) +
+                          (scores['brightness']!  * 0.20) +
+                          (scores['sharpness']!   * 0.25) +
+                          (scores['face']!        * 0.45);
+    } else {
+      scores['overall'] = (scores['fileQuality']! * 0.20) +
+                          (scores['brightness']!  * 0.35) +
+                          (scores['sharpness']!   * 0.45);
+    }
 
     return {
       'isValid': true,
+      'faceChecked': faceResult.available,
       'scores': scores,
     };
   }

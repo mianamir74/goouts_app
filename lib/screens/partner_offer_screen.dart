@@ -10,6 +10,9 @@ enum _StepState { passed, failed, loading, waiting }
 
 /// Counter-service (QR required) vs table-service (GPS only).
 /// Mirrors the same logic in partner_details_screen.dart.
+// Suppressed 14 August 2026, not deleted.
+// Same helper as partner_details_screen. Neither screen branches on it yet.
+// ignore: unused_element
 bool _isCounterService(String category) {
   final c = category.toLowerCase();
   const counterKeywords = [

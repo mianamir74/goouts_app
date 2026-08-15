@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'firebase_options.dart';
 import 'theme/app_theme.dart';
+import 'features/short_stay/stay_routes.dart';
 
 import 'screens/splash_screen.dart';
 import 'screens/slide1_screen.dart';
@@ -88,6 +89,23 @@ void main() async {
   await DeliveryAddressService().init();
   // Auto-seeds merchants collection once — skips if already done
   PartnerSeedService().seedOnce().catchError((_) {});
+  // ── THE FRESH-INSTALL GUARD MOVED OUT OF HERE ──────────────────────────
+  //
+  // 14 August 2026. It used to be awaited on this line, before runApp.
+  //
+  // Until runApp is called Flutter has painted nothing — iOS shows the static
+  // launch image and nothing else. The guard was changed earlier the same day
+  // to await the first authStateChanges event, which is allowed up to five
+  // seconds, so a slow cold start meant up to five seconds of frozen picture
+  // before the app appeared.
+  //
+  // This app already learned that lesson once: see the note in driver_app's
+  // main.dart about awaiting FCM here, which produced "a guaranteed ~10s blank
+  // screen then crash on every launch".
+  //
+  // It now runs inside SplashScreen.initState, during the 1200ms the splash
+  // animation is already on screen. Same protection, no blank window.
+
   runApp(const GoOutsApp());
 }
 
@@ -165,6 +183,28 @@ class _GoOutsAppState extends State<GoOutsApp> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       home: const SplashScreen(),
+
+      // Short Stay, added 4 August 2026. Until this line existed the whole
+      // feature — 41 files, about 11,000 lines — was unreachable from the app.
+      //
+      // It is one line rather than 29 entries in `routes` below because
+      // StayRoutes.onGenerateRoute owns its own names, parses its own
+      // arguments, and returns null for anything that is not a /stay route, so
+      // the map below still handles everything else. Adding a Short Stay screen
+      // means touching stay_routes.dart only, never this file.
+      // HOST SIDE REMOVED 6 August 2026. The 25 host screens were chained here
+      // on 4 August, but a host and a guest are different people using
+      // different apps — the host side now lives in the separate GoOuts Host
+      // app (goouts/goouts_host, bundle com.goouts.host). Shipping those
+      // screens inside the consumer app meant every guest carried 10,000 lines
+      // of property-management UI they can never reach.
+      //
+      // The chain still works the same way: StayRoutes returns NULL for any
+      // name it does not own, so `routes` below handles everything else. A
+      // resolver that returned a "not found" page instead of null would
+      // swallow every route after it.
+      onGenerateRoute: (settings) => StayRoutes.onGenerateRoute(settings),
+
       routes: {
         '/splash': (context) => const SplashScreen(),
         '/slide1': (context) => const Slide1Screen(),

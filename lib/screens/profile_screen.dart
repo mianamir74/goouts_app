@@ -67,6 +67,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: source, imageQuality: 80);
     if (picked == null) return;
+    // Same reason as elsewhere: the picker is a separate system UI and this
+    // screen can be unloaded behind it on a low memory device.
+    if (!mounted) return;
     final file = File(picked.path);
     setState(() { _profileImage = file; _uploadingPhoto = true; });
     try {

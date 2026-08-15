@@ -51,11 +51,10 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
     setState(() => _loading = true);
     try {
       final group = await _familyService.getMyFamilyGroup();
-      List<Map<String, dynamic>> members = [];
-      if (group != null) {
-        final uids = List<String>.from(group['memberUids'] as List? ?? []);
-        members = await _familyService.getFamilyMembers(uids);
-      }
+      // getFamilyMembers now reads the summaries already inside the group
+      // document, so this is no longer N Firestore reads and no longer needs
+      // to be awaited. See FamilyService for why that changed.
+      final members = _familyService.getFamilyMembers(group);
       final requests = await _familyService.getIncomingRequests();
       final plus = await _userService.isGoOutsPlusMember();
 
@@ -92,7 +91,11 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
         if (result == null) {
           _searchError =
               'No GoOuts account found with that number. Make sure they have signed up first.';
-        } else if (result['familyGroupId'] != null) {
+        } else if (result['inFamilyGroup'] == true) {
+          // Was result['familyGroupId'] != null. findUserByPhone no longer
+          // returns anyone else's group id, only whether they are in one,
+          // because the id would let a stranger work out who is related to
+          // whom.
           _searchError = 'This person is already in a GoOuts family group.';
         } else {
           _searchResult = result;
@@ -114,10 +117,32 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
         _phoneController.clear();
         _searchResult = null;
       });
-      GoOutsSheet.success(context,
-        title: 'Request Sent!',
-        message: 'error ?? \'Request sent! They will see it in their GoOuts app.',
-      );
+      // ── ⚠ THIS USED TO REPORT SUCCESS EVEN WHEN THE REQUEST FAILED ────
+      //
+      // FIXED 14 August 2026. The line read:
+      //
+      //   message: 'error ?? \'Request sent! They will see it in their...',
+      //
+      // A QUOTED STRING, not an expression. During the snackbar-to-GoOutsSheet
+      // migration the interpolation was swallowed into the literal, so the
+      // user was shown the raw characters "error ?? 'Request sent! They will
+      // see it in their GoOuts app." — and always under a green "Request
+      // Sent!" heading, because sendLinkRequest's error return was never read.
+      //
+      // A family link request that failed reported success, in the live app.
+      // The analyzer had been calling this out as "the value of the local
+      // variable 'error' isn't used" and it was being read as noise.
+      if (error != null) {
+        GoOutsSheet.error(context,
+          title: 'Request not sent',
+          message: error,
+        );
+      } else {
+        GoOutsSheet.success(context,
+          title: 'Request sent',
+          message: 'They will see it in their GoOuts app.',
+        );
+      }
     }
   }
 
