@@ -100,7 +100,13 @@ const Map<String, List<StayAmenity>> stayAmenityGroups =
     StayAmenity('travel_bed', 'Travel bed', Icons.bed),
   ],
   'Safety': <StayAmenity>[
-    StayAmenity('smoke_alarm', 'Smoke alarm', Icons.detector_smoke),
+    // Icons.sensors, NOT Icons.detector_smoke.
+    //
+    // detector_smoke exists in Material Symbols, Google's newer icon set, and
+    // was never added to Flutter's Icons class. It reads as though it should
+    // be there, which is exactly why it got used — and it is a compile error,
+    // not a missing glyph, so the app would not build at all.
+    StayAmenity('smoke_alarm', 'Smoke alarm', Icons.sensors),
     StayAmenity('carbon_monoxide_alarm', 'Carbon monoxide alarm', Icons.co2),
     StayAmenity('fire_extinguisher', 'Fire extinguisher', Icons.fire_extinguisher),
     StayAmenity('first_aid_kit', 'First aid kit', Icons.medical_services),
