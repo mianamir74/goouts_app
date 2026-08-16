@@ -8,6 +8,7 @@ import '../services/user_service.dart';
 import '../services/address_lookup_service.dart';
 import '../services/referral_service.dart';
 import '../widgets/goouts_sheet.dart';
+import '../utils/dob_input_formatter.dart';
 
 class CreateProfileExpandedScreen extends StatefulWidget {
   const CreateProfileExpandedScreen({super.key});
@@ -209,16 +210,9 @@ class _CreateProfileExpandedScreenState
     }
   }
 
-  // ── DOB manual formatter — auto-inserts " / " after DD and MM ─────────────
-  String _formatDobInput(String raw) {
-    final digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
-    final buf = StringBuffer();
-    for (int i = 0; i < digits.length && i < 8; i++) {
-      if (i == 2 || i == 4) buf.write(' / ');
-      buf.write(digits[i]);
-    }
-    return buf.toString();
-  }
+  // The DOB formatter moved to utils/dob_input_formatter.dart on 14 August
+  // 2026, so the KYC screen can use the same one. It was private here, which
+  // is why that screen went without it.
 
   // ── Postcode lookup → address dropdown ────────────────────────────────────
   //
@@ -629,7 +623,7 @@ class _CreateProfileExpandedScreenState
                         v == null || v.isEmpty ? 'Date of birth is required' : null,
                     style: _inputStyle(),
                     onChanged: (val) {
-                      final formatted = _formatDobInput(val);
+                      final formatted = formatDobInput(val);
                       if (formatted != val) {
                         _dobController.value = TextEditingValue(
                           text: formatted,

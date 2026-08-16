@@ -8,6 +8,8 @@
 // a listing that appears and disappears from results for no visible reason.
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../models/stay_amenities.dart';
+import '../models/stay_property_types.dart';
 import '../services/stay_availability_service.dart';
 import '../theme/stay_colors.dart';
 
@@ -29,15 +31,39 @@ class _SearchFiltersSheetState extends State<SearchFiltersSheet> {
   static const double _maxPounds = 500;
   static const int _maxPartners = 25;
 
-  static const _propertyTypes = ['Apartment', 'House', 'Room', 'Hotel'];
+  // ⚠ FIXED 16 August 2026. This used to be:
+  //
+  //   static const _propertyTypes = ['Apartment', 'House', 'Room', 'Hotel'];
+  //
+  // Hosts store slugs — flat, house, annexe, room, cottage, other — and
+  // stay_availability_service runs a SERVER-side equality filter:
+  //
+  //   q.where('propertyType', isEqualTo: criteria.propertyType)
+  //
+  // so every one of the four returned nothing. 'House' and 'Room' were case
+  // mismatches; 'Apartment' and 'Hotel' were values the host wizard cannot
+  // produce at all. 'Annexe' and 'Cottage', which hosts DO create, could not
+  // be filtered for.
+  //
+  // See models/stay_property_types.dart.
+  static Map<String, String> get _propertyTypes => stayPropertyTypes;
 
-  static const _amenityGroups = <String, List<String>>{
-    'Internet and office': ['Fast WiFi', 'Dedicated workspace'],
-    'Kitchen and dining': ['Kitchen', 'Cooking basics', 'Dining table'],
-    'Parking and facilities': ['Free parking', 'Private gym', 'Lift'],
-    'Bathroom': ['Bath', 'Hair dryer', 'Hot water'],
-    'Outdoor': ['Patio or balcony', 'Garden', 'Outdoor furniture'],
-  };
+  // ⚠ FIXED 16 August 2026. This used to be a private list of LABELS:
+  //
+  //   'Internet and office': ['Fast WiFi', 'Dedicated workspace'],
+  //   'Kitchen and dining':  ['Kitchen', 'Cooking basics', 'Dining table'],
+  //   ...
+  //
+  // Hosts store SLUGS — 'wifi', 'workspace', 'kitchen'. The service filters
+  // client-side with `criteria.amenities.every(l.amenities.contains)`, so a
+  // label could never be found in a list of slugs and `.every` returned false
+  // for every listing. Ticking ANY single amenity emptied the results, and it
+  // read as "no properties match" rather than as a fault.
+  //
+  // The groups now come from models/stay_amenities.dart, which mirrors the
+  // host wizard. Do not reintroduce a local list here — that is the bug.
+  static Map<String, List<StayAmenity>> get _amenityGroups =>
+      stayAmenityGroups;
 
   late RangeValues _price;
   String? _propertyType;
@@ -165,17 +191,19 @@ class _SearchFiltersSheetState extends State<SearchFiltersSheet> {
             Wrap(
               spacing: 8,
               children: [
-                for (final t in _propertyTypes)
+                // Selects the slug, shows the label. Selecting the label is
+                // the bug this section used to have.
+                for (final t in _propertyTypes.entries)
                   ChoiceChip(
-                    label: Text(t),
-                    selected: _propertyType == t,
+                    label: Text(t.value),
+                    selected: _propertyType == t.key,
                     onSelected: (sel) =>
-                        setState(() => _propertyType = sel ? t : null),
+                        setState(() => _propertyType = sel ? t.key : null),
                     selectedColor: GoOutsColors.paleBlueTint,
                     labelStyle: GoogleFonts.inter(
                       fontSize: 13.5,
                       fontWeight: FontWeight.w600,
-                      color: _propertyType == t
+                      color: _propertyType == t.key
                           ? GoOutsColors.primaryBlue
                           : GoOutsColors.bodyText,
                     ),
@@ -288,7 +316,7 @@ class _SearchFiltersSheetState extends State<SearchFiltersSheet> {
         ),
       );
 
-  Widget _amenityGroup(String title, List<String> items) => Column(
+  Widget _amenityGroup(String title, List<StayAmenity> items) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
@@ -302,18 +330,21 @@ class _SearchFiltersSheetState extends State<SearchFiltersSheet> {
               ),
             ),
           ),
+          // The checkbox stores item.slug, which is what Firestore holds, and
+          // shows item.label, which is what a guest reads. Storing the label
+          // is the bug this file used to have.
           for (final item in items)
             CheckboxListTile(
-              value: _amenities.contains(item),
+              value: _amenities.contains(item.slug),
               onChanged: (on) => setState(() {
                 if (on ?? false) {
-                  _amenities.add(item);
+                  _amenities.add(item.slug);
                 } else {
-                  _amenities.remove(item);
+                  _amenities.remove(item.slug);
                 }
               }),
               title: Text(
-                item,
+                item.label,
                 style: GoogleFonts.inter(
                   fontSize: 13.5,
                   color: GoOutsColors.bodyText,

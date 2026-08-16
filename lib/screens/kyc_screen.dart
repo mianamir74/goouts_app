@@ -15,6 +15,7 @@ import '../services/document_quality_inspector.dart';
 // UserService().updateUser({'kycStatus': 'pending'}), which is now the
 // markKycSubmitted Cloud Function — kycStatus is no longer client writable.
 import '../widgets/goouts_sheet.dart';
+import '../utils/dob_input_formatter.dart';
 
 class KycScreen extends StatefulWidget {
   const KycScreen({super.key});
@@ -517,7 +518,24 @@ class _KycScreenState extends State<KycScreen> {
               const SizedBox(height: 16),
               _inputField('Date of Birth', _dobCtrl,
                   hint: 'DD / MM / YYYY',
-                  keyboardType: TextInputType.datetime,
+                  // number, not datetime. On iOS the datetime keyboard is a
+                  // normal QWERTY with a few extra symbols — it does not give
+                  // the numeric pad, which is what a date entered as digits
+                  // actually needs.
+                  keyboardType: TextInputType.number,
+                  // Inserts " / " after the day and the month as you type, the
+                  // same as the registration screen. Shared helper so the two
+                  // screens cannot drift apart again.
+                  onChanged: (val) {
+                    final String formatted = formatDobInput(val);
+                    if (formatted != val) {
+                      _dobCtrl.value = TextEditingValue(
+                        text: formatted,
+                        selection: TextSelection.collapsed(
+                            offset: formatted.length),
+                      );
+                    }
+                  },
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Required';
                     return null;
@@ -1130,7 +1148,11 @@ class _KycScreenState extends State<KycScreen> {
   Widget _inputField(String label, TextEditingController ctrl,
       {String? hint,
       TextInputType? keyboardType,
-      String? Function(String?)? validator}) =>
+      String? Function(String?)? validator,
+      // Added 14 August 2026. This helper had no way to react to typing, which
+      // is why the date-of-birth field on this screen never auto-formatted
+      // while the identical field on the registration screen did.
+      void Function(String)? onChanged}) =>
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1144,6 +1166,7 @@ class _KycScreenState extends State<KycScreen> {
             controller: ctrl,
             keyboardType: keyboardType,
             validator: validator,
+            onChanged: onChanged,
             style: GoogleFonts.inter(fontSize: 15, color: _dark),
             decoration: InputDecoration(
               hintText: hint,

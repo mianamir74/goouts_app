@@ -17,11 +17,14 @@ import 'guest/13_booking_confirmed_screen.dart';
 import 'guest/14_my_bookings_screen.dart';
 import 'guest/15_trip_detail_screen.dart';
 import 'guest/16_capture_intro_screen.dart';
-import 'guest/17_capture_checklist_screen.dart';
-import 'guest/18_camera_capture_screen.dart';
-import 'guest/19_skip_room_sheet_screen.dart';
-import 'guest/20_capture_complete_screen.dart';
-import 'guest/21_checkout_capture_screen.dart';
+// 17, 18, 19, 20 and 21 are no longer imported here. They are pure components
+// with no data of their own, and routing straight to one opens it empty — a
+// checklist with no rooms, a summary of no photographs. They are reached
+// through capture_flow_screen.dart and capture_complete_host.dart, which own
+// the booking and supply the props.
+import 'guest/capture_complete_host.dart';
+import 'models/stay_enums.dart';
+import 'guest/capture_flow_screen.dart';
 import 'guest/22_evidence_pack_screen.dart';
 import 'guest/23_claim_notification_screen.dart';
 import 'guest/24_contest_claim_screen.dart';
@@ -30,6 +33,7 @@ import 'guest/26_booking_details_screen.dart';
 import 'guest/27_edit_booking_screen.dart';
 import 'guest/28_cancel_booking_screen.dart';
 import 'guest/29_cancellation_confirmed_screen.dart';
+import 'models/stay_booking_request.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Short Stay routing.
@@ -100,6 +104,40 @@ class StayRoutes {
     final args = (settings.arguments as Map<String, dynamic>?) ?? const {};
     String id(String key) => (args[key] ?? '') as String;
 
+    // ⚠ PARSED BEFORE page(), NOT AFTER.
+    //
+    // This used to sit BELOW the switch with `// ignore: unused_local_variable`
+    // on it, under a note saying the screens would consume it later. That is
+    // why "no listing is opening" was reported on 16 August: screen 02 passed
+    // the id correctly, this file read it correctly, and then built
+    // `const ListingDetailScreen()` — so every property in the results opened
+    // the same hardcoded Richmond flat.
+    //
+    // The ignore comment is what hid it. An unused local the analyzer has been
+    // told to stop mentioning is an unfinished wire that no longer reports
+    // itself.
+    //
+    // RULE: anything parsed here must be PASSED to its screen in the switch
+    // below, or not parsed at all.
+    //
+    // The Phase C screens — trip, bookingDetails, editBooking, cancelBooking,
+    // cancellationDone — still show hardcoded content. They are the last
+    // group left, and they take nothing until they consume it.
+    final listingId = id('listingId');
+    final bookingId = id('bookingId');
+
+    // Arrival or departure. Defaults to arrival via CaptureKind.from, which is
+    // the safe way round: a missing value sends a guest to the check-in set
+    // rather than silently recording arrival photographs as departure ones.
+    final captureKind = CaptureKind.from(id('captureKind'));
+
+    // A pending selection is a value, not a row — there is nothing to look up
+    // until createStayBooking has run. Passed as an object for the same reason
+    // StaySearchCriteria is: six loose keys in a map fail silently one at a
+    // time, and `id('checkIn')` on a missing key returns '' rather than
+    // complaining.
+    final bookingRequest = args['request'] as StayBookingRequest?;
+
     Widget page() => switch (name) {
           home              => const ShortStayHomeScreen(),
           // The one route that takes a real object rather than an id. Search
@@ -111,41 +149,62 @@ class StayRoutes {
               ),
           filters           => const SearchFiltersSheet(),
           map               => const MapResultsScreen(),
-          listing           => const ListingDetailScreen(),
-          amenities         => const AmenitiesFullScreen(),
+          listing           => ListingDetailScreen(listingId: listingId),
+          amenities         => AmenitiesFullScreen(listingId: listingId),
           daysOut           => const DaysOutScreen(),
           cluster           => const ClusterDetailScreen(),
           neighbourhood     => const NeighbourhoodScreen(),
           whatsOn           => const WhatsOnScreen(),
-          bookingDates      => const BookingDatesScreen(),
-          checkout          => const CheckoutScreen(),
-          bookingConfirmed  => const BookingConfirmedScreen(),
+          bookingDates      => BookingDatesScreen(listingId: listingId),
+          // Checkout cannot be opened cold — without a selection there is
+          // nothing to price. Reached directly (a deep link, or a mistake in a
+          // future screen) it says so instead of pricing a blank request.
+          checkout          => bookingRequest == null
+                ? const _StayRouteMissing()
+                : CheckoutScreen(request: bookingRequest),
+          bookingConfirmed  => BookingConfirmedScreen(bookingId: bookingId),
           myBookings        => const MyBookingsScreen(),
           trip              => const TripDetailsScreen(),
           bookingDetails    => const BookingDetailsScreen(),
           editBooking       => const EditBookingScreen(),
           cancelBooking     => const CancelBookingScreen(),
           cancellationDone  => const CancellationConfirmedScreen(),
-          captureIntro      => const DepositProtectionScreen(),
-          captureChecklist  => const CaptureChecklistScreen(),
-          cameraCapture     => const CameraCaptureScreen(),
-          skipRoom          => const SkipRoomSheet(),
-          captureComplete   => const CaptureCompleteScreen(),
-          checkoutCapture   => const CheckoutCaptureScreen(),
-          evidencePack      => const EvidencePackScreen(),
+          // ── CAPTURE ──────────────────────────────────────────────────
+          //
+          // captureChecklist maps to CaptureFlowScreen, NOT to
+          // CaptureChecklistScreen. 17 is a pure component with no data of its
+          // own; routed directly it opens with `rooms: const []` and shows
+          // "nothing to photograph" for ever. The flow screen owns the booking
+          // and feeds it. Same for captureComplete and screen 20.
+          //
+          // cameraCapture and skipRoom are NOT routed to any more. They are
+          // pushed by CaptureFlowScreen with the callbacks that make them do
+          // something — reached through a route name they would have no way to
+          // save a photograph. They stay in the switch only to say so.
+          captureIntro      => DepositProtectionScreen(
+                bookingId: bookingId,
+                kind: captureKind,
+              ),
+          captureChecklist  => CaptureFlowScreen(
+                bookingId: bookingId,
+                kind: captureKind,
+              ),
+          cameraCapture     => const _StayRouteMissing(),
+          skipRoom          => const _StayRouteMissing(),
+          captureComplete   => CaptureCompleteHost(
+                bookingId: bookingId,
+                kind: captureKind,
+              ),
+          checkoutCapture   => CaptureFlowScreen(
+                bookingId: bookingId,
+                kind: CaptureKind.guestCheckOut,
+              ),
+          evidencePack      => EvidencePackScreen(bookingId: bookingId),
           claim             => const ClaimNotificationScreen(),
           contestClaim      => const ContestClaimScreen(),
           review            => const ReviewStayScreen(),
           _                 => const _StayRouteMissing(),
         };
-
-    // TODO wiring, task 116. Each screen will take its id from `id('...')`
-    // once it loads real data. Ids are already parsed above so the call sites
-    // can start passing them before the screens consume them.
-    // ignore: unused_local_variable
-    final listingId = id('listingId');
-    // ignore: unused_local_variable
-    final bookingId = id('bookingId');
 
     // Sheets present from the bottom, full screens push normally.
     final isSheet = name == filters || name == skipRoom;

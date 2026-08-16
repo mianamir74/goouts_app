@@ -612,18 +612,40 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
             .where('isOnline', isEqualTo: true)
             .where('isApproved', isEqualTo: true)
             .snapshots(),
+        // ── ⚠ EVERY BRANCH HERE MUST RETURN A SLIVER ──────────────────────
+        //
+        // FIXED 15 August 2026, reported as "food delivery opens to a white
+        // screen".
+        //
+        // This StreamBuilder sits directly inside CustomScrollView.slivers, so
+        // whatever the builder returns becomes a child of a sliver parent. Three
+        // of the five branches returned plain box widgets — _listMessage() is a
+        // Padding, and the loading branch was a bare Padding too.
+        //
+        // Flutter throws "expected a child of type RenderSliver but received a
+        // child of type RenderPadding", the whole CustomScrollView fails to lay
+        // out, and the screen renders as blank white. In release there is no red
+        // error box, so it looks like a screen that simply does nothing.
+        //
+        // The loading branch is the one that made it total: it runs FIRST on
+        // every open, before Firestore replies, so the screen never rendered at
+        // all. The success branch was correct, which is why this was never
+        // caught by reading the code.
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return _listMessage(
+            return SliverToBoxAdapter(
+                child: _listMessage(
               icon: Icons.wifi_off_rounded,
               title: 'Could not load restaurants',
               body: 'Please check your connection and try again.',
-            );
+            ));
           }
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Padding(
-              padding: EdgeInsets.symmetric(vertical: 48),
-              child: Center(child: CircularProgressIndicator()),
+            return const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 48),
+                child: Center(child: CircularProgressIndicator()),
+              ),
             );
           }
 
@@ -632,12 +654,13 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
               .toList();
 
           if (restaurants.isEmpty) {
-            return _listMessage(
+            return SliverToBoxAdapter(
+                child: _listMessage(
               icon: Icons.storefront_outlined,
               title: 'No restaurants available yet',
               body: 'We are adding partners in your area. Please check back '
                   'soon.',
-            );
+            ));
           }
 
           // ── Apply filters ──────────────────────────────────────────────────

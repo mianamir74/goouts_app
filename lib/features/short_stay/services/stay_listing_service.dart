@@ -29,13 +29,58 @@ class StayListingService {
   /// The "most GoOuts partners nearby" rail on the home screen. This is the
   /// differentiator, and it is a plain field read because the counts are
   /// precomputed by enrichListingLocation. No geo query at runtime.
+  /// Live listings, best first by how many GoOuts partners are within half a
+  /// mile. Drives the Short Stay home screen.
+  ///
+  /// ── TWO WAYS THIS SILENTLY RETURNED NOTHING ────────────────────────────
+  ///
+  /// Found 16 August 2026, when screen 01 was finally wired to it. This method
+  /// was written on 4 August and never called by anything, so neither fault
+  /// had ever been observed.
+  ///
+  /// 1. NO INDEX. An equality filter on `status` plus an orderBy on a
+  ///    different field needs a composite index, and no stay_listings index
+  ///    existed in firestore.indexes.json at all. Every call would have thrown
+  ///    FAILED_PRECONDITION. One is added now, but a newly deployed index
+  ///    takes minutes to build and the screen must work meanwhile.
+  ///
+  /// 2. orderBy EXCLUDES DOCUMENTS MISSING THE FIELD. locationContext is
+  ///    written by enrichListingLocation after a listing goes live, so a
+  ///    property whose location has not been computed yet is not merely last
+  ///    in this list — it is absent from it. A freshly seeded set could return
+  ///    an empty home screen while every property sat there live and
+  ///    bookable.
+  ///
+  /// So the ordered query is attempted, and ANY shortfall — an error, or fewer
+  /// results than asked for — falls back to plain live listings. Ordering is a
+  /// nicety; showing the properties at all is not.
   Future<List<StayListing>> mostPartnersNearby({int limit = 10}) async {
-    final q = await _col
+    List<StayListing> ranked = const [];
+    try {
+      final q = await _col
+          .where('status', isEqualTo: 'live')
+          .orderBy('locationContext.partnerCounts.halfMile', descending: true)
+          .limit(limit)
+          .get();
+      ranked = q.docs.map(StayListing.fromDoc).toList(growable: false);
+      if (ranked.length >= limit) return ranked;
+    } catch (_) {
+      // Index missing or still building. Fall through.
+    }
+
+    final plain = await _col
         .where('status', isEqualTo: 'live')
-        .orderBy('locationContext.partnerCounts.halfMile', descending: true)
         .limit(limit)
         .get();
-    return q.docs.map(StayListing.fromDoc).toList(growable: false);
+    final all = plain.docs.map(StayListing.fromDoc).toList();
+
+    // Keep the ranked ones in front, then append anything the ordered query
+    // could not see, without repeating a listing that appears in both.
+    final seen = ranked.map((l) => l.id).toSet();
+    return <StayListing>[
+      ...ranked,
+      ...all.where((l) => !seen.contains(l.id)),
+    ].take(limit).toList(growable: false);
   }
 
   Future<List<StayListing>> byIds(List<String> ids) async {

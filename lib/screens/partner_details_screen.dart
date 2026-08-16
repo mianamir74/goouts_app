@@ -3165,6 +3165,10 @@ class _SocialBoostSheetState extends State<_SocialBoostSheet>
     super.dispose();
   }
 
+  // Suppressed 15 August 2026, not deleted.
+  // Share sheet for a partner. Written but never attached to a share button —
+  // the entry point is the missing half, not this.
+  // ignore: unused_element
   Future<void> _onShareTap() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
@@ -3182,6 +3186,10 @@ class _SocialBoostSheetState extends State<_SocialBoostSheet>
     await _doShare(uid, storedHandle);
   }
 
+  // Suppressed 15 August 2026, not deleted.
+  // Saves the user's social handle then shares. Pairs with _onShareTap above;
+  // both are waiting on the same missing button.
+  // ignore: unused_element
   Future<void> _saveHandleAndShare() async {
     final handle = _handleCtrl.text.trim();
     if (handle.isEmpty) return;

@@ -27,13 +27,23 @@ import '../models/stay_booking.dart';
 //     have parsed as zero — and Pence.fromFirestore returns Pence(0) on
 //     anything it does not recognise, so a checkout screen would have shown
 //     a confident, well formatted £0.00 rather than an error.
-//   * four functions do not exist AT ALL: quoteStayCancellation,
-//     cancelStayBooking, quoteStayAmendment, amendStayBooking. They are kept
+//   * four functions did not exist AT ALL: quoteStayCancellation,
+//     cancelStayBooking, quoteStayAmendment, amendStayBooking. They were kept
 //     below, clearly marked, because deleting them would silently remove
 //     features from screens that already call them.
 //
+//     WRITTEN 16 August 2026 in admin_panel/functions/stay_booking.js and
+//     exported from index.js. This note stays because the reason those methods
+//     survived as stubs is the reason they could be filled in later.
+//
 // WHAT IS LIVE:   getStayQuote, createStayBooking, listBlockedNights
-// WHAT IS NOT:    cancellation and amendment, both server side
+// WHAT IS WRITTEN BUT NEEDS DEPLOYING:
+//                 quoteStayCancellation, cancelStayBooking,
+//                 quoteStayAmendment, amendStayBooking
+//
+// ⚠ "Written" is not "deployed". Until `firebase deploy --only functions` has
+//    run, the four above return NOT_FOUND on a device and the analyzer stays
+//    green throughout — which is exactly how listBlockedNights was missed.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Thrown when a screen calls something the backend does not implement yet.
@@ -320,37 +330,66 @@ class StayBookingService {
       '${d.day.toString().padLeft(2, '0')}';
 
   // ───────────────────────────────────────────────────────────────────────────
-  //  NOT BUILT YET.
+  //  CANCELLATION AND AMENDMENT
   //
-  //  These four Cloud Functions do not exist. They are kept because screens 27,
-  //  28 and 29 already call them, and deleting the methods would remove those
-  //  buttons without anybody deciding to.
+  //  BUILT 16 August 2026. All four of these used to throw StayFeatureNotBuilt
+  //  because the Cloud Functions did not exist. They exist now, in
+  //  admin_panel/functions/stay_booking.js, and are exported from index.js.
   //
-  //  They throw StayFeatureNotBuilt rather than reaching Firebase, so the
-  //  failure names itself instead of arriving as a bare NOT_FOUND that looks
-  //  like a network fault.
+  //  ⚠ THEY MUST BE DEPLOYED. Writing the function is not the same as shipping
+  //  it — until `firebase deploy --only functions` has run, every one of these
+  //  returns NOT_FOUND on a device and nothing in the analyzer will say so.
+  //  That is the same failure listBlockedNights had on 4 August.
+  //
+  //  ── NO MONEY MOVES ─────────────────────────────────────────────────────────
+  //
+  //  A refund figure is what the policy WOULD return once payments exist. Every
+  //  booking has paymentStatus 'not_taken', so nothing is actually returned
+  //  today. The server says so in `explanation`, and screens must show that
+  //  text rather than writing their own.
   // ───────────────────────────────────────────────────────────────────────────
 
+  /// What cancelling this booking would refund, without cancelling it.
+  ///
+  /// Read only, so screen 28 can show the consequence before the guest commits.
   Future<StayRefundQuote> quoteCancellation(String bookingId) async {
-    throw const StayFeatureNotBuilt(
-      'quoteStayCancellation',
-      'The refund maths is server side and unwritten. The terms are already '
-          'snapshotted onto every booking under cancellationTerms, so the '
-          'function has what it needs.',
-    );
+    final res = await _fn
+        .httpsCallable('quoteStayCancellation')
+        .call<Map<String, dynamic>>({'bookingId': bookingId});
+    return StayRefundQuote.fromWire(res.data);
   }
 
-  Future<void> cancel({
+  /// Cancels the booking and frees the nights it was holding.
+  ///
+  /// Safe to retry: the server returns the existing cancellation record rather
+  /// than failing if the booking is already cancelled, so a double tap on a
+  /// poor connection does not produce an error about something that worked.
+  Future<StayRefundQuote> cancel({
     required String bookingId,
     required String reason,
   }) async {
-    throw const StayFeatureNotBuilt(
-      'cancelStayBooking',
-      'Cancelling must free the nights it took, from blocked_dates, inside a '
-          'transaction. The booking stores nightKeys for exactly this.',
-    );
+    final res = await _fn
+        .httpsCallable('cancelStayBooking')
+        .call<Map<String, dynamic>>({
+      'bookingId': bookingId,
+      'reason': reason,
+    });
+    // The commit returns the same four fields as the quote, under the server's
+    // own names, so the screen can show what was actually applied rather than
+    // the figure it happened to be showing a moment earlier.
+    final Map<String, dynamic> d = res.data;
+    return StayRefundQuote.fromWire(<String, dynamic>{
+      'refundAmount': d['refundPence'],
+      'nonRefundable': d['nonRefundablePence'],
+      'policyApplied': d['policyApplied'],
+      'explanation': d['explanation'],
+    });
   }
 
+  /// Prices a change of dates or party size. Changes nothing.
+  ///
+  /// Returns the same shape as [quote] — the server deliberately mirrors
+  /// getStayQuote so one parser serves both.
   Future<StayQuote> quoteAmendment({
     required String bookingId,
     DateTime? checkIn,
@@ -359,13 +398,33 @@ class StayBookingService {
     int? children,
     int? infants,
   }) async {
-    throw const StayFeatureNotBuilt(
-      'quoteStayAmendment',
-      'An amendment is a new availability check plus a re-price, not an edit.',
-    );
+    final res = await _fn
+        .httpsCallable('quoteStayAmendment')
+        .call<Map<String, dynamic>>({
+      'bookingId': bookingId,
+      if (checkIn != null) 'checkIn': _day(checkIn),
+      if (checkOut != null) 'checkOut': _day(checkOut),
+      if (adults != null || children != null || infants != null)
+        'guests': <String, dynamic>{
+          if (adults != null) 'adults': adults,
+          if (children != null) 'children': children,
+          if (infants != null) 'infants': infants,
+        },
+    });
+    return StayQuote.fromWire(res.data);
   }
 
-  Future<void> amend({
+  /// Applies the amendment. Releases the old nights and takes the new ones in
+  /// one server transaction.
+  ///
+  /// Returns whether the booking went back to `pending`. On a request-mode
+  /// listing a DATE change needs the host's agreement again — they accepted
+  /// particular nights, and moving them without asking would let a guest turn
+  /// an accepted weekend into a fortnight. A party-size change does not.
+  ///
+  /// Screen 27 must warn about this BEFORE the guest confirms, not report it
+  /// afterwards.
+  Future<({String status, bool returnedToPending, int differencePence})> amend({
     required String bookingId,
     DateTime? checkIn,
     DateTime? checkOut,
@@ -373,10 +432,23 @@ class StayBookingService {
     int? children,
     int? infants,
   }) async {
-    throw const StayFeatureNotBuilt(
-      'amendStayBooking',
-      'Must release the old nights and take the new ones in ONE transaction, '
-          'or a guest loses their booking to a failure in the middle.',
+    final res = await _fn
+        .httpsCallable('amendStayBooking')
+        .call<Map<String, dynamic>>({
+      'bookingId': bookingId,
+      if (checkIn != null) 'checkIn': _day(checkIn),
+      if (checkOut != null) 'checkOut': _day(checkOut),
+      if (adults != null || children != null || infants != null)
+        'guests': <String, dynamic>{
+          if (adults != null) 'adults': adults,
+          if (children != null) 'children': children,
+          if (infants != null) 'infants': infants,
+        },
+    });
+    return (
+      status: (res.data['status'] ?? 'pending') as String,
+      returnedToPending: res.data['returnedToPending'] == true,
+      differencePence: (res.data['differencePence'] ?? 0) as int,
     );
   }
 }
