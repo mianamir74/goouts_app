@@ -42,6 +42,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/stay_listing.dart';
+import '../services/stay_booking_service.dart';
 import '../services/stay_listing_service.dart';
 import '../theme/stay_colors.dart';
 import '../stay_routes.dart';
@@ -66,6 +67,9 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
   List<StayListing> _listings = const <StayListing>[];
   bool _loading = true;
 
+  /// Platform wide, so fetched once and shown on every card.
+  StayCashbackRate _rate = StayCashbackRate.unknown;
+
   /// The first four, which are the ones with the most partners within half a
   /// mile — mostPartnersNearby already returns them in that order.
   List<StayListing> get _topByPartners => _listings.take(4).toList();
@@ -81,11 +85,17 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
 
   Future<void> _load() async {
     try {
-      final List<StayListing> l =
-          await StayListingService.instance.mostPartnersNearby(limit: 12);
+      // Fetched together. The rate never blocks the listings: cashbackRate
+      // swallows its own failures and returns `unknown`, so a cashback outage
+      // costs the cashback line and not the whole screen.
+      final results = await Future.wait(<Future<Object>>[
+        StayListingService.instance.mostPartnersNearby(limit: 12),
+        StayBookingService.instance.cashbackRate(),
+      ]);
       if (!mounted) return;
       setState(() {
-        _listings = l;
+        _listings = results[0] as List<StayListing>;
+        _rate = results[1] as StayCashbackRate;
         _loading = false;
       });
     } catch (e) {
@@ -548,12 +558,35 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
                           ],
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          '${l.nightlyRate.compact} per night',
-                          style: GoogleFonts.inter(
-                            fontSize: 13.5,
-                            color: GoOutsColors.bodyText,
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              '${l.nightlyRate.compact} per night',
+                              style: GoogleFonts.inter(
+                                fontSize: 13.5,
+                                color: GoOutsColors.bodyText,
+                              ),
+                            ),
+                            // The cashback the guest actually earns on this
+                            // stay, at THEIR rate — Plus members see theirs.
+                            // Hidden when the server did not supply a rate,
+                            // rather than falling back to a plausible number
+                            // nobody promised.
+                            if (_rate.isKnown) ...[
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  '· ${_rate.label} back',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: GoOutsColors.tealSecondary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                         const SizedBox(height: 8),
                         // Hidden entirely until the location engine has run.

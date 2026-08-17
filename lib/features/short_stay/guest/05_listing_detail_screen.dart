@@ -44,6 +44,7 @@ import '../models/money.dart';
 import '../models/stay_amenities.dart';
 import '../models/stay_listing.dart';
 import '../models/stay_property_types.dart';
+import '../services/stay_booking_service.dart';
 import '../services/stay_listing_service.dart';
 import '../stay_routes.dart';
 import '../theme/stay_colors.dart';
@@ -63,11 +64,23 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
   late Future<StayListing?> _listing;
   late Future<List<Map<String, dynamic>>> _reviews;
 
+  /// The guest's own rate. Cached in the service, so this costs one call the
+  /// first time Short Stay is opened and nothing after that.
+  StayCashbackRate _rate = StayCashbackRate.unknown;
+
   @override
   void initState() {
     super.initState();
     _listing = _service.byId(widget.listingId);
     _reviews = _service.reviews(widget.listingId);
+    _loadRate();
+  }
+
+  Future<void> _loadRate() async {
+    final StayCashbackRate r =
+        await StayBookingService.instance.cashbackRate();
+    if (!mounted) return;
+    setState(() => _rate = r);
   }
 
   @override
@@ -110,6 +123,10 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                           _buildHeader(listing),
                           const SizedBox(height: 16),
                           _buildFactsRow(listing),
+                          if (_rate.isKnown) ...[
+                            const SizedBox(height: 16),
+                            _buildCashbackRow(listing),
+                          ],
                           const Divider(height: 32),
                           _buildAboutSection(listing),
                           if (listing.amenities.isNotEmpty) ...[
@@ -335,6 +352,58 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
 
   static String _plural(int n, String word) =>
       '$n $word${n == 1 ? '' : 's'}';
+
+  // ── Cashback ─────────────────────────────────────────────────────────────
+  //
+  // Shown per NIGHT, not as a total, because no dates have been chosen yet and
+  // a total would have to invent a length of stay. The exact figure for the
+  // real dates comes from getStayQuote on the checkout screen.
+  //
+  // "at least" because Plus members earn more, and because the quote is the
+  // authority. Understating here and settling up at checkout is the safe
+  // direction to be wrong in.
+  Widget _buildCashbackRow(StayListing listing) {
+    final int perNightPence =
+        ((listing.nightlyRate.value * _rate.pct) / 100).round();
+    if (perNightPence <= 0) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: GoOutsColors.tealSecondary.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.savings_outlined,
+              size: 20, color: GoOutsColors.tealSecondary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Earn ${_rate.label} back — about '
+                  '${Pence(perNightPence).compact} a night',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: GoOutsColors.deepNavy,
+                  ),
+                ),
+                if (_rate.note.isNotEmpty)
+                  Text(
+                    _rate.note,
+                    style: GoogleFonts.inter(
+                        fontSize: 12, color: GoOutsColors.bodyText),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildAboutSection(StayListing listing) {
     return Column(

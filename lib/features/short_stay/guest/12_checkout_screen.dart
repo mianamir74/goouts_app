@@ -71,6 +71,34 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   bool _submitting = false;
 
+  /// card | wallet | apple | google. Defaults to card, same as the food
+  /// checkout, and only ever set from the list the SERVER said it accepts.
+  String _paymentMethod = 'card';
+
+  static const Map<String, ({IconData icon, String label, String sub})>
+      _methodMeta = <String, ({IconData icon, String label, String sub})>{
+    'card': (
+      icon: Icons.credit_card_rounded,
+      label: 'Card',
+      sub: 'Visa, Mastercard, Amex'
+    ),
+    'wallet': (
+      icon: Icons.account_balance_wallet_rounded,
+      label: 'GoOuts Wallet',
+      sub: 'Use your cashback balance'
+    ),
+    'apple': (
+      icon: Icons.phone_iphone_rounded,
+      label: 'Apple Pay',
+      sub: 'Pay with Face ID'
+    ),
+    'google': (
+      icon: Icons.g_mobiledata_rounded,
+      label: 'Google Pay',
+      sub: 'Pay with your Google account'
+    ),
+  };
+
   /// Generated ONCE, when the screen opens, and reused for every attempt.
   ///
   /// This is the whole defence against a double tap or a retry after a dropped
@@ -153,7 +181,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     if (_quote!.cashback.value > 0) _buildCashbackCard(),
                     if (!_quote!.depositHold.isZero) _buildDepositInfo(),
                     _buildCancellationPolicy(),
-                    _buildNoPaymentNotice(),
+                    // One or the other, never both. paymentAvailable is the
+                    // server's answer, so a config change flips this screen
+                    // without an app release.
+                    if (_quote!.paymentAvailable)
+                      _buildPaymentMethod()
+                    else
+                      _buildNoPaymentNotice(),
                   ],
                 ),
       bottomSheet: (_loading || _error != null) ? null : _buildBottomAction(),
@@ -560,6 +594,127 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
+  // ── Payment method ───────────────────────────────────────────────────────
+  //
+  // The section that replaced the fake "Visa ending in 4242".
+  //
+  // The difference is not cosmetic. That card was invented by the screen and
+  // shown regardless of anything. These options come from the server, in
+  // quote.paymentMethods, and choosing one is a value sent to createStayBooking
+  // that the server validates and records. Nothing here is decoration.
+  Widget _buildPaymentMethod() {
+    final StayQuote q = _quote!;
+    final List<String> methods = q.paymentMethods
+        .where(_methodMeta.containsKey)
+        .toList(growable: false);
+
+    if (methods.isEmpty) return _buildNoPaymentNotice();
+
+    return _buildCardWrapper(
+      title: 'Payment method',
+      child: Column(
+        children: [
+          for (final m in methods) _paymentOption(m),
+
+          // ── The Test mode line ────────────────────────────────────────
+          //
+          // Keyed off q.isDemoPayment and nothing else. When paymentMode
+          // becomes 'stripe' this disappears on its own; if someone shipped a
+          // build with demo still on, it would still be here saying so.
+          // Hardcoding either state is how a screen ends up lying about money.
+          if (q.isDemoPayment) ...[
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.science_outlined,
+                    size: 16, color: GoOutsColors.bodyText),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _paymentMethod == 'wallet'
+                        ? 'Test mode. Your GoOuts wallet is a real balance and '
+                            'will be debited; no card is charged.'
+                        : 'Test mode. Your booking is confirmed and nothing '
+                            'is charged.',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      height: 1.35,
+                      color: GoOutsColors.bodyText,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _paymentOption(String id) {
+    final meta = _methodMeta[id]!;
+    final bool selected = _paymentMethod == id;
+
+    return InkWell(
+      onTap: _submitting ? null : () => setState(() => _paymentMethod = id),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: selected ? GoOutsColors.paleBlueTint : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected
+                ? GoOutsColors.primaryBlue
+                : GoOutsColors.dividerGray,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(meta.icon,
+                size: 24,
+                color: selected
+                    ? GoOutsColors.primaryBlue
+                    : GoOutsColors.bodyText),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    meta.label,
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: GoOutsColors.deepNavy,
+                    ),
+                  ),
+                  Text(
+                    meta.sub,
+                    style: GoogleFonts.inter(
+                        fontSize: 13, color: GoOutsColors.bodyText),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              selected
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_unchecked,
+              size: 20,
+              color: selected
+                  ? GoOutsColors.primaryBlue
+                  : GoOutsColors.dividerGray,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildCardWrapper({
     required String title,
     Widget? trailing,
@@ -601,6 +756,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool get _isInstant =>
       (_listing?.bookingMode ?? BookingMode.request) == BookingMode.instant;
 
+  /// The line above the button. Says what this tap commits the guest to.
+  ///
+  /// Two facts decide it and both come from the server: whether the host must
+  /// accept, and whether money moves. Neither is assumed by this screen.
+  String _payLine() {
+    final StayQuote q = _quote!;
+    final String who = _isInstant
+        ? 'Your booking is confirmed straight away.'
+        : 'The host has 24 hours to reply.';
+
+    if (!q.paymentAvailable) return '$who No payment now.';
+    if (q.isDemoPayment) {
+      return _paymentMethod == 'wallet'
+          ? '$who ${q.total.formatted} comes off your GoOuts wallet.'
+          : '$who Test mode — nothing is charged.';
+    }
+    return '$who ${q.total.formatted} will be charged.';
+  }
+
   Widget _buildBottomAction() {
     final bool canSubmit = _quote!.available && !_submitting;
 
@@ -617,9 +791,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           // were reassurance about a transaction that does not happen. What a
           // guest needs to know at this button is what it commits them to.
           Text(
-            _isInstant
-                ? 'Your booking is confirmed straight away. No payment now.'
-                : 'The host has 24 hours to reply. No payment now.',
+            _payLine(),
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
                 fontSize: 12, color: GoOutsColors.bodyText),
@@ -642,7 +814,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         strokeWidth: 2, color: Colors.white),
                   )
                 : Text(
-                    _isInstant ? 'Confirm booking' : 'Request to book',
+                    // "Pay" appears ONLY when a payment is genuinely taken.
+                    // In demo the money is notional except by wallet, so the
+                    // button says what it does rather than what it looks like.
+                    _quote!.paymentAvailable && _paymentMethod == 'wallet'
+                        ? 'Pay ${_quote!.total.formatted}'
+                        : _isInstant
+                            ? 'Confirm booking'
+                            : 'Request to book',
                     style: GoogleFonts.inter(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -669,6 +848,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         children: r.children,
         infants: r.infants,
         idempotencyKey: _idempotencyKey,
+        paymentMethod: _paymentMethod,
       );
 
       if (!mounted) return;

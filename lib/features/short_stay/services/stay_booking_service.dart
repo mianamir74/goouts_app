@@ -89,9 +89,27 @@ class StayQuote {
   final int partialRefundPct;
   final DateTime? graceUntil;
 
-  /// There is no payment integration. Always false today. A checkout screen
-  /// that says "Pay now" while this is false is lying to the guest.
+  /// Whether the checkout may offer to take a payment at all.
+  ///
+  /// This used to be documented as "always false today", and the checkout
+  /// screen was built around that. It now follows platform_config paymentMode
+  /// server side, so it is true in demo and in stripe, false in none.
   final bool paymentAvailable;
+
+  /// none | demo | stripe. THE thing the screen must key its wording off.
+  ///
+  /// paymentAvailable says a payment can be taken; this says whether it is
+  /// real. Showing "Test mode" is driven by this being 'demo' and by nothing
+  /// else, so the label cannot drift away from the behaviour — a screen that
+  /// hardcoded the label would keep showing it after Stripe went live, or
+  /// worse, stop showing it before.
+  final String paymentMode;
+
+  /// Methods the server will accept. Sent by the server rather than listed in
+  /// the app, so adding one does not need an app release to match.
+  final List<String> paymentMethods;
+
+  bool get isDemoPayment => paymentMode == 'demo';
 
   const StayQuote({
     required this.nightlyRate,
@@ -113,6 +131,8 @@ class StayQuote {
     required this.partialRefundPct,
     required this.graceUntil,
     required this.paymentAvailable,
+    required this.paymentMode,
+    required this.paymentMethods,
   });
 
   /// Callable results arrive as `Map<Object?, Object?>` on Android, so every
@@ -161,6 +181,13 @@ class StayQuote {
       partialRefundPct: (c['partialRefundPct'] as num?)?.toInt() ?? 0,
       graceUntil: _ts(c['graceUntil']),
       paymentAvailable: m['paymentAvailable'] == true,
+      paymentMode: (m['paymentMode'] ?? 'none') as String,
+      // Defaults to empty, NOT to the four methods. An older server that does
+      // not send this yet must produce a checkout with no payment section
+      // rather than one offering methods it will reject.
+      paymentMethods: ((m['paymentMethods'] as List?) ?? const [])
+          .map((e) => e.toString())
+          .toList(growable: false),
     );
   }
 
@@ -205,6 +232,53 @@ class StayRefundQuote {
         nonRefundable: Pence.fromFirestore(m['nonRefundable']),
         policyApplied: (m['policyApplied'] ?? '') as String,
         explanation: (m['explanation'] ?? '') as String,
+      );
+}
+
+/// The guest-facing cashback terms. No commission, no host payout — those stay
+/// on the server. See getStayCashbackRate.
+class StayCashbackRate {
+  final double pct;
+  final bool isPlus;
+  final double plusPct;
+  final bool partnerCreditOnly;
+  final String note;
+
+  const StayCashbackRate({
+    required this.pct,
+    required this.isPlus,
+    required this.plusPct,
+    required this.partnerCreditOnly,
+    required this.note,
+  });
+
+  /// Zero means "not known", and every caller treats it as "show nothing".
+  ///
+  /// Deliberately NOT a plausible default like 3%. A hardcoded fallback rate
+  /// is an advertised figure the server never agreed to, and the guest would
+  /// be told they earn something they might not.
+  static const StayCashbackRate unknown = StayCashbackRate(
+    pct: 0,
+    isPlus: false,
+    plusPct: 0,
+    partnerCreditOnly: true,
+    note: '',
+  );
+
+  bool get isKnown => pct > 0;
+
+  /// "3%" or "2.5%" — no trailing zero on whole numbers.
+  String get label => pct == pct.roundToDouble()
+      ? '${pct.toStringAsFixed(0)}%'
+      : '${pct.toStringAsFixed(1)}%';
+
+  factory StayCashbackRate.fromWire(Map<String, dynamic> m) =>
+      StayCashbackRate(
+        pct: (m['pct'] as num?)?.toDouble() ?? 0,
+        isPlus: m['isPlus'] == true,
+        plusPct: (m['plusPct'] as num?)?.toDouble() ?? 0,
+        partnerCreditOnly: m['partnerCreditOnly'] != false,
+        note: (m['note'] ?? '') as String,
       );
 }
 
@@ -300,6 +374,14 @@ class StayBookingService {
     required int infants,
     required String idempotencyKey,
     String? messageToHost,
+
+    /// card | wallet | apple | google, from StayQuote.paymentMethods.
+    ///
+    /// Ignored by the server when paymentMode is 'none'. Sending a method the
+    /// server does not accept is refused rather than quietly treated as a
+    /// card — a booking recorded against a payment route that does not exist
+    /// is worse than a failed booking.
+    String paymentMethod = 'card',
   }) async {
     final res = await _fn
         .httpsCallable('createStayBooking')
@@ -309,6 +391,7 @@ class StayBookingService {
       'checkOut': _day(checkOut),
       'guests': {'adults': adults, 'children': children, 'infants': infants},
       'idempotencyKey': idempotencyKey,
+      'paymentMethod': paymentMethod,
       if (messageToHost != null && messageToHost.isNotEmpty)
         'messageToHost': messageToHost,
     });
@@ -323,6 +406,33 @@ class StayBookingService {
   // StayAvailabilityService, where the date picker already looks for it. Two
   // copies of the same call is how the two drift — one gets a fix, the other
   // does not, and which one a screen used decides whether it works.
+
+  /// The signed-in guest's cashback rate, for the listing cards.
+  ///
+  /// Cached for the life of the app process. The rate is platform wide and the
+  /// home screen draws a dozen cards from it, so fetching per card would be a
+  /// dozen identical callable invocations to render one number.
+  ///
+  /// On failure it returns [StayCashbackRate.unknown] rather than throwing or
+  /// guessing. A card then shows no cashback line at all, which is the correct
+  /// failure: an advertised rate the server did not supply is a promise nobody
+  /// made.
+  StayCashbackRate? _rateCache;
+
+  Future<StayCashbackRate> cashbackRate({bool refresh = false}) async {
+    final StayCashbackRate? cached = _rateCache;
+    if (cached != null && !refresh) return cached;
+    try {
+      final res = await _fn
+          .httpsCallable('getStayCashbackRate')
+          .call<Map<String, dynamic>>({});
+      final rate = StayCashbackRate.fromWire(res.data);
+      _rateCache = rate;
+      return rate;
+    } catch (_) {
+      return StayCashbackRate.unknown;
+    }
+  }
 
   /// A night is a calendar date, never an instant. See `quote`.
   static String _day(DateTime d) => '${d.year.toString().padLeft(4, '0')}-'

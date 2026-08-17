@@ -25,6 +25,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../models/stay_listing.dart';
 import '../services/stay_availability_service.dart';
+import '../services/stay_booking_service.dart';
 import '../stay_routes.dart';
 import '../theme/stay_colors.dart';
 
@@ -43,6 +44,9 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   late StaySearchCriteria _criteria;
   StaySearchPage _page = StaySearchPage.empty;
   bool _loading = true;
+
+  /// Platform wide and identical on every card, so fetched once per screen.
+  StayCashbackRate _rate = StayCashbackRate.unknown;
   String? _error;
 
   @override
@@ -61,9 +65,14 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
       final page = await StayAvailabilityService.instance
           .search(_criteria)
           .timeout(const Duration(seconds: 20));
+      // After the search, not alongside it. The results are what this screen
+      // is for; the rate decorates them, and cashbackRate is cached after the
+      // first call so re-filtering does not re-fetch it.
+      final rate = await StayBookingService.instance.cashbackRate();
       if (!mounted) return;
       setState(() {
         _page = page;
+        _rate = rate;
         _loading = false;
       });
     } catch (e) {
@@ -411,7 +420,10 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                     ),
                   const SizedBox(height: 8),
                   Text(
-                    '${l.nightlyRate.compact} per night',
+                    _rate.isKnown
+                        ? '${l.nightlyRate.compact} per night · '
+                            '${_rate.label} back'
+                        : '${l.nightlyRate.compact} per night',
                     style: GoogleFonts.inter(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
