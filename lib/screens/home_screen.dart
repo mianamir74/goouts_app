@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../data/goouts_services.dart';
 import '../services/user_service.dart';
 import '../services/message_service.dart';
 import '../services/user_fcm_service.dart';
@@ -151,15 +152,15 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  final List<Map<String, dynamic>> _services = [
-    {'icon': Icons.coffee_rounded, 'label': 'Cafes', 'route': 'Cafes'},
-    {'icon': Icons.restaurant_rounded, 'label': 'Restaurant', 'route': 'Restaurants'},
-    {'icon': Icons.fastfood_rounded, 'label': 'Fast Food', 'route': 'Fast Food'},
-    {'icon': Icons.sports_bar_rounded, 'label': 'Pubs', 'route': 'Pubs'},
-    {'icon': Icons.nightlife_rounded, 'label': 'Clubs', 'route': 'Clubs'},
-    {'icon': Icons.music_note_rounded, 'label': 'Music', 'route': 'Music'},
-    {'icon': Icons.theater_comedy_rounded, 'label': 'Comedy', 'route': 'Comedy'},
-  ];
+  // ── FROM THE SHARED LIST, NOT A LOCAL COPY ───────────────────────────────
+  //
+  // This was seven hardcoded venue types with no Short Stay and no Food
+  // Delivery — so the dashboard, the one screen a guest sees every time they
+  // open the app, never mentioned either of the two products GoOuts runs.
+  //
+  // data/goouts_services.dart is now the only list. Adding a service means
+  // editing that file and nothing else.
+  List<GoOutsService> get _services => gooutsAllServices;
 
   final List<Map<String, dynamic>> _trending = [
     {
@@ -578,8 +579,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 itemBuilder: (context, index) {
                   final s = _services[index];
                   return GestureDetector(
-                    onTap: () => Navigator.pushNamed(context, '/nearby',
-                        arguments: {'category': s['route'] as String}),
+                    // openGoOutsService knows a service opens its own screen
+                    // and a category needs the /nearby argument. Doing that
+                    // inline is how a tile ends up at an empty /nearby.
+                    onTap: () => openGoOutsService(context, s),
                     child: SizedBox(
                       width: 80,
                       child: Column(
@@ -600,7 +603,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                               ],
                             ),
-                            child: Icon(s['icon'] as IconData,
+                            child: Icon(s.icon,
                                 color: const Color(0xFF0392CA), size: 28),
                           ),
                           const SizedBox(height: 8),
@@ -609,7 +612,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: Align(
                               alignment: Alignment.topCenter,
                               child: Text(
-                                s['label'] as String,
+                                s.label,
                                 textAlign: TextAlign.center,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,

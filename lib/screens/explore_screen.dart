@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../data/goouts_services.dart';
 import '../services/message_service.dart';
 
 class ExploreScreen extends StatefulWidget {
@@ -105,6 +106,30 @@ class _ExploreScreenState extends State<ExploreScreen> {
           });
         }
       }
+      // ── GoOuts services, pinned to the front ─────────────────────────────
+      //
+      // Added 17 August 2026, reported as "Explore has no Short Stay or Food
+      // Delivery icon — they only show in Services".
+      //
+      // They were not missing by oversight so much as by construction: this
+      // strip is built from the `category` field on partner documents, and
+      // neither is a partner category. No amount of Firestore data would have
+      // produced them.
+      //
+      // Pinned FIRST, and deliberately. They are the two things GoOuts sells
+      // that a competitor does not, and burying them behind Cafes and Pubs on
+      // the one screen called Explore is the wrong way round. They carry
+      // 'nav' rather than 'route', so they open their own feature instead of
+      // a partner filter.
+      //
+      // Routes are the same ones services_screen uses — StayRoutes.home and
+      // '/food-delivery' — so there is one answer to "where does Short Stay
+      // live", not two that can drift.
+      // ⚠ INSERTED AFTER THE FALLBACK BELOW, NOT HERE. Adding them at this
+      // point would leave `cats` non-empty, the `cats.isEmpty` fallback would
+      // never fire, and a Firestore read returning nothing would show two
+      // service tiles and no categories at all.
+
       // Fallback if Firestore empty
       if (cats.isEmpty) {
         cats = [
@@ -118,6 +143,34 @@ class _ExploreScreenState extends State<ExploreScreen> {
           {'icon': Icons.local_bar_rounded,      'label': 'Bars',        'route': 'Bars',        'color': const Color(0xFF0A3A4A)},
         ];
       }
+
+      // ── GoOuts services, pinned to the front ─────────────────────────────
+      //
+      // Added 17 August 2026, reported as "Explore has no Short Stay or Food
+      // Delivery icon — they only show in Services".
+      //
+      // They were not missing by oversight so much as by construction: this
+      // strip is built from the `category` field on partner documents, and
+      // neither is a partner category. No amount of Firestore data would ever
+      // have produced them.
+      //
+      // Pinned FIRST, deliberately. They are the two things GoOuts sells that
+      // a competitor does not, and burying them behind Cafes and Pubs on the
+      // one screen called Explore is the wrong way round.
+      //
+      // They carry 'nav' rather than 'route', so the tile opens their own
+      // feature instead of a partner-category filter. Routes are the same ones
+      // services_screen uses — StayRoutes.home and '/food-delivery' — so there
+      // is ONE answer to "where does Short Stay live", not two that can drift.
+      cats.insertAll(
+        0,
+        gooutsOwnServices.map((x) => <String, dynamic>{
+              'icon': x.icon,
+              'label': x.label,
+              'nav': x.nav,
+              'color': x.color,
+            }),
+      );
 
       // Partners from Firestore
       final allCards = partnersSnap.docs
@@ -396,9 +449,21 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       return const SizedBox(width: 78); // empty slot
                     }
                     final c = pageItems[i];
+                    // ── TWO KINDS OF TILE ────────────────────────────────
+                    //
+                    // Most tiles are partner CATEGORIES and open /nearby
+                    // filtered to that category. The GoOuts services — Short
+                    // Stay and Food Delivery — are not categories of partner
+                    // venue, so they carry a 'nav' route and open their own
+                    // screen instead. Without this they could never appear
+                    // here at all: the strip is built from the categories
+                    // found on partner documents.
+                    final String? nav = c['nav'] as String?;
                     return GestureDetector(
-                      onTap: () => Navigator.pushNamed(context, '/nearby',
-                          arguments: {'category': c['route'] as String}),
+                      onTap: () => nav != null
+                          ? Navigator.pushNamed(context, nav)
+                          : Navigator.pushNamed(context, '/nearby',
+                              arguments: {'category': c['route'] as String}),
                       child: SizedBox(
                         width: 78,
                         child: Column(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../data/goouts_services.dart';
 import '../features/short_stay/stay_routes.dart';
 
 class ServicesScreen extends StatefulWidget {
@@ -16,17 +17,16 @@ class _ServicesScreenState extends State<ServicesScreen> {
   static const Color _dark = Color(0xFF0D1B3E);
   static const Color _bg = Color(0xFFF2F4F7);
 
-  final List<Map<String, dynamic>> _allServices = [
-    {'icon': Icons.delivery_dining_rounded, 'label': 'Food Delivery', 'isNew': true, 'route': '/food-delivery'},
-    {'icon': Icons.coffee_rounded, 'label': 'Cafes', 'isNew': false, 'route': '/nearby'},
-    {'icon': Icons.restaurant_rounded, 'label': 'Restaurants', 'isNew': false, 'route': '/nearby'},
-    {'icon': Icons.nightlife_rounded, 'label': 'Clubs', 'isNew': false, 'route': '/nearby'},
-    {'icon': Icons.sports_bar_rounded, 'label': 'Pubs', 'isNew': false, 'route': '/nearby'},
-    {'icon': Icons.fastfood_rounded, 'label': 'Fast Food', 'isNew': false, 'route': '/nearby'},
-    {'icon': Icons.music_note_rounded, 'label': 'Music', 'isNew': false, 'route': '/nearby'},
-    {'icon': Icons.theater_comedy_rounded, 'label': 'Comedy', 'isNew': false, 'route': '/nearby'},
-    {'icon': Icons.local_bar_rounded, 'label': 'Bars', 'isNew': false, 'route': '/nearby'},
-  ];
+  // ── FROM THE SHARED LIST ─────────────────────────────────────────────────
+  //
+  // This had Food Delivery but not Short Stay — Short Stay was a separate hero
+  // card lower down, so it was missing from the grid a guest actually scans.
+  // Meanwhile the dashboard had neither and Explore could not show either.
+  //
+  // data/goouts_services.dart is the only list now. The hero card below stays,
+  // because Short Stay deserves the space; it is a feature of this screen, not
+  // a substitute for being in the grid.
+  List<GoOutsService> get _allServices => gooutsAllServices;
 
   final List<Map<String, dynamic>> _offers = [
     {
@@ -477,11 +477,14 @@ class _ServicesScreenState extends State<ServicesScreen> {
               itemCount: _allServices.length,
               itemBuilder: (context, index) {
                 final s = _allServices[index];
-                final isNew = s['isNew'] as bool;
-                final route = s['route'] as String;
+                final isNew = s.isNew;
                 return GestureDetector(
-                  onTap: () => Navigator.pushNamed(context, route,
-                      arguments: {'category': s['label']}),
+                  // Was `pushNamed(route, arguments: {'category': label})`,
+                  // which sent a category argument to /food-delivery as well —
+                  // harmless there, but it only worked for venues because the
+                  // label happened to equal the category. openGoOutsService
+                  // knows which kind it is holding.
+                  onTap: () => openGoOutsService(context, s),
                   child: Column(
                     children: [
                       Stack(
@@ -496,7 +499,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
                                   : const Color(0xFFE8F4FB),
                               borderRadius: BorderRadius.circular(14),
                             ),
-                            child: Icon(s['icon'] as IconData,
+                            child: Icon(s.icon,
                                 color: isNew ? const Color(0xFFEA580C) : _primary,
                                 size: 26),
                           ),
@@ -521,7 +524,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        s['label'] as String,
+                        s.label,
                         textAlign: TextAlign.center,
                         style: GoogleFonts.inter(
                             fontSize: 11,
