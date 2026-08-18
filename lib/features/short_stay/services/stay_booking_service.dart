@@ -105,9 +105,24 @@ class StayQuote {
   /// worse, stop showing it before.
   final String paymentMode;
 
-  /// Methods the server will accept. Sent by the server rather than listed in
-  /// the app, so adding one does not need an app release to match.
+  /// Methods the server will accept for the REMAINDER after the wallet.
+  ///
+  /// 'wallet' is deliberately NOT in this list any more. The wallet is applied
+  /// to every booking first; these name how what is left over is paid. Showing
+  /// wallet alongside them would imply an either/or that no longer exists.
   final List<String> paymentMethods;
+
+  /// The guest's whole wallet balance, in pence.
+  final Pence walletBalance;
+
+  /// What the server WOULD take off the wallet for this booking — the balance
+  /// or the total, whichever is smaller. Computed server side so the screen
+  /// and the settlement cannot disagree about the split.
+  final Pence walletApplicable;
+
+  /// What is left for the card once the wallet has been applied.
+  Pence get remainderAfterWallet =>
+      Pence(total.value - walletApplicable.value);
 
   bool get isDemoPayment => paymentMode == 'demo';
 
@@ -133,6 +148,8 @@ class StayQuote {
     required this.paymentAvailable,
     required this.paymentMode,
     required this.paymentMethods,
+    required this.walletBalance,
+    required this.walletApplicable,
   });
 
   /// Callable results arrive as `Map<Object?, Object?>` on Android, so every
@@ -188,6 +205,10 @@ class StayQuote {
       paymentMethods: ((m['paymentMethods'] as List?) ?? const [])
           .map((e) => e.toString())
           .toList(growable: false),
+      // Default zero: an older server that does not send these produces a
+      // checkout with no wallet line, which is correct rather than wrong.
+      walletBalance: Pence.fromFirestore(m['walletBalancePence']),
+      walletApplicable: Pence.fromFirestore(m['walletApplicablePence']),
     );
   }
 
@@ -382,6 +403,12 @@ class StayBookingService {
     /// card — a booking recorded against a payment route that does not exist
     /// is worse than a failed booking.
     String paymentMethod = 'card',
+
+    /// Whether to spend the guest's wallet balance on this booking.
+    ///
+    /// Defaults true. The wallet is applied first and only the remainder goes
+    /// to [paymentMethod]. Set false for a guest saving their cashback.
+    bool useWallet = true,
   }) async {
     final res = await _fn
         .httpsCallable('createStayBooking')
@@ -392,6 +419,7 @@ class StayBookingService {
       'guests': {'adults': adults, 'children': children, 'infants': infants},
       'idempotencyKey': idempotencyKey,
       'paymentMethod': paymentMethod,
+      'useWallet': useWallet,
       if (messageToHost != null && messageToHost.isNotEmpty)
         'messageToHost': messageToHost,
     });

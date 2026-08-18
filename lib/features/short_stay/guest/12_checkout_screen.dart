@@ -46,6 +46,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../models/money.dart';
 import '../models/stay_booking_request.dart';
 import '../models/stay_enums.dart';
 import '../models/stay_listing.dart';
@@ -71,9 +72,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   bool _submitting = false;
 
-  /// card | wallet | apple | google. Defaults to card, same as the food
-  /// checkout, and only ever set from the list the SERVER said it accepts.
+  /// How the REMAINDER is paid after the wallet has been applied.
+  ///
+  /// No longer includes 'wallet' — that is not a method any more, it is a
+  /// balance that comes off first. Only ever set from the list the SERVER
+  /// said it accepts.
   String _paymentMethod = 'card';
+
+  /// Spend the wallet balance on this booking. On by default.
+  ///
+  /// A guest saving their cashback for something else can turn it off, and
+  /// the whole amount goes to the card instead.
+  bool _useWallet = true;
+
+  /// What the wallet actually covers, given the toggle.
+  Pence get _fromWallet =>
+      _useWallet ? (_quote?.walletApplicable ?? Pence.zero) : Pence.zero;
+
+  /// What is left to pay. This is the figure on the button.
+  Pence get _fromCard =>
+      Pence((_quote?.total.value ?? 0) - _fromWallet.value);
 
   static const Map<String, ({IconData icon, String label, String sub})>
       _methodMeta = <String, ({IconData icon, String label, String sub})>{
@@ -81,11 +99,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       icon: Icons.credit_card_rounded,
       label: 'Card',
       sub: 'Visa, Mastercard, Amex'
-    ),
-    'wallet': (
-      icon: Icons.account_balance_wallet_rounded,
-      label: 'GoOuts Wallet',
-      sub: 'Use your cashback balance'
     ),
     'apple': (
       icon: Icons.phone_iphone_rounded,
@@ -611,10 +624,36 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (methods.isEmpty) return _buildNoPaymentNotice();
 
     return _buildCardWrapper(
-      title: 'Payment method',
+      title: 'How you are paying',
       child: Column(
         children: [
-          for (final m in methods) _paymentOption(m),
+          // ── The wallet, applied first ──────────────────────────────────
+          //
+          // Shown ABOVE the methods, because it is not one of them. It comes
+          // off the total and what remains goes to whichever method is
+          // chosen below. A guest with £31 of cashback and a £269 stay used
+          // to be refused for insufficient funds; now the cashback is spent
+          // on the thing it was earned for.
+          if (q.walletBalance.value > 0) ...[
+            _walletRow(q),
+            const SizedBox(height: 10),
+            const Divider(height: 1, color: GoOutsColors.dividerGray),
+            const SizedBox(height: 12),
+          ],
+          if (_fromCard.value > 0)
+            for (final m in methods) _paymentOption(m)
+          else
+            // The wallet covers everything, so there is nothing for a card to
+            // do. Showing card options here would invite a guest to pick one
+            // and then be charged nothing by it.
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                'Your wallet covers the whole booking. Nothing else to pay.',
+                style: GoogleFonts.inter(
+                    fontSize: 13.5, color: GoOutsColors.bodyText),
+              ),
+            ),
 
           // ── The Test mode line ────────────────────────────────────────
           //
@@ -632,9 +671,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    _paymentMethod == 'wallet'
-                        ? 'Test mode. Your GoOuts wallet is a real balance and '
-                            'will be debited; no card is charged.'
+                    _fromWallet.value > 0
+                        ? 'Test mode. Your wallet is a real balance and '
+                            '${_fromWallet.formatted} will come off it. The '
+                            'rest is not charged to any card.'
                         : 'Test mode. Your booking is confirmed and nothing '
                             'is charged.',
                     style: GoogleFonts.inter(
@@ -649,6 +689,81 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ],
         ],
       ),
+    );
+  }
+
+  Widget _walletRow(StayQuote q) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.account_balance_wallet_rounded,
+                size: 24, color: GoOutsColors.tealSecondary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'GoOuts Wallet',
+                    style: GoogleFonts.inter(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: GoOutsColors.deepNavy),
+                  ),
+                  Text(
+                    '${q.walletBalance.formatted} available',
+                    style: GoogleFonts.inter(
+                        fontSize: 13, color: GoOutsColors.bodyText),
+                  ),
+                ],
+              ),
+            ),
+            Switch(
+              value: _useWallet,
+              onChanged: _submitting
+                  ? null
+                  : (v) => setState(() => _useWallet = v),
+              activeColor: GoOutsColors.tealSecondary,
+            ),
+          ],
+        ),
+        if (_useWallet && _fromWallet.value > 0) ...[
+          const SizedBox(height: 8),
+          // The split, stated in full. A guest should never have to work out
+          // what is coming off where.
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('From your wallet',
+                  style: GoogleFonts.inter(
+                      fontSize: 14, color: GoOutsColors.bodyText)),
+              Text('− ${_fromWallet.formatted}',
+                  style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: GoOutsColors.tealSecondary)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Left to pay',
+                  style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: GoOutsColors.deepNavy)),
+              Text(_fromCard.formatted,
+                  style: GoogleFonts.inter(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: GoOutsColors.deepNavy)),
+            ],
+          ),
+        ],
+      ],
     );
   }
 
@@ -767,12 +882,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         : 'The host has 24 hours to reply.';
 
     if (!q.paymentAvailable) return '$who No payment now.';
+
     if (q.isDemoPayment) {
-      return _paymentMethod == 'wallet'
-          ? '$who ${q.total.formatted} comes off your GoOuts wallet.'
-          : '$who Test mode — nothing is charged.';
+      if (_fromWallet.value > 0 && _fromCard.value == 0) {
+        return '$who ${_fromWallet.formatted} comes off your wallet.';
+      }
+      if (_fromWallet.value > 0) {
+        return '$who ${_fromWallet.formatted} off your wallet, '
+            '${_fromCard.formatted} not charged in test mode.';
+      }
+      return '$who Test mode — nothing is charged.';
     }
-    return '$who ${q.total.formatted} will be charged.';
+    return '$who ${_fromCard.formatted} will be charged.';
   }
 
   Widget _buildBottomAction() {
@@ -814,11 +935,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         strokeWidth: 2, color: Colors.white),
                   )
                 : Text(
-                    // "Pay" appears ONLY when a payment is genuinely taken.
-                    // In demo the money is notional except by wallet, so the
-                    // button says what it does rather than what it looks like.
-                    _quote!.paymentAvailable && _paymentMethod == 'wallet'
-                        ? 'Pay ${_quote!.total.formatted}'
+                    // "Pay" appears ONLY when money genuinely moves — which
+                    // in demo means the wallet share. The card share is
+                    // recorded, not charged, so the button must not promise
+                    // to take it.
+                    _quote!.paymentAvailable && _fromWallet.value > 0
+                        ? 'Pay ${_fromWallet.formatted}'
                         : _isInstant
                             ? 'Confirm booking'
                             : 'Request to book',
@@ -849,6 +971,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         infants: r.infants,
         idempotencyKey: _idempotencyKey,
         paymentMethod: _paymentMethod,
+        useWallet: _useWallet,
       );
 
       if (!mounted) return;

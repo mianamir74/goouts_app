@@ -34,6 +34,43 @@ class StayBooking {
   final StayCancellation? cancellation;
   final String? claimId;
 
+  // ── ADDED 17 August 2026 ─────────────────────────────────────────────────
+  //
+  // createStayBooking has written these since the demo payment seam went in,
+  // and this model did not read them. The booking details screen needed to
+  // show whether a stay was paid for and could not ask — so it would have had
+  // to guess, which is how the Stitch version ended up showing a green PAID
+  // badge to everybody.
+  //
+  // Server writes, client reads. Never set from the app.
+
+  /// not_taken | demo_paid | whatever a real integration writes later.
+  final String paymentStatus;
+
+  /// What was actually settled. Zero when paymentStatus is not_taken.
+  final Pence paidPence;
+
+  /// The two pots that make up paidPence. Always sum to it.
+  ///
+  /// Stored separately because a refund goes back to where the money came
+  /// from — £31 of cashback returns to the wallet and £238 returns to the
+  /// card. A single combined figure could not tell them apart, and refunding
+  /// cash for cashback is a real loss.
+  final Pence paidFromWallet;
+  final Pence paidFromCard;
+
+  /// card | wallet | apple | google, or null when nothing was taken.
+  final String? paymentMethod;
+
+  /// none | demo | stripe — the mode in force WHEN THIS BOOKING WAS MADE.
+  /// Stored per booking so a demo one can never be mistaken for a real one
+  /// after Stripe goes live.
+  final String paymentMode;
+
+  /// Set by creditStayCashbackOnce when the guest completes check-out. False
+  /// until then, and false forever on a stay that was never paid for.
+  final bool cashbackAwarded;
+
   const StayBooking({
     required this.id,
     required this.listingId,
@@ -48,6 +85,13 @@ class StayBooking {
     required this.deposit,
     required this.capture,
     required this.cancellation,
+    required this.paymentStatus,
+    required this.paidPence,
+    required this.paidFromWallet,
+    required this.paidFromCard,
+    required this.paymentMethod,
+    required this.paymentMode,
+    required this.cashbackAwarded,
     required this.claimId,
   });
 
@@ -81,6 +125,15 @@ class StayBooking {
           : StayCancellation.fromMap(
               (m['cancellation'] as Map).cast<String, dynamic>()),
       claimId: m['claimId'] as String?,
+      // Defaults describe a booking nothing was taken for, which is the
+      // correct reading of a document written before these fields existed.
+      paymentStatus: (m['paymentStatus'] ?? 'not_taken') as String,
+      paidPence: Pence.fromFirestore(m['paidPence']),
+      paidFromWallet: Pence.fromFirestore(m['paidFromWalletPence']),
+      paidFromCard: Pence.fromFirestore(m['paidFromCardPence']),
+      paymentMethod: m['paymentMethod'] as String?,
+      paymentMode: (m['paymentMode'] ?? 'none') as String,
+      cashbackAwarded: m['cashbackAwarded'] == true,
     );
   }
 
@@ -270,21 +323,59 @@ class StayCancellation {
   final DateTime? at;
   final String reason;
   final Pence refundAmount;
+  final Pence nonRefundable;
+
+  /// Where the refund went. toWallet has already moved; toCard is recorded
+  /// and waits for a card integration. See refundStatus on the document.
+  final Pence refundToWallet;
+  final Pence refundToCard;
+
   final String policyApplied;
+
+  /// The server's own sentence explaining the figure. Shown verbatim so the
+  /// screen cannot describe the refund differently from the function that
+  /// calculated it.
+  final String explanation;
+
   const StayCancellation({
     required this.by,
     required this.at,
     required this.reason,
     required this.refundAmount,
+    required this.nonRefundable,
+    required this.refundToWallet,
+    required this.refundToCard,
     required this.policyApplied,
+    required this.explanation,
   });
 
+  // ⚠ refundPence FIRST, refundAmount SECOND.
+  //
+  // FIXED 17 August 2026. This read m['refundAmount']. cancelStayBooking —
+  // written the day before — stores the figure as `refundPence`:
+  //
+  //     cancellation: { refundPence, nonRefundablePence, policyApplied, ... }
+  //
+  // So every cancellation would have parsed as Pence(0), because
+  // Pence.fromFirestore returns zero for anything it does not recognise. The
+  // screen would then have shown a confident, well formatted £0.00 refund to a
+  // guest owed £269 — the exact failure this file's own service header warns
+  // about, and I wrote both halves a day apart without checking one against
+  // the other.
+  //
+  // refundAmount is kept as a fallback in case any document was written under
+  // the old name. The server name wins.
   factory StayCancellation.fromMap(Map<String, dynamic> m) => StayCancellation(
         by: (m['by'] ?? '') as String,
         at: (m['at'] as Timestamp?)?.toDate(),
         reason: (m['reason'] ?? '') as String,
-        refundAmount: Pence.fromFirestore(m['refundAmount']),
+        refundAmount:
+            Pence.fromFirestore(m['refundPence'] ?? m['refundAmount']),
+        nonRefundable: Pence.fromFirestore(m['nonRefundablePence']),
+        refundToWallet: Pence.fromFirestore(m['refundToWalletPence']),
+        refundToCard: Pence.fromFirestore(m['refundToCardPence']),
         policyApplied: (m['policyApplied'] ?? '') as String,
+        explanation: (m['explanation'] ?? '') as String,
       );
 
   bool get byHost => by == 'host';

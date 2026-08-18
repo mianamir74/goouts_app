@@ -120,9 +120,10 @@ class StayRoutes {
     // RULE: anything parsed here must be PASSED to its screen in the switch
     // below, or not parsed at all.
     //
-    // The Phase C screens — trip, bookingDetails, editBooking, cancelBooking,
-    // cancellationDone — still show hardcoded content. They are the last
-    // group left, and they take nothing until they consume it.
+    // Every guest screen that needs an id now takes one. What remains
+    // unwired is 07-10 (days out, cluster, neighbourhood, what's on), which
+    // have no service behind them at all, and 23-25 (claims and reviews),
+    // deferred under task #106 until payments exist.
     final listingId = id('listingId');
     final bookingId = id('bookingId');
 
@@ -163,12 +164,15 @@ class StayRoutes {
                 ? const _StayRouteMissing()
                 : CheckoutScreen(request: bookingRequest),
           bookingConfirmed  => BookingConfirmedScreen(bookingId: bookingId),
+          // myBookings takes nothing on purpose — it queries the signed-in
+          // guest's own bookings and there is no other guest it could show.
           myBookings        => const MyBookingsScreen(),
-          trip              => const TripDetailsScreen(),
-          bookingDetails    => const BookingDetailsScreen(),
-          editBooking       => const EditBookingScreen(),
-          cancelBooking     => const CancelBookingScreen(),
-          cancellationDone  => const CancellationConfirmedScreen(),
+          trip              => TripDetailsScreen(bookingId: bookingId),
+          bookingDetails    => BookingDetailsScreen(bookingId: bookingId),
+          editBooking       => EditBookingScreen(bookingId: bookingId),
+          cancelBooking     => CancelBookingScreen(bookingId: bookingId),
+          cancellationDone  =>
+              CancellationConfirmedScreen(bookingId: bookingId),
           // ── CAPTURE ──────────────────────────────────────────────────
           //
           // captureChecklist maps to CaptureFlowScreen, NOT to
