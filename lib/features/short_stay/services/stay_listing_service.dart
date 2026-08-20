@@ -62,7 +62,7 @@ class StayListingService {
           .orderBy('locationContext.partnerCounts.halfMile', descending: true)
           .limit(limit)
           .get();
-      ranked = q.docs.map(StayListing.fromDoc).toList(growable: false);
+      ranked = StayListing.parseAll(q.docs);
       if (ranked.length >= limit) return ranked;
     } catch (_) {
       // Index missing or still building. Fall through.
@@ -72,7 +72,7 @@ class StayListingService {
         .where('status', isEqualTo: 'live')
         .limit(limit)
         .get();
-    final all = plain.docs.map(StayListing.fromDoc).toList();
+    final all = StayListing.parseAll(plain.docs).toList();
 
     // Keep the ranked ones in front, then append anything the ordered query
     // could not see, without repeating a listing that appears in both.
@@ -90,7 +90,7 @@ class StayListingService {
     for (var i = 0; i < ids.length; i += 30) {
       final chunk = ids.sublist(i, i + 30 > ids.length ? ids.length : i + 30);
       final q = await _col.where(FieldPath.documentId, whereIn: chunk).get();
-      out.addAll(q.docs.map(StayListing.fromDoc));
+      out.addAll(StayListing.parseAll(q.docs));
     }
     return out;
   }

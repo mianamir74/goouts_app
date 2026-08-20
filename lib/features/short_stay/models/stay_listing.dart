@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'money.dart';
 import 'stay_enums.dart';
 
@@ -79,6 +80,46 @@ class StayListing {
 
   factory StayListing.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) =>
       StayListing.fromMap(doc.id, doc.data() ?? const {});
+
+  /// Parses a whole query result, DROPPING any document that will not parse.
+  ///
+  /// ── WHY THIS IS NOT `docs.map(fromDoc)` ──────────────────────────────────
+  ///
+  /// 18 August 2026, reported as "I cannot see listings any more" with 46 live
+  /// listings sitting in the database.
+  ///
+  /// fromMap is defensive about MISSING fields — every read has a default. It
+  /// is not defensive about fields of the WRONG TYPE. `m['amenities'] as List?`
+  /// returns null for absent and throws for a Map. Same for photos, and for
+  /// title or hostUid stored as a number.
+  ///
+  /// Eight of those 46 are our demo seed and are perfectly shaped. The other
+  /// 38 came from elsewhere. `docs.map(fromDoc)` is all-or-nothing across the
+  /// batch, so ONE malformed document anywhere in the window threw, and the
+  /// guest saw an empty Short Stay with no properties and no explanation.
+  ///
+  /// A listing we cannot read is a listing we cannot show. It is not a reason
+  /// to hide the other forty-five.
+  ///
+  /// The failure is not silent — it is counted and logged, so a listing that
+  /// vanishes from the app is findable rather than merely absent.
+  static List<StayListing> parseAll(
+      Iterable<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
+    final out = <StayListing>[];
+    final skipped = <String>[];
+    for (final d in docs) {
+      try {
+        out.add(StayListing.fromDoc(d));
+      } catch (e) {
+        skipped.add('${d.id}: $e');
+      }
+    }
+    if (skipped.isNotEmpty) {
+      debugPrint('StayListing.parseAll dropped ${skipped.length} of '
+          '${out.length + skipped.length}: ${skipped.join(" | ")}');
+    }
+    return List<StayListing>.unmodifiable(out);
+  }
 
   factory StayListing.fromMap(String id, Map<String, dynamic> m) {
     final geo = (m['geo'] as Map?)?.cast<String, dynamic>();

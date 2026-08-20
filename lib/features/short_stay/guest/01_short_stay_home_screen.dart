@@ -67,6 +67,22 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
   List<StayListing> _listings = const <StayListing>[];
   bool _loading = true;
 
+  /// Why the list is empty, when the reason was an error rather than an
+  /// absence of properties.
+  ///
+  /// ── WHY THIS FIELD EXISTS ────────────────────────────────────────────────
+  ///
+  /// 18 August 2026, reported as "I cannot see listings any more". The screen
+  /// showed "No properties are listed yet" — which is what it shows when the
+  /// query THROWS as well as when it legitimately returns nothing. Those are
+  /// completely different faults with completely different fixes, and the
+  /// screen was reporting them identically, so working out which one had
+  /// happened meant reading code instead of reading the screen.
+  ///
+  /// A silent catch that renders the empty state is not a graceful failure.
+  /// It is a lost error message.
+  String? _error;
+
   /// Platform wide, so fetched once and shown on every card.
   StayCashbackRate _rate = StayCashbackRate.unknown;
 
@@ -96,6 +112,7 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
       setState(() {
         _listings = results[0] as List<StayListing>;
         _rate = results[1] as StayCashbackRate;
+        _error = null;
         _loading = false;
       });
     } catch (e) {
@@ -104,6 +121,7 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
       // works, so a guest is not stuck — and the empty state says what to do.
       setState(() {
         _listings = const <StayListing>[];
+        _error = e.toString();
         _loading = false;
       });
     }
@@ -283,6 +301,8 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
                 padding: EdgeInsets.symmetric(vertical: 48),
                 child: Center(child: CircularProgressIndicator()),
               )
+            else if (_error != null)
+              _buildLoadFailed()
             else if (_listings.isEmpty)
               _buildEmpty()
             else ...[
@@ -432,6 +452,66 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
         fontSize: 15,
         fontWeight: FontWeight.w700,
         color: GoOutsColors.primaryBlue,
+      ),
+    );
+  }
+
+  /// Shown when the query FAILED. Deliberately not the same as the empty
+  /// state: "no properties are listed yet" is a lie if the truth is that the
+  /// app could not read them.
+  Widget _buildLoadFailed() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+      child: Column(
+        children: [
+          const Icon(Icons.cloud_off_rounded,
+              size: 48, color: GoOutsColors.primaryBlue),
+          const SizedBox(height: 12),
+          Text(
+            'We could not load properties',
+            style: GoogleFonts.inter(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: GoOutsColors.deepNavy,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'They are still there. Something went wrong fetching them.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+                fontSize: 14, color: GoOutsColors.bodyText),
+          ),
+          const SizedBox(height: 12),
+          // The real message. A guest will not read it, and the one person who
+          // needs it — whoever is asked "why can I not see listings" — gets
+          // the answer from the screen instead of from the source.
+          Text(
+            _error ?? '',
+            textAlign: TextAlign.center,
+            maxLines: 4,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              height: 1.35,
+              color: GoOutsColors.bodyText.withValues(alpha: 0.7),
+            ),
+          ),
+          const SizedBox(height: 14),
+          OutlinedButton(
+            onPressed: () {
+              setState(() {
+                _loading = true;
+                _error = null;
+              });
+              _load();
+            },
+            child: Text('Try again',
+                style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w600,
+                    color: GoOutsColors.primaryBlue)),
+          ),
+        ],
       ),
     );
   }

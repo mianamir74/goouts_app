@@ -472,7 +472,11 @@ class _ServicesScreenState extends State<ServicesScreen> {
                 crossAxisCount: 4,
                 crossAxisSpacing: 10,
                 mainAxisSpacing: 14,
-                childAspectRatio: 0.85,
+                // 0.78, not 0.85. A tile is ~82 wide on a 390pt phone, so
+                // 0.85 gave 96 of height for 60 icon + 6 gap + up to 32 of
+                // two line label = 98. Two pixels of overflow is a yellow
+                // and black stripe across the grid.
+                childAspectRatio: 0.78,
               ),
               itemCount: _allServices.length,
               itemBuilder: (context, index) {
@@ -526,8 +530,11 @@ class _ServicesScreenState extends State<ServicesScreen> {
                       Text(
                         s.label,
                         textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.inter(
                             fontSize: 11,
+                            height: 1.2,
                             color: isNew ? const Color(0xFFEA580C) : Colors.grey[700],
                             fontWeight: isNew ? FontWeight.w700 : FontWeight.normal),
                       ),

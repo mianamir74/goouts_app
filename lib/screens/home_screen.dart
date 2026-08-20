@@ -425,7 +425,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildVirtualCard() => Padding(
         padding: const EdgeInsets.all(16),
         child: AspectRatio(
-          aspectRatio: 85.60 / 53.98,
+          // ISO/IEC 7810 ID-1 — 85.60 x 53.98mm, the size of a real bank
+          // card. Held at 90% of that HEIGHT since 18 August 2026: full size
+          // crowded the services row underneath, where "Food Delivery" needs
+          // two lines. Width is untouched, so it still reads as a card.
+          aspectRatio: 85.60 / (53.98 * 0.9),
           child: Container(
             width: double.infinity,
             decoration: BoxDecoration(
@@ -571,7 +575,9 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 8),
             SizedBox(
-              height: 108,
+              // 60 icon + 8 gap + 36 label = 104, leaving 8 spare so a two
+              // line label cannot clip the way "Food Delivery" did.
+              height: 112,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: _services.length,
@@ -608,7 +614,13 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           const SizedBox(height: 8),
                           SizedBox(
-                            height: 32,
+                            // 36, not 32. Two lines of 11pt Inter at the
+                            // font's own line height came to ~32, so the
+                            // second line of "Food Delivery" was clipped at
+                            // exactly the boundary. height: 1.2 below makes
+                            // the line box a known 13.2 rather than whatever
+                            // the font ships with.
+                            height: 36,
                             child: Align(
                               alignment: Alignment.topCenter,
                               child: Text(
@@ -618,6 +630,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 overflow: TextOverflow.ellipsis,
                                 style: GoogleFonts.inter(
                                   fontSize: 11,
+                                  height: 1.2,
                                   fontWeight: FontWeight.w600,
                                   color: const Color(0xFF0D1B3E),
                                 ),

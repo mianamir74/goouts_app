@@ -633,11 +633,17 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
         // caught by reading the code.
         builder: (context, snapshot) {
           if (snapshot.hasError) {
+            // The REAL reason, not "check your connection".
+            //
+            // 18 August 2026: restaurants stopped appearing and this branch
+            // blamed the network, which sent the search in the wrong
+            // direction for an hour. A permission-denied and a flat aeroplane
+            // mode are not the same fault and must not read the same.
             return SliverToBoxAdapter(
                 child: _listMessage(
               icon: Icons.wifi_off_rounded,
               title: 'Could not load restaurants',
-              body: 'Please check your connection and try again.',
+              body: '${snapshot.error}',
             ));
           }
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -649,9 +655,30 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
             );
           }
 
-          final restaurants = (snapshot.data?.docs ?? const [])
-              .map((d) => _RestaurantItem.fromDoc(d))
-              .toList();
+          // ── PER DOCUMENT, NOT PER BATCH ──────────────────────────────
+          //
+          // Was `.map((d) => _RestaurantItem.fromDoc(d)).toList()`, which is
+          // all-or-nothing: fromDoc throws on a field of the wrong TYPE (a
+          // number where a String is expected, a Map where a List is), and
+          // one bad restaurant anywhere in the collection threw inside this
+          // builder — taking out the entire list, and with it the screen.
+          //
+          // Exactly the same shape as the Short Stay listing fault found the
+          // same day. A restaurant we cannot read is one restaurant we cannot
+          // show; it is not a reason to hide every other one.
+          final restaurants = <_RestaurantItem>[];
+          final skipped = <String>[];
+          for (final d in (snapshot.data?.docs ?? const [])) {
+            try {
+              restaurants.add(_RestaurantItem.fromDoc(d));
+            } catch (e) {
+              skipped.add('${d.id}: $e');
+            }
+          }
+          if (skipped.isNotEmpty) {
+            debugPrint('food: dropped ${skipped.length} unreadable '
+                'restaurant(s): ${skipped.join(" | ")}');
+          }
 
           if (restaurants.isEmpty) {
             return SliverToBoxAdapter(

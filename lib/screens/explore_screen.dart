@@ -494,10 +494,15 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                 child: Text(
                                   c['label'] as String,
                                   textAlign: TextAlign.center,
-                                  maxLines: 1,
+                                  // Was maxLines: 1, which rendered the new
+                                  // service as "Food Deli...". The box is
+                                  // already 40 tall, so two lines fit with
+                                  // room; only the cap was wrong.
+                                  maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                   style: GoogleFonts.inter(
                                       fontSize: 10,
+                                      height: 1.2,
                                       fontWeight: FontWeight.w600,
                                       color: _dark),
                                 ),

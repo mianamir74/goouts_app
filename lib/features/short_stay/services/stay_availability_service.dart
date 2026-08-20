@@ -203,8 +203,9 @@ class StayAvailabilityService {
     // Over-fetch, because the Dart-side filters below will remove some.
     final snap = await q.limit(limit * 4).get();
 
-    var results = snap.docs
-        .map(StayListing.fromDoc)
+    // parseAll, not map(fromDoc): one malformed document must not empty the
+    // whole result set. See the note on StayListing.parseAll.
+    var results = StayListing.parseAll(snap.docs)
         .where((l) => l.maxGuests >= criteria.guests)
         .where((l) => criteria.minBedrooms == null ||
             l.bedrooms >= criteria.minBedrooms!)
