@@ -10,6 +10,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/id_quality_inspector.dart';
 import '../services/biometric_selfie_inspector.dart';
+import '../services/auto_selfie_controller.dart';
 import '../services/document_quality_inspector.dart';
 // user_service import removed 4 August 2026. Both uses were
 // UserService().updateUser({'kycStatus': 'pending'}), which is now the
@@ -54,6 +55,11 @@ class _KycScreenState extends State<KycScreen> {
   bool _selfieValid = false;
   bool _checking = false;
   String _feedbackMsg = '';
+
+  /// Watches the preview and takes the selfie itself once the checks pass.
+  /// Null whenever the front camera is not running, or on a device where image
+  /// streaming is unavailable — the manual shutter still works in both cases.
+  AutoSelfieController? _autoSelfie;
 
   // ── Inspectors ────────────────────────────────────────────────────────────
   final _idInspector       = IdQualityInspector();
@@ -110,9 +116,26 @@ class _KycScreenState extends State<KycScreen> {
             orElse: () => _cameras.first,
           );
 
+    await _disposeAutoSelfie();
     await _cameraCtrl?.dispose();
+
+    // ⚠ THE FORMAT DECIDES WHETHER AUTO-CAPTURE CAN WORK AT ALL.
+    //
+    // This was ImageFormatGroup.jpeg for both cameras. JPEG frames cannot be
+    // fed to ML Kit, so an image stream on a JPEG group yields nothing usable
+    // and the live check would simply never see a face — silently, with no
+    // error, for ever.
+    //
+    // The ID step does not stream, so it keeps JPEG. The selfie step needs the
+    // platform's raw format: NV21 on Android, BGRA on iOS.
+    final ImageFormatGroup group = front
+        ? (Platform.isAndroid
+            ? ImageFormatGroup.nv21
+            : ImageFormatGroup.bgra8888)
+        : ImageFormatGroup.jpeg;
+
     final ctrl = CameraController(desc, ResolutionPreset.high,
-        enableAudio: false, imageFormatGroup: ImageFormatGroup.jpeg);
+        enableAudio: false, imageFormatGroup: group);
     await ctrl.initialize();
     if (!mounted) return;
     setState(() {
@@ -120,9 +143,26 @@ class _KycScreenState extends State<KycScreen> {
       _cameraReady = true;
       _feedbackMsg = '';
     });
+
+    if (front) {
+      final auto = AutoSelfieController(
+        controller: ctrl,
+        onCaptured: _acceptSelfie,
+      );
+      _autoSelfie = auto;
+      await auto.start();
+      if (mounted) setState(() {});
+    }
+  }
+
+  Future<void> _disposeAutoSelfie() async {
+    final auto = _autoSelfie;
+    _autoSelfie = null;
+    await auto?.dispose();
   }
 
   Future<void> _stopCamera() async {
+    await _disposeAutoSelfie();
     await _cameraCtrl?.dispose();
     _cameraCtrl = null;
     if (mounted) setState(() => _cameraReady = false);
@@ -134,6 +174,7 @@ class _KycScreenState extends State<KycScreen> {
     _lastNameCtrl.dispose();
     _dobCtrl.dispose();
     _cameraCtrl?.dispose();
+    _autoSelfie?.dispose();
     _idInspector.dispose();
     _selfieInspector.dispose();
     super.dispose();
@@ -255,32 +296,75 @@ class _KycScreenState extends State<KycScreen> {
     }
   }
 
-  Future<void> _captureSelfie() async {
-    if (_cameraCtrl == null || !_cameraReady || _checking) return;
+  /// Judges a selfie that has already been taken, whoever took it.
+  ///
+  /// Both the manual shutter and AutoSelfieController end up here, so the photo
+  /// is held to one standard however it was captured.
+  ///
+  /// Returns true when it was accepted. AutoSelfieController uses that to
+  /// decide whether to move on or quietly resume guiding — which is why the
+  /// rejection path below does NOT say "Please retake" when the shutter fired
+  /// by itself. Nobody chose to take that photo, so there is nothing for them
+  /// to do again.
+  Future<bool> _acceptSelfie(String path) async {
+    if (!mounted) return false;
     setState(() {
       _checking = true;
-      _feedbackMsg = 'Analysing selfie…';
+      _feedbackMsg = 'Checking…';
     });
-
     try {
-      final file = await _cameraCtrl!.takePicture();
-      final result = await _selfieInspector.inspectSelfie(file.path);
-      if (!mounted) return;
+      final result = await _selfieInspector.inspectSelfie(path);
+      if (!mounted) return false;
 
       if (result['isValid'] == true) {
         setState(() {
-          _selfieImagePath = file.path;
+          _selfieImagePath = path;
           _selfieValid = true;
           _feedbackMsg = '';
           _checking = false;
         });
         await _goTo(3);
-      } else {
-        // crash_scan: ok - sibling branch of the await above, cannot both run
-        setState(() {
-          _feedbackMsg = result['errorMessage'] ?? 'Please retake.';
-          _checking = false;
-        });
+        return true;
+      }
+
+      final bool auto = _autoSelfie != null;
+      setState(() {
+        _feedbackMsg = auto
+            ? ''
+            : (result['errorMessage'] as String? ?? 'Please retake.');
+        _checking = false;
+      });
+      return false;
+    } catch (e) {
+      if (!mounted) return false;
+      setState(() {
+        _feedbackMsg = 'Capture failed. Please try again.';
+        _checking = false;
+      });
+      return false;
+    }
+  }
+
+  /// The manual shutter. Kept deliberately.
+  ///
+  /// Auto-capture will not fire on every device — image streaming is
+  /// unavailable on some, and poor light can keep the score below the bar
+  /// indefinitely. An identity check with no way to finish is the one outcome
+  /// worth avoiding, so there is always a button.
+  Future<void> _captureSelfie() async {
+    if (_cameraCtrl == null || !_cameraReady || _checking) return;
+    // The stream must stop before takePicture — several Android devices fail
+    // outright if both run at once.
+    await _autoSelfie?.stop();
+    setState(() {
+      _checking = true;
+      _feedbackMsg = 'Analysing selfie…';
+    });
+    try {
+      final file = await _cameraCtrl!.takePicture();
+      final bool accepted = await _acceptSelfie(file.path);
+      if (!accepted && mounted && _autoSelfie != null) {
+        await _autoSelfie!.start();
       }
     } catch (e) {
       if (!mounted) return;
@@ -288,6 +372,7 @@ class _KycScreenState extends State<KycScreen> {
         _feedbackMsg = 'Capture failed. Please try again.';
         _checking = false;
       });
+      await _autoSelfie?.start();
     }
   }
 
@@ -648,6 +733,58 @@ class _KycScreenState extends State<KycScreen> {
                     child: const SizedBox.expand(),
                   ),
                 ),
+
+                // ── Live guidance, selfie step only ──────────────────────
+                //
+                // Comes from AutoSelfieController, which gets it from the same
+                // check that judges the final photo. So what it tells you to
+                // fix is exactly what would otherwise have rejected you.
+                if (!isId && _autoSelfie != null)
+                  Positioned(
+                    top: 20,
+                    left: 24,
+                    right: 24,
+                    child: ValueListenableBuilder<String>(
+                      valueListenable: _autoSelfie!.guidance,
+                      builder: (_, msg, __) => AnimatedOpacity(
+                        opacity: msg.isEmpty ? 0.0 : 1.0,
+                        duration: const Duration(milliseconds: 180),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.72),
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          child: Text(
+                            msg.isEmpty ? ' ' : msg,
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // Hold-still ring. Fills over 0.7s so the shutter never fires
+                // without warning — an unannounced capture reads as a bug even
+                // when it worked.
+                if (!isId && _autoSelfie != null)
+                  IgnorePointer(
+                    child: ValueListenableBuilder<double>(
+                      valueListenable: _autoSelfie!.holdProgress,
+                      builder: (_, p, __) => p <= 0.0
+                          ? const SizedBox.shrink()
+                          : CustomPaint(
+                              painter: _HoldStillRing(p),
+                              child: const SizedBox.expand(),
+                            ),
+                    ),
+                  ),
 
                 // Feedback message
                 if (_feedbackMsg.isNotEmpty)
@@ -1318,4 +1455,39 @@ class _OvalOverlay extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter old) => false;
+}
+
+/// Traces the selfie oval as the hold-still countdown runs.
+///
+/// Deliberately the same geometry as _OvalOverlay below. If the ring and the
+/// mask disagree, the app draws its target in one place and measures in
+/// another — which is the shape of the original bug, in pixels.
+class _HoldStillRing extends CustomPainter {
+  _HoldStillRing(this.progress);
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Copied from _OvalOverlay, not approximated. I wrote this ring with its
+    // own proportions first and it sat visibly off the mask — the same fault
+    // as everything else this week, in pixels: two definitions of one thing.
+    const double hPad = 40.0;
+    final double vPad = size.height * 0.18;
+    final Rect oval =
+        Rect.fromLTRB(hPad, vPad, size.width - hPad, size.height - vPad);
+    canvas.drawArc(
+      oval,
+      -1.5708,
+      6.2832 * progress.clamp(0.0, 1.0),
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 5
+        ..strokeCap = StrokeCap.round
+        ..color = const Color(0xFF0A7A3E),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_HoldStillRing old) => old.progress != progress;
 }

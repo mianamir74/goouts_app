@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'short_stay_faq_screen.dart';
 
 class FaqScreen extends StatefulWidget {
   const FaqScreen({super.key});
@@ -19,6 +20,14 @@ class _FaqScreenState extends State<FaqScreen> {
     {'icon': Icons.credit_card_rounded, 'label': 'Cashback'},
     {'icon': Icons.delivery_dining_rounded, 'label': 'Food Orders'},
     {'icon': Icons.shield_rounded, 'label': 'Account Security'},
+    // Short Stay does NOT filter the list below like the other four. Its
+    // answers live in a different collection with a different field shape, so
+    // it opens its own screen. `nav` is what marks that difference.
+    {
+      'icon': Icons.night_shelter_rounded,
+      'label': 'Short Stay',
+      'nav': true,
+    },
   ];
 
   final Set<String> _expanded = {};
@@ -171,13 +180,24 @@ class _FaqScreenState extends State<FaqScreen> {
               itemBuilder: (context, i) {
                 final item = _quickHelp[i];
                 final label = item['label'] as String;
+                final bool opensScreen = item['nav'] == true;
                 final category = _categoryMap[label];
-                final isActive = _selectedCategory == category;
+                final isActive = !opensScreen && _selectedCategory == category;
                 return GestureDetector(
-                  onTap: () => setState(() {
-                    _selectedCategory = isActive ? null : category;
-                    _expanded.clear();
-                  }),
+                  onTap: () {
+                    if (opensScreen) {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const ShortStayFaqScreen(),
+                        ),
+                      );
+                      return;
+                    }
+                    setState(() {
+                      _selectedCategory = isActive ? null : category;
+                      _expanded.clear();
+                    });
+                  },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
                     decoration: BoxDecoration(
@@ -279,6 +299,49 @@ class _FaqScreenState extends State<FaqScreen> {
                     child: Padding(
                       padding: EdgeInsets.all(32),
                       child: CircularProgressIndicator(color: _primary, strokeWidth: 2),
+                    ),
+                  );
+                }
+                // ── FAILED IS NOT EMPTY ──────────────────────────────────
+                //
+                // 20 August 2026: the screen showed "No FAQs available at this
+                // time" and the collection had questions in it. The query was
+                // failing, not returning nothing — this filter needs a
+                // composite index on (isActive, order) and it had never been
+                // deployed, so Firestore threw FAILED_PRECONDITION on every
+                // load.
+                //
+                // The old code checked only `docs.isEmpty`, so both outcomes
+                // produced the same sentence. Exactly the same fault as the
+                // Short Stay listings screen the day before: a silent catch
+                // that renders the empty state is not a graceful failure, it
+                // is a lost error message.
+                if (snap.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        children: [
+                          Icon(Icons.cloud_off_rounded,
+                              size: 36, color: Colors.grey[400]),
+                          const SizedBox(height: 10),
+                          Text(
+                            'We could not load the help articles.',
+                            style: GoogleFonts.inter(
+                                fontSize: 14, color: Colors.grey[600]),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            '${snap.error}',
+                            maxLines: 4,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.inter(
+                                fontSize: 11, color: Colors.grey[400]),
+                          ),
+                        ],
+                      ),
                     ),
                   );
                 }
