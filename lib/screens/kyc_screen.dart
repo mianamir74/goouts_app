@@ -726,12 +726,25 @@ class _KycScreenState extends State<KycScreen> {
 
                 // Overlay mask
                 IgnorePointer(
-                  child: CustomPaint(
-                    painter: isId
-                        ? _RoundedRectOverlay()
-                        : _OvalOverlay(),
-                    child: const SizedBox.expand(),
-                  ),
+                  child: isId
+                      ? CustomPaint(
+                          painter: _RoundedRectOverlay(),
+                          child: const SizedBox.expand(),
+                        )
+                      : _autoSelfie == null
+                          ? CustomPaint(
+                              painter: _FaceBracketOverlay(framed: false),
+                              child: const SizedBox.expand(),
+                            )
+                          : ValueListenableBuilder<Rect?>(
+                              valueListenable: _autoSelfie!.faceBox,
+                              builder: (_, box, __) => CustomPaint(
+                                painter: _FaceBracketOverlay(
+                                  framed: _autoSelfie!.isFramed(box),
+                                ),
+                                child: const SizedBox.expand(),
+                              ),
+                            ),
                 ),
 
                 // ── Live guidance, selfie step only ──────────────────────
@@ -780,8 +793,46 @@ class _KycScreenState extends State<KycScreen> {
                       builder: (_, p, __) => p <= 0.0
                           ? const SizedBox.shrink()
                           : CustomPaint(
-                              painter: _HoldStillRing(p),
+                              painter: _HoldStillBar(p),
                               child: const SizedBox.expand(),
+                            ),
+                    ),
+                  ),
+
+                // Auto-capture has stopped trying. Say so, once, instead of
+                // letting the screen sit there looking like it is still
+                // working.
+                //
+                // ⚠ Positioned OUTSIDE the builder, not returned from it.
+                // A Positioned must be a DIRECT child of its Stack. Returning
+                // one from a ValueListenableBuilder makes the BUILDER the
+                // Stack's child, and Flutter throws "Incorrect use of
+                // ParentDataWidget" at runtime — invisible to the analyzer,
+                // and it would have fired exactly when auto-capture gave up,
+                // which is the moment the person most needs the screen to work.
+                if (!isId && _autoSelfie != null)
+                  Positioned(
+                    bottom: 90,
+                    left: 24,
+                    right: 24,
+                    child: ValueListenableBuilder<bool>(
+                      valueListenable: _autoSelfie!.gaveUp,
+                      builder: (_, up, __) => !up
+                          ? const SizedBox.shrink()
+                          : Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.75),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                'Automatic capture could not get a clear '
+                                'photo. Use the button below.',
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.inter(
+                                    fontSize: 12.5, color: Colors.white),
+                              ),
                             ),
                     ),
                   ),
@@ -1424,70 +1475,100 @@ class _RoundedRectOverlay extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter old) => false;
 }
 
-/// Oval overlay for selfie capture.
-class _OvalOverlay extends CustomPainter {
+
+/// The selfie target: four corner brackets, not a circle.
+///
+/// ── WHY BRACKETS, AND WHY THIS SIZE ─────────────────────────────────────────
+///
+/// 20 August 2026, reported as "the selfie circle is too big".
+///
+/// It was. The old oval covered roughly 40% of the frame while
+/// FaceCheckService wants a face at about 22% of it. So the app drew one
+/// target and measured against another: fill the oval as instructed, and the
+/// check still said move closer, because by its own arithmetic you had not.
+///
+/// These brackets are AutoSelfieController.targetW x targetH — 0.55 x 0.40,
+/// area 0.220, which is _idealFaceArea. Filling the brackets and passing the
+/// size check are now the same act. Change either number and change the other
+/// in the same edit.
+///
+/// Corners rather than a closed shape because a bracket says "put it between
+/// these" without drawing an outline the face is meant to trace. A circle
+/// invites people to match its edge, which is not what is measured.
+class _FaceBracketOverlay extends CustomPainter {
+  _FaceBracketOverlay({required this.framed});
+
+  /// True when the face is inside the zone at roughly the right size.
+  final bool framed;
+
+  static const Color _ok = Color(0xFF0A7A3E);
+
   @override
   void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    const hPad = 40.0;
-    final vPad = h * 0.18;
-    final ovalRect = Rect.fromLTRB(hPad, vPad, w - hPad, h - vPad);
-
-    // Dark overlay excluding oval
-    final path = Path()
-      ..addRect(Rect.fromLTWH(0, 0, w, h))
-      ..addOval(ovalRect)
-      ..fillType = PathFillType.evenOdd;
-
-    canvas.drawPath(path, Paint()..color = Colors.black.withValues(alpha: 0.55));
-
-    // Oval border
-    canvas.drawOval(
-      ovalRect,
-      Paint()
-        ..color = const Color(0xFF0392CA)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5,
+    final Rect zone = Rect.fromCenter(
+      center: Offset(size.width / 2, size.height * 0.46),
+      width: size.width * 0.55,
+      height: size.height * 0.40,
     );
+
+    final Path mask = Path()
+      ..addRect(Rect.fromLTWH(0, 0, size.width, size.height))
+      ..addRRect(RRect.fromRectAndRadius(zone, const Radius.circular(24)))
+      ..fillType = PathFillType.evenOdd;
+    canvas.drawPath(
+        mask, Paint()..color = Colors.black.withValues(alpha: 0.55));
+
+    final Paint stroke = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = framed ? 5 : 3.5
+      ..strokeCap = StrokeCap.round
+      ..color = framed ? _ok : Colors.white.withValues(alpha: 0.92);
+
+    final double arm = zone.width * 0.22;
+
+    void corner(Offset c, double dx, double dy) {
+      canvas.drawLine(c, c.translate(arm * dx, 0), stroke);
+      canvas.drawLine(c, c.translate(0, arm * dy), stroke);
+    }
+
+    corner(zone.topLeft, 1, 1);
+    corner(zone.topRight, -1, 1);
+    corner(zone.bottomLeft, 1, -1);
+    corner(zone.bottomRight, -1, -1);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter old) => false;
+  bool shouldRepaint(_FaceBracketOverlay old) => old.framed != framed;
 }
 
-/// Traces the selfie oval as the hold-still countdown runs.
+/// Hold-still progress, drawn as a bar beneath the brackets.
 ///
-/// Deliberately the same geometry as _OvalOverlay below. If the ring and the
-/// mask disagree, the app draws its target in one place and measures in
-/// another — which is the shape of the original bug, in pixels.
-class _HoldStillRing extends CustomPainter {
-  _HoldStillRing(this.progress);
+/// A bar rather than an arc around the target: an arc has to trace the same
+/// geometry as the brackets, and two definitions of one shape is exactly how
+/// the first version of this ended up visibly misaligned with its own mask.
+class _HoldStillBar extends CustomPainter {
+  _HoldStillBar(this.progress);
   final double progress;
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Copied from _OvalOverlay, not approximated. I wrote this ring with its
-    // own proportions first and it sat visibly off the mask — the same fault
-    // as everything else this week, in pixels: two definitions of one thing.
-    const double hPad = 40.0;
-    final double vPad = size.height * 0.18;
-    final Rect oval =
-        Rect.fromLTRB(hPad, vPad, size.width - hPad, size.height - vPad);
-    canvas.drawArc(
-      oval,
-      -1.5708,
-      6.2832 * progress.clamp(0.0, 1.0),
-      false,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 5
-        ..strokeCap = StrokeCap.round
-        ..color = const Color(0xFF0A7A3E),
+    final double w = size.width * 0.55;
+    final double left = (size.width - w) / 2;
+    final double y = size.height * 0.46 + (size.height * 0.40) / 2 + 22;
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+          Rect.fromLTWH(left, y, w, 5), const Radius.circular(3)),
+      Paint()..color = Colors.white.withValues(alpha: 0.28),
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+          Rect.fromLTWH(left, y, w * progress.clamp(0.0, 1.0), 5),
+          const Radius.circular(3)),
+      Paint()..color = const Color(0xFF0A7A3E),
     );
   }
 
   @override
-  bool shouldRepaint(_HoldStillRing old) => old.progress != progress;
+  bool shouldRepaint(_HoldStillBar old) => old.progress != progress;
 }

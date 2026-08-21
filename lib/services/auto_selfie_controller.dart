@@ -47,6 +47,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'dart:async';
+import 'dart:ui' show Rect;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
@@ -79,6 +80,35 @@ class AutoSelfieController {
   /// borderline frame does not fire a shutter the accurate pass would reject.
   static const double _liveMinOverall = 0.65;
 
+  /// The target zone, as fractions of the frame. The screen draws corner
+  /// brackets at exactly these proportions.
+  ///
+  /// 0.55 x 0.40 = 0.220 of the frame, which is FaceCheckService's
+  /// _idealFaceArea to three decimal places. That is not a coincidence and it
+  /// must stay true: it is what makes "fill the brackets" and "your face is
+  /// the right size" the same instruction. The old oval was ~40% of the frame
+  /// while the check wanted 22%, so the app drew one target and measured
+  /// against another — and the person in the middle was told to move closer
+  /// while already filling the guide.
+  static const double targetW = 0.55;
+  static const double targetH = 0.40;
+
+  /// ── THE RUNAWAY LOOP, FIXED 20 August 2026 ────────────────────────────────
+  ///
+  /// Reported as "it keeps capturing every second".
+  ///
+  /// The first version, on a rejected photo, reset the counter and restarted
+  /// scanning immediately. If the live check passes and the still check does
+  /// not — which is exactly what happens when the preview and the saved photo
+  /// are framed differently — that is an infinite loop: capture, reject,
+  /// rescan, capture, about once a second, for ever.
+  ///
+  /// Silently retrying a thing that just failed, at speed, is worse than
+  /// failing once and saying so. Three attempts, spaced, then hand it to the
+  /// person with the real reason.
+  static const int _maxAutoAttempts = 3;
+  static const int _cooldownMs = 2500;
+
   final LiveFaceDetector _detector = LiveFaceDetector();
 
   final ValueNotifier<AutoSelfieState> state =
@@ -90,8 +120,19 @@ class AutoSelfieController {
   /// 0.0 to 1.0 — how far through the hold-still countdown. Drives the ring.
   final ValueNotifier<double> holdProgress = ValueNotifier<double>(0.0);
 
+  /// Where the face is right now, as fractions of the frame. Null when there
+  /// is no face. The screen draws this so a person can SEE what to move, which
+  /// is the difference between guiding and merely refusing.
+  final ValueNotifier<Rect?> faceBox = ValueNotifier<Rect?>(null);
+
+  /// True once auto-capture has given up. The manual button stays, and the
+  /// screen says why rather than pretending nothing happened.
+  final ValueNotifier<bool> gaveUp = ValueNotifier<bool>(false);
+
   DateTime _lastCheck = DateTime.fromMillisecondsSinceEpoch(0);
+  DateTime _cooldownUntil = DateTime.fromMillisecondsSinceEpoch(0);
   int _goodFrames = 0;
+  int _autoAttempts = 0;
   Timer? _holdTimer;
   bool _streaming = false;
   bool _stopped = false;
@@ -135,6 +176,8 @@ class AutoSelfieController {
     state.dispose();
     guidance.dispose();
     holdProgress.dispose();
+    faceBox.dispose();
+    gaveUp.dispose();
   }
 
   void _onFrame(CameraImage image) {
@@ -147,6 +190,7 @@ class AutoSelfieController {
     if (_detector.isBusy) return;
 
     final DateTime now = DateTime.now();
+    if (now.isBefore(_cooldownUntil)) return;
     if (now.difference(_lastCheck).inMilliseconds < _checkEveryMs) return;
     _lastCheck = now;
 
@@ -178,8 +222,13 @@ class AutoSelfieController {
     // already uses.
     if (!result.available) {
       guidance.value = '';
+      faceBox.value = null;
       return;
     }
+
+    // Publish the position on EVERY result, passing or failing. A hint that
+    // only appears once you are already correct is not a hint.
+    faceBox.value = result.faceBox;
 
     final bool good = result.isValid && result.overall >= _liveMinOverall;
 
@@ -188,9 +237,13 @@ class AutoSelfieController {
       _cancelHold();
       // The check's own words. One source of truth for what is wrong, so the
       // live hint and the final message cannot contradict each other.
-      guidance.value = result.errorMessage?.isNotEmpty == true
-          ? _liveWording(result.errorMessage!)
-          : 'Hold steady…';
+      // Prefer a DIRECTION over a diagnosis. "Move closer" is actionable;
+      // "your face is too small in the photo" describes a photo that does not
+      // exist yet and does not say what to do about it.
+      guidance.value = _positionHint(result.faceBox) ??
+          (result.errorMessage?.isNotEmpty == true
+              ? _liveWording(result.errorMessage!)
+              : 'Hold steady…');
       state.value = AutoSelfieState.scanning;
       return;
     }
@@ -201,6 +254,44 @@ class AutoSelfieController {
         state.value != AutoSelfieState.holdStill) {
       _beginHold();
     }
+  }
+
+  /// Turns the face position into an instruction, or null when the framing is
+  /// already fine and something else is wrong (eyes shut, head turned).
+  ///
+  /// Direction only. Exact pixels would need the preview's letterboxing
+  /// accounted for, and a hint that is confidently a few pixels wrong is worse
+  /// than one that only says which way to move.
+  String? _positionHint(Rect? box) {
+    if (box == null) return 'Bring your face into the frame';
+
+    final double area = box.width * box.height;
+    if (area < targetW * targetH * 0.45) return 'Move closer';
+    if (area > targetW * targetH * 2.0) return 'Move back a little';
+
+    final double cx = box.left + box.width / 2;
+    final double cy = box.top + box.height / 2;
+
+    // The preview is mirrored for a front camera, so a face sitting left in
+    // the FRAME appears right to the person looking at it. The instruction has
+    // to match what they see, not what the sensor sees.
+    if (cx < 0.34) return 'Move right a little';
+    if (cx > 0.66) return 'Move left a little';
+    if (cy < 0.30) return 'Move down a little';
+    if (cy > 0.70) return 'Move up a little';
+    return null;
+  }
+
+  /// True when the face is inside the bracket zone at roughly the right size.
+  /// Drives the brackets turning green.
+  bool isFramed(Rect? box) {
+    if (box == null) return false;
+    final double area = box.width * box.height;
+    if (area < targetW * targetH * 0.45) return false;
+    if (area > targetW * targetH * 2.0) return false;
+    final double cx = box.left + box.width / 2;
+    final double cy = box.top + box.height / 2;
+    return cx >= 0.34 && cx <= 0.66 && cy >= 0.30 && cy <= 0.70;
   }
 
   /// The still-photo messages are written for after the event — "take it
@@ -242,6 +333,33 @@ class AutoSelfieController {
     holdProgress.value = 0.0;
   }
 
+  /// What happens when a photo we chose to take was then rejected.
+  ///
+  /// Retry, but SLOWLY and not for ever. The live checks passed and the still
+  /// checks did not, which means something differs between the preview and the
+  /// saved photo — usually framing. Firing again immediately cannot fix that,
+  /// it just does the same thing faster.
+  Future<void> _afterRejection() async {
+    _goodFrames = 0;
+    _cancelHold();
+    _cooldownUntil =
+        DateTime.now().add(const Duration(milliseconds: _cooldownMs));
+
+    if (_autoAttempts >= _maxAutoAttempts) {
+      // Stop trying. Say so, leave the manual button, and stop taking
+      // photographs of somebody who did not ask for any of them.
+      gaveUp.value = true;
+      state.value = AutoSelfieState.idle;
+      guidance.value = 'Tap the button below when you are ready';
+      await stop();
+      return;
+    }
+
+    state.value = AutoSelfieState.scanning;
+    guidance.value = 'Adjusting…';
+    await start();
+  }
+
   Future<void> _capture() async {
     if (_stopped || state.value == AutoSelfieState.capturing) return;
     state.value = AutoSelfieState.capturing;
@@ -253,6 +371,7 @@ class AutoSelfieController {
     await stop();
 
     try {
+      _autoAttempts++;
       final XFile shot = await controller.takePicture();
       final bool accepted = await onCaptured(shot.path);
       if (_stopped) return;
@@ -260,17 +379,11 @@ class AutoSelfieController {
         state.value = AutoSelfieState.captured;
         return;
       }
-      // Rejected by the full-quality check. Not the person's fault and not
-      // their problem to solve — go back to guiding, silently.
-      _goodFrames = 0;
-      state.value = AutoSelfieState.scanning;
-      await start();
+      await _afterRejection();
     } catch (e) {
       debugPrint('AutoSelfieController: capture failed — $e');
       if (_stopped) return;
-      _goodFrames = 0;
-      state.value = AutoSelfieState.scanning;
-      await start();
+      await _afterRejection();
     }
   }
 }

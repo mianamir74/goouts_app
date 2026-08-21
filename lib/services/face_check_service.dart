@@ -63,6 +63,7 @@
 //   ML Kit ran and found NO   -> fail CLOSED. That is a definitive answer and
 //   face, or a bad one           it is the whole point of this file.
 import 'dart:math' as math;
+import 'dart:ui' show Rect;
 
 import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
@@ -74,6 +75,7 @@ class FaceCheckResult {
     this.errorMessage,
     this.scores = const <String, double>{},
     this.faceCount = 0,
+    this.faceBox,
   });
 
   /// False when ML Kit itself could not run. The caller should ignore this
@@ -87,6 +89,15 @@ class FaceCheckResult {
   final Map<String, double> scores;
 
   final int faceCount;
+
+  /// Where the face is, as FRACTIONS of the frame (0..1), not pixels.
+  ///
+  /// Normalised on purpose. The preview widget, the camera stream and the
+  /// saved photo are three different pixel sizes; a rect in any one of them is
+  /// wrong in the other two. Fractions survive the trip.
+  ///
+  /// Null when no face was found, or when ML Kit is unavailable.
+  final Rect? faceBox;
 
   double get overall => scores['overall'] ?? 0.0;
 
@@ -236,6 +247,18 @@ class FaceCheckService {
 
       final Face face = faces.first;
 
+      // Normalised once, then handed to every result below so the live UI can
+      // draw where the face actually is while the checks are still failing —
+      // which is the whole point of guiding rather than judging.
+      final Rect? box = (imageWidth > 0 && imageHeight > 0)
+          ? Rect.fromLTWH(
+              face.boundingBox.left / imageWidth,
+              face.boundingBox.top / imageHeight,
+              face.boundingBox.width.abs() / imageWidth,
+              face.boundingBox.height.abs() / imageHeight,
+            )
+          : null;
+
       // ── Signal 1: how much of the frame the face fills ─────────────────
       final double imageArea = (imageWidth * imageHeight).toDouble();
       final double faceArea =
@@ -248,6 +271,7 @@ class FaceCheckService {
           available: true,
           isValid: false,
           faceCount: 1,
+          faceBox: box,
           errorMessage:
               'Your face is too small in the photo. Move closer and take it '
               'again.',
@@ -271,16 +295,17 @@ class FaceCheckService {
       final double? roll = face.headEulerAngleZ;
 
       if (yaw != null && yaw.abs() > _maxYaw) {
-        return _poseFailure(areaRatio, sizeScore);
+        return _poseFailure(areaRatio, sizeScore, box);
       }
       if (pitch != null && pitch.abs() > _maxPitch) {
-        return _poseFailure(areaRatio, sizeScore);
+        return _poseFailure(areaRatio, sizeScore, box);
       }
       if (roll != null && roll.abs() > _maxRoll) {
         return FaceCheckResult(
           available: true,
           isValid: false,
           faceCount: 1,
+          faceBox: box,
           errorMessage:
               'Your head is tilted. Hold the phone level and take it again.',
           scores: <String, double>{'faceSize': sizeScore, 'overall': 0.0},
@@ -304,6 +329,7 @@ class FaceCheckService {
             available: true,
             isValid: false,
             faceCount: 1,
+          faceBox: box,
             errorMessage:
                 'Your eyes look closed. Keep both eyes open and take it again.',
             scores: <String, double>{
@@ -335,6 +361,7 @@ class FaceCheckService {
           available: true,
           isValid: false,
           faceCount: 1,
+          faceBox: box,
           errorMessage:
               'Part of your face is covered. Remove anything over your face '
               'and take it again.',
@@ -363,6 +390,7 @@ class FaceCheckService {
         available: true,
         isValid: true,
         faceCount: 1,
+        faceBox: box,
         scores: <String, double>{
           'faceSize': double.parse(sizeScore.toStringAsFixed(4)),
           'pose': double.parse(poseScore.toStringAsFixed(4)),
@@ -377,11 +405,16 @@ class FaceCheckService {
     }
   }
 
-  FaceCheckResult _poseFailure(double areaRatio, double sizeScore) =>
+  FaceCheckResult _poseFailure(
+    double areaRatio,
+    double sizeScore,
+    Rect? box,
+  ) =>
       FaceCheckResult(
         available: true,
         isValid: false,
         faceCount: 1,
+        faceBox: box,
         errorMessage:
             'Please look straight at the camera and take the photo again.',
         scores: <String, double>{'faceSize': sizeScore, 'overall': 0.0},
