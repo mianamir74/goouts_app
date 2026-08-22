@@ -139,6 +139,15 @@ void routeFromMessage(RemoteMessage msg) {
     case 'refer_friend':
       nav.pushNamed('/refer-friend');
       break;
+    // ⚠ THE KEY IS SET IN stay_messages.js AS 'stay_message_thread' AND THE
+    // ARGUMENT SHAPE IS StayRoutes' Map, not a bare string. Tapping the
+    // notification lands in the conversation it is about; without this case
+    // it fell through to /notifications, which is not where the message is.
+    case 'stay_message_thread':
+      nav.pushNamed(StayRoutes.messageHost, arguments: <String, dynamic>{
+        'bookingId': (data['bookingId'] ?? '').toString(),
+      });
+      break;
     case 'notifications':
     default:
       nav.pushNamed('/notifications');

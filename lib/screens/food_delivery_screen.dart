@@ -76,6 +76,18 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
 
   late final TabController _tabCtrl;
 
+  /// How many restaurants the list will fetch and hold a listener on.
+  /// See the note on the query in _buildRestaurantList before changing it.
+  static const int _listLimit = 60;
+
+  /// Decode width for a cover photo, in device pixels.
+  ///
+  /// A card is about 150 logical pixels tall and full width. Without this,
+  /// Image.network decodes the ORIGINAL — a 3000px partner photograph is
+  /// decoded and held in memory at full size for a thumbnail, which is both
+  /// the scroll jank and a large slice of the memory this screen uses.
+  static const int _coverDecodeWidth = 800;
+
   @override
   void initState() {
     super.initState();
@@ -97,9 +109,23 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
       body: CustomScrollView(
         slivers: [
           _buildAppBar(),
-          SliverToBoxAdapter(child: _buildSearchAndFilter()),
-          SliverToBoxAdapter(child: _buildCuisineRow()),
-          if (_filtersExpanded) SliverToBoxAdapter(child: _buildDietaryRow()),
+          SliverToBoxAdapter(
+            child: _buildHeroBand(
+              child: Column(
+                children: [
+                  _buildSearchAndFilter(),
+                  _buildCuisineRow(),
+                ],
+              ),
+            ),
+          ),
+          // ── DIETARY ROW SITS BELOW THE BAND, NOT INSIDE IT ──────────────
+          //
+          // Its chips are green and purple when selected. On the orange band
+          // that is three warm colours fighting; on the neutral background
+          // they read as what they are — filters, not decoration.
+          if (_filtersExpanded)
+            SliverToBoxAdapter(child: _buildDietaryRow()),
           SliverToBoxAdapter(child: _buildAddressBanner()),
           SliverToBoxAdapter(child: _buildPromoBanner()),
           SliverToBoxAdapter(child: _buildSectionHeader('Restaurants near you')),
@@ -113,11 +139,13 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
   // ── App bar ─────────────────────────────────────────────────────────────────
   Widget _buildAppBar() {
     return SliverAppBar(
-      backgroundColor: Colors.white,
-      elevation: 0.5,
+      // Orange, so the app bar and the search band below it read as one
+      // header rather than a white strip on a coloured panel.
+      backgroundColor: _primary,
+      elevation: 0,
       pinned: true,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_rounded, color: Colors.black87),
+        icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
         onPressed: () => Navigator.pop(context),
       ),
       // Address bar replaces static title
@@ -253,7 +281,9 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
                 duration: const Duration(milliseconds: 200),
                 width: 46, height: 46,
                 decoration: BoxDecoration(
-                  color: _filtersExpanded ? _primary : Colors.white,
+                  color: _filtersExpanded
+                      ? Colors.white
+                      : Colors.white.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
@@ -263,7 +293,7 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
                   ],
                 ),
                 child: Icon(Icons.tune_rounded,
-                    color: _filtersExpanded ? Colors.white : Colors.grey[700],
+                    color: _filtersExpanded ? _primary : Colors.white,
                     size: 20),
               ),
             ),
@@ -320,10 +350,17 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
                 padding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 decoration: BoxDecoration(
-                  color: selected ? _primary : Colors.white,
+                  // ⚠ INVERTED FOR THE ORANGE BAND. Selected used to be
+                  // _primary — orange on orange, which made the chosen
+                  // cuisine invisible the moment the header became coloured.
+                  color: selected
+                      ? Colors.white
+                      : Colors.white.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(
-                      color: selected ? _primary : Colors.grey.shade300),
+                      color: selected
+                          ? Colors.white
+                          : Colors.white.withValues(alpha: 0.35)),
                   boxShadow: selected
                       ? [
                           BoxShadow(
@@ -344,7 +381,8 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
                             fontWeight: selected
                                 ? FontWeight.w700
                                 : FontWeight.normal,
-                            color: selected ? Colors.white : Colors.grey[700])),
+                            color:
+                                selected ? _primary : Colors.white)),
                   ],
                 ),
               ),
@@ -606,11 +644,89 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
   // problem by looking at the app, which is why it survived.
   //
   // The three states are now distinct, and a failure says so.
+  /// Grey blocks the size of the real cards.
+  Widget _skeletons() {
+    Widget box(double h, double w, [double r = 8]) => Container(
+          height: h,
+          width: w,
+          decoration: BoxDecoration(
+            color: const Color(0xFFE4E8EE),
+            borderRadius: BorderRadius.circular(r),
+          ),
+        );
+
+    return Column(
+      children: List<Widget>.generate(
+        3,
+        (_) => Container(
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              box(150, double.infinity, 16),
+              const SizedBox(height: 14),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: box(15, 180),
+              ),
+              const SizedBox(height: 9),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: box(12, 120),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The orange band the search sits in.
+  ///
+  /// The screen used to open on a white app bar over a grey background with
+  /// the search field floating on it, which read as a settings page. Food is
+  /// the one section where appetite matters.
+  Widget _buildHeroBand({required Widget child}) => Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFEA580C), Color(0xFFF97316)],
+          ),
+        ),
+        padding: const EdgeInsets.only(bottom: 16),
+        child: child,
+      );
+
+  /// 10.0 -> "10%", 12.5 -> "12.5%". A trailing ".0" on a cashback rate
+  /// reads like a system talking rather than an offer.
+  static String _pct(double v) =>
+      '${v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1)}%';
+
   Widget _buildRestaurantList() => StreamBuilder<QuerySnapshot>(
+        // ── ⚠ .limit() IS NOT OPTIONAL. Added 22 August 2026, reported as
+        //    "food delivery takes too much time to load".
+        //
+        // This was an UNBOUNDED live listener. It downloaded every approved,
+        // online restaurant on every open and kept a socket open for all of
+        // them, and the filters below run in Dart AFTER the whole collection
+        // has arrived. With a few dozen demo restaurants that is merely
+        // wasteful; at a few hundred it is the load time.
+        //
+        // _listLimit is the one number that controls it. Raising it costs
+        // every user on every open, so raise it only with a reason — the real
+        // fix at scale is filtering in the query, and location, not a bigger
+        // number here.
         stream: FirebaseFirestore.instance
             .collection('restaurants')
             .where('isOnline', isEqualTo: true)
             .where('isApproved', isEqualTo: true)
+            .limit(_listLimit)
             .snapshots(),
         // ── ⚠ EVERY BRANCH HERE MUST RETURN A SLIVER ──────────────────────
         //
@@ -647,12 +763,9 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
             ));
           }
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 48),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-            );
+            // Blocks in the shape of the cards, not a bare spinner. Still a
+            // sliver — see the warning above; every branch here must be one.
+            return SliverToBoxAdapter(child: _skeletons());
           }
 
           // ── PER DOCUMENT, NOT PER BATCH ──────────────────────────────
@@ -786,6 +899,9 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
           'deliveryFee': r.deliveryFee,
           'deliveryMins': r.deliveryMins,
           'socialBoostEnabled': r.socialBoostEnabled,
+          // Carried through so the menu can show the same rate the
+          // card promised. Null when the partner has none.
+          'cashbackPct': r.cashbackPct,
         }),
         child: Container(
           margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
@@ -813,6 +929,10 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
                             height: 150,
                             width: double.infinity,
                             fit: BoxFit.cover,
+                            // Decode to roughly card size, not to the size of
+                            // whatever the partner uploaded. See
+                            // _coverDecodeWidth.
+                            cacheWidth: _coverDecodeWidth,
                             errorBuilder: (_, __, ___) => _coverPlaceholder(r))
                         : _coverPlaceholder(r),
                     // Gradient overlay at bottom
@@ -846,6 +966,38 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
                         ],
                       ),
                     ),
+                    // ── CASHBACK, BOTTOM LEFT ──────────────────────────
+                    //
+                    // Hidden entirely when the partner has no rate. See the
+                    // note on _RestaurantItem.cashbackPct — a card that
+                    // invents a rate is a promise the checkout will break.
+                    if (r.cashbackPct != null && r.cashbackPct! > 0)
+                      Positioned(
+                        bottom: 8, left: 10,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _navy,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.savings_outlined,
+                                  size: 12, color: Colors.white),
+                              const SizedBox(width: 5),
+                              Text(
+                                '${_pct(r.cashbackPct!)} cashback',
+                                style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     // Delivery fee — bottom right
                     Positioned(
                       bottom: 8, right: 10,
@@ -1086,6 +1238,12 @@ class _RestaurantItem {
   final List<String> tags; // halal, vegetarian, vegan, gluten-free
   final String? coverImageUrl;
 
+  /// The partner's cashback rate, or null when they have none.
+  ///
+  /// ⚠ NULLABLE ON PURPOSE. A default here would put a rate on the card that
+  /// nothing else in the system promised, and the checkout would disagree.
+  final double? cashbackPct;
+
   const _RestaurantItem({
     required this.id,
     required this.name,
@@ -1099,6 +1257,7 @@ class _RestaurantItem {
     required this.socialBoostEnabled,
     required this.tags,
     this.coverImageUrl,
+    this.cashbackPct,
   });
 
   factory _RestaurantItem.fromDoc(DocumentSnapshot doc) {
@@ -1117,6 +1276,7 @@ class _RestaurantItem {
       // Read `dietaryTags` (new field); fall back to `tags` for legacy docs
       tags: List<String>.from(d['dietaryTags'] ?? d['tags'] ?? []),
       coverImageUrl: d['coverImageUrl'],
+      cashbackPct: (d['cashbackPct'] as num?)?.toDouble(),
     );
   }
 }

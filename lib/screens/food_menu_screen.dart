@@ -28,6 +28,7 @@ class _FoodMenuScreenState extends State<FoodMenuScreen> {
   // ── Args ───────────────────────────────────────────────────────────────────
   late String _restaurantId;
   late String _restaurantName;
+  double? _cashbackPct;
   late String _cuisineType;
   late double _deliveryFee;
   late int    _deliveryMins;
@@ -66,6 +67,10 @@ class _FoodMenuScreenState extends State<FoodMenuScreen> {
     _deliveryFee    = (args['deliveryFee']  as num?)?.toDouble() ?? 0;
     _deliveryMins   = (args['deliveryMins'] as num?)?.toInt()    ?? 30;
     _socialBoost    = (args['socialBoostEnabled']  ?? false) as bool;
+    // ⚠ NULLABLE. Absent when the partner has no rate — the strip below is
+    // hidden rather than defaulted. A menu that promises a rate the card did
+    // not is how a customer ends up disputing their cashback.
+    _cashbackPct    = (args['cashbackPct'] as num?)?.toDouble();
 
     // Register with CartService (clear if different restaurant)
     final ok = _cart.setRestaurant(
@@ -272,6 +277,14 @@ class _FoodMenuScreenState extends State<FoodMenuScreen> {
                   slivers: [
                     // ── Restaurant header ────────────────────────────────────
                     _buildSliverHeader(),
+                    // ── CASHBACK STRIP ────────────────────────────────────────
+                    //
+                    // Added 22 August 2026. This screen mentioned cashback
+                    // nowhere at all — a GoOuts menu that reads exactly like
+                    // any other delivery app's menu. The rate is carried in
+                    // from the restaurant card so the two cannot disagree.
+                    if (_cashbackPct != null && _cashbackPct! > 0)
+                      SliverToBoxAdapter(child: _buildCashbackStrip()),
                     // ── Popular Picks / AI upsell ─────────────────────────────
                     if (_popularItems.isNotEmpty)
                       SliverToBoxAdapter(child: _buildPopularPicksSection()),
@@ -313,6 +326,66 @@ class _FoodMenuScreenState extends State<FoodMenuScreen> {
   }
 
   // ── Sliver header ──────────────────────────────────────────────────────────
+  /// States the rate once, near the top, and says when it arrives.
+  ///
+  /// ⚠ ONLY RENDERED WHEN _cashbackPct IS NON NULL. See didChangeDependencies.
+  Widget _buildCashbackStrip() {
+    final double pct = _cashbackPct!;
+    final String label = pct == pct.roundToDouble()
+        ? pct.toStringAsFixed(0)
+        : pct.toStringAsFixed(1);
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _navy,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.savings_outlined,
+                color: Colors.white, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$label% cashback on this order',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  // Says WHEN, not just that. "You will get cashback" with no
+                  // timing is the sentence customers dispute later.
+                  'Added to your GoOuts wallet after the order is delivered.',
+                  style: GoogleFonts.inter(
+                    fontSize: 11.5,
+                    height: 1.4,
+                    color: Colors.white.withValues(alpha: 0.8),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSliverHeader() {
     return SliverAppBar(
       expandedHeight: 220,

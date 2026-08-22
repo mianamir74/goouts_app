@@ -392,7 +392,36 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
+      child: Column(
+        children: [
+          // ── MESSAGE THE HOST ────────────────────────────────────────────
+          //
+          // Shown on the same statuses as Change and Cancel — pending and
+          // confirmed. A guest with a question before arrival previously had
+          // no way to ask one; the only contact route in the app was GoOuts
+          // support, who cannot tell them where the key is.
+          //
+          // Deliberately the FIRST button. Asking a question is far more
+          // common than cancelling, and Cancel should not be the most
+          // prominent thing a guest sees on their own booking.
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => Navigator.of(context).pushNamed(
+                StayRoutes.messageHost,
+                arguments: <String, dynamic>{'bookingId': b.id},
+              ),
+              icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+              label: const Text('Message your host'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 48),
+                backgroundColor: GoOutsColors.primaryBlue,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
         children: [
           Expanded(
             child: OutlinedButton.icon(
@@ -424,6 +453,8 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                 side: const BorderSide(color: GoOutsColors.error),
               ),
             ),
+          ),
+        ],
           ),
         ],
       ),

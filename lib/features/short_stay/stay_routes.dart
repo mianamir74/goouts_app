@@ -30,6 +30,7 @@ import 'guest/23_claim_notification_screen.dart';
 import 'guest/24_contest_claim_screen.dart';
 import 'guest/25_review_stay_screen.dart';
 import 'guest/26_booking_details_screen.dart';
+import 'guest/30_message_host_screen.dart';
 import 'guest/27_edit_booking_screen.dart';
 import 'guest/28_cancel_booking_screen.dart';
 import 'guest/29_cancellation_confirmed_screen.dart';
@@ -84,6 +85,9 @@ class StayRoutes {
   static const claim                = '/stay/claim';
   static const contestClaim         = '/stay/claim/contest';
   static const review               = '/stay/review';
+  // The guest half of stay_bookings/{id}/messages. The host half lives in
+  // goouts_host at HostRoutes.guestThread and writes the same documents.
+  static const messageHost          = '/stay/booking/messages';
 
   /// Every route this feature owns. Used by the guard below so a typo in a
   /// route name produces a clear error rather than a blank screen.
@@ -93,6 +97,7 @@ class StayRoutes {
     myBookings, trip, bookingDetails, editBooking, cancelBooking,
     cancellationDone, captureIntro, captureChecklist, cameraCapture, skipRoom,
     captureComplete, checkoutCapture, evidencePack, claim, contestClaim, review,
+    messageHost,
   };
 
   static bool owns(String? name) => name != null && _all.contains(name);
@@ -169,6 +174,7 @@ class StayRoutes {
           myBookings        => const MyBookingsScreen(),
           trip              => TripDetailsScreen(bookingId: bookingId),
           bookingDetails    => BookingDetailsScreen(bookingId: bookingId),
+          messageHost       => MessageHostScreen(bookingId: bookingId),
           editBooking       => EditBookingScreen(bookingId: bookingId),
           cancelBooking     => CancelBookingScreen(bookingId: bookingId),
           cancellationDone  =>

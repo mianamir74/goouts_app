@@ -99,19 +99,38 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
     _load();
   }
 
+  // ── ⚠ TWO INDEPENDENT LOADS. DO NOT PUT THESE BACK IN A Future.wait. ──────
+  //
+  // Fixed 22 August 2026, reported as "Short Stay takes too much time to load".
+  //
+  // This WAS a Future.wait over the listings and the cashback rate, under a
+  // comment claiming "the rate never blocks the listings". It did. Future.wait
+  // completes when the SLOWEST future completes, so the screen sat on a
+  // spinner until both were back.
+  //
+  // And the rate is the slow one by a wide margin. mostPartnersNearby is a
+  // single Firestore read; cashbackRate is a Cloud Function call, and a
+  // function that has been idle for fifteen minutes COLD STARTS — seconds, not
+  // milliseconds. In testing almost every open pays that, because nothing else
+  // keeps the function warm.
+  //
+  // So the listings now decide when the screen is ready and the rate fills
+  // itself in whenever it arrives. _rate already defaults to
+  // StayCashbackRate.unknown and the cashback line is behind `_rate.isKnown`,
+  // so arriving late costs one line appearing a moment after the cards — not
+  // a blank screen.
   Future<void> _load() async {
+    _loadListings();
+    _loadRate();
+  }
+
+  Future<void> _loadListings() async {
     try {
-      // Fetched together. The rate never blocks the listings: cashbackRate
-      // swallows its own failures and returns `unknown`, so a cashback outage
-      // costs the cashback line and not the whole screen.
-      final results = await Future.wait(<Future<Object>>[
-        StayListingService.instance.mostPartnersNearby(limit: 12),
-        StayBookingService.instance.cashbackRate(),
-      ]);
+      final List<StayListing> found =
+          await StayListingService.instance.mostPartnersNearby(limit: 12);
       if (!mounted) return;
       setState(() {
-        _listings = results[0] as List<StayListing>;
-        _rate = results[1] as StayCashbackRate;
+        _listings = found;
         _error = null;
         _loading = false;
       });
@@ -125,6 +144,15 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
         _loading = false;
       });
     }
+  }
+
+  Future<void> _loadRate() async {
+    // cashbackRate swallows its own failures and returns `unknown`, so a
+    // cashback outage costs the cashback line and nothing else.
+    final StayCashbackRate r =
+        await StayBookingService.instance.cashbackRate();
+    if (!mounted) return;
+    setState(() => _rate = r);
   }
 
   @override
@@ -264,7 +292,9 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
     return Scaffold(
       backgroundColor: GoOutsColors.pageBackground,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        // Deep navy so the app bar and the hero below it read as one block
+        // rather than a white strip sitting on a coloured panel.
+        backgroundColor: GoOutsColors.deepNavy,
         elevation: 0.5,
         // ── ⚠ THIS WAS A PLAIN Icon, NOT A BUTTON ────────────────────────
         //
@@ -275,7 +305,7 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
         // AppBar, which is why it survived review: the only way to notice is to
         // press it.
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: GoOutsColors.primaryBlue),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
@@ -283,46 +313,291 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
           style: GoogleFonts.inter(
             fontSize: 20,
             fontWeight: FontWeight.w700,
-            color: GoOutsColors.deepNavy,
+            color: Colors.white,
           ),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildSearchField(),
-            const SizedBox(height: 12),
-            _buildPillSelectors(),
-            const SizedBox(height: 20),
+      // ── PULL TO REFRESH ─────────────────────────────────────────────────
+      //
+      // The two loads stay separate here for the same reason they are separate
+      // in _load: the cashback rate is a Cloud Function and must never be what
+      // the guest is waiting on.
+      body: RefreshIndicator(
+        color: GoOutsColors.primaryBlue,
+        onRefresh: () async {
+          _loadRate();
+          await _loadListings();
+        },
+        child: ListView(
+          padding: EdgeInsets.zero,
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: <Widget>[
+            _hero(),
+            if (_cities.isNotEmpty) _cityChips(),
+            const SizedBox(height: 18),
             if (_loading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 48),
-                child: Center(child: CircularProgressIndicator()),
-              )
+              _skeletons()
             else if (_error != null)
-              _buildLoadFailed()
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _buildLoadFailed(),
+              )
             else if (_listings.isEmpty)
-              _buildEmpty()
-            else ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _buildEmpty(),
+              )
+            else ...<Widget>[
               // Ordered by partnerCounts.halfMile, computed by the location
               // engine from each property's real postcode. This is the one
               // thing no other stay platform can show, so it leads.
-              _buildSectionHeader(
-                  'Places with the most GoOuts partners nearby'),
-              const SizedBox(height: 8),
-              _buildHorizontalList(_topByPartners),
-              if (_others.isNotEmpty) ...[
-                const SizedBox(height: 20),
-                _buildSectionHeader('More places to stay'),
-                const SizedBox(height: 8),
-                _buildHorizontalList(_others),
+              _sectionTitle(
+                'Most GoOuts partners nearby',
+                'Stay where your cashback goes furthest',
+              ),
+              _horizontalRow(_topByPartners),
+              if (_others.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 22),
+                _sectionTitle('More places to stay', null),
+                for (final StayListing l in _others) _wideCard(l),
               ],
             ],
+            const SizedBox(height: 28),
           ],
         ),
       ),
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
+  //  PRESENTATION — rebuilt 22 August 2026
+  //
+  //  The screen was a search bar, two pills and one horizontal row of twelve
+  //  cards on a grey background. Everything underneath it — the location
+  //  engine, partner counts, real cashback rates — was already working and
+  //  none of it showed.
+  //
+  //  ⚠ NOTHING BELOW INVENTS A NUMBER. Every badge is hidden when the data
+  //  behind it is absent, exactly as before:
+  //    · rating hidden when ratingCount == 0 (a new property is not a bad one)
+  //    · partner count hidden when 0 (not known yet is not zero)
+  //    · cashback hidden unless _rate.isKnown (we promise no rate we were not
+  //      given)
+  //  A prettier screen that fills those gaps with plausible defaults would be
+  //  worse than the plain one it replaced.
+  // ════════════════════════════════════════════════════════════════════════
+
+  /// Towns that actually have listings, taken from the loaded data.
+  ///
+  /// NOT a hardcoded list of British cities. A chip for a city with nothing
+  /// in it sends the guest to an empty results page and makes the whole
+  /// product look broken.
+  List<String> get _cities {
+    final List<String> out = <String>[];
+    for (final StayListing l in _listings) {
+      final String t = l.address.town.trim();
+      if (t.isNotEmpty && !out.contains(t)) out.add(t);
+    }
+    return out.take(8).toList(growable: false);
+  }
+
+  Widget _hero() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 22),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: <Color>[
+            GoOutsColors.deepNavy,
+            GoOutsColors.primaryBlue,
+          ],
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            'Stay somewhere,\nearn everywhere',
+            style: GoogleFonts.inter(
+              fontSize: 25,
+              height: 1.2,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            // Says what the product does without quoting a rate we may not
+            // have been given. The rate itself appears on the cards, once.
+            'Book a place, then get cashback at GoOuts partners around it.',
+            style: GoogleFonts.inter(
+              fontSize: 13.5,
+              height: 1.45,
+              color: Colors.white.withValues(alpha: 0.85),
+            ),
+          ),
+          const SizedBox(height: 18),
+          _buildSearchField(),
+          const SizedBox(height: 10),
+          _buildPillSelectors(),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _search,
+              icon: const Icon(Icons.search_rounded, size: 19),
+              label: const Text('Search'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 50),
+                backgroundColor: Colors.white,
+                foregroundColor: GoOutsColors.deepNavy,
+                textStyle: GoogleFonts.inter(
+                    fontSize: 15, fontWeight: FontWeight.w700),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _cityChips() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: SizedBox(
+        height: 36,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: _cities.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 8),
+          itemBuilder: (context, i) {
+            final String town = _cities[i];
+            return InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: () {
+                _whereCtrl.text = town;
+                _search();
+              },
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: GoOutsColors.cardSurface,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: GoOutsColors.dividerGray),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    const Icon(Icons.place_outlined,
+                        size: 14, color: GoOutsColors.primaryBlue),
+                    const SizedBox(width: 6),
+                    Text(
+                      town,
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: GoOutsColors.deepNavy,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionTitle(String title, String? subtitle) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            title,
+            style: GoogleFonts.inter(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: GoOutsColors.deepNavy,
+            ),
+          ),
+          if (subtitle != null) ...<Widget>[
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: GoogleFonts.inter(
+                fontSize: 12.5,
+                color: GoOutsColors.bodyText,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Grey blocks in the shape of the real content.
+  ///
+  /// A bare spinner tells a guest nothing about what is coming. These occupy
+  /// the same space the cards will, so the page does not jump when they land.
+  Widget _skeletons() {
+    Widget box(double h, double w, [double r = 8]) => Container(
+          height: h,
+          width: w,
+          decoration: BoxDecoration(
+            color: GoOutsColors.dividerGray,
+            borderRadius: BorderRadius.circular(r),
+          ),
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+          child: box(18, 210),
+        ),
+        SizedBox(
+          height: 250,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: 3,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (_, __) => Container(
+              width: 230,
+              decoration: BoxDecoration(
+                color: GoOutsColors.cardSurface,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  box(140, 230, 14),
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: box(14, 150),
+                  ),
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: box(12, 100),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -445,17 +720,6 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
     );
   }
 
-  Widget _buildSectionHeader(String title) {
-    return Text(
-      title,
-      style: GoogleFonts.inter(
-        fontSize: 15,
-        fontWeight: FontWeight.w700,
-        color: GoOutsColors.primaryBlue,
-      ),
-    );
-  }
-
   /// Shown when the query FAILED. Deliberately not the same as the empty
   /// state: "no properties are listed yet" is a lie if the truth is that the
   /// app could not read them.
@@ -544,154 +808,207 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
     );
   }
 
-  Widget _buildHorizontalList(List<StayListing> items) {
+  // ── CARDS ─────────────────────────────────────────────────────────────────
+  //
+  // Two shapes for two jobs. The horizontal row is for browsing a short,
+  // curated set; the wide card is for reading down a longer list. The old
+  // screen used the same 200px card for both, so "more places to stay" was a
+  // second identical row that scrolled sideways and nobody reached the end of.
+
+  /// Small overlay chip drawn on top of a photo.
+  Widget _photoChip(String text, {required Color colour, IconData? icon}) =>
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: colour,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            if (icon != null) ...<Widget>[
+              Icon(icon, size: 11, color: Colors.white),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              text,
+              style: GoogleFonts.inter(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      );
+
+  /// The property photograph, or an honest placeholder when there is none.
+  Widget _photo(StayListing l, {required double h, double w = double.infinity}) {
+    final List<StayPhoto> photos = List<StayPhoto>.from(l.photos)
+      ..sort((a, b) => a.order.compareTo(b.order));
+
+    Widget placeholder() => Container(
+          height: h,
+          width: w,
+          color: GoOutsColors.paleBlueTint,
+          child: const Icon(Icons.home_outlined,
+              size: 32, color: GoOutsColors.primaryBlue),
+        );
+
+    if (photos.isEmpty) return placeholder();
+    return Image.network(
+      photos.first.url,
+      height: h,
+      width: w,
+      fit: BoxFit.cover,
+      // Decoded to roughly card size. Without this a host's 3000px photograph
+      // is decoded and held at full resolution for a thumbnail — twelve of
+      // them is the scroll jank on this screen and most of its memory.
+      cacheWidth: 700,
+      errorBuilder: (_, __, ___) => placeholder(),
+    );
+  }
+
+  Widget _ratingRow(StayListing l) {
+    // A property with no reviews shows nothing rather than 0.0 beside a star,
+    // which reads as a bad property instead of a new one.
+    if (l.ratingCount == 0) return const SizedBox.shrink();
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        const Icon(Icons.star_rounded, size: 14, color: GoOutsColors.warning),
+        const SizedBox(width: 3),
+        Text(
+          l.ratingAvg.toStringAsFixed(1),
+          style: GoogleFonts.inter(
+              fontSize: 12, fontWeight: FontWeight.w700,
+              color: GoOutsColors.deepNavy),
+        ),
+        const SizedBox(width: 3),
+        Text(
+          '(${l.ratingCount})',
+          style: GoogleFonts.inter(
+              fontSize: 11, color: GoOutsColors.bodyText),
+        ),
+      ],
+    );
+  }
+
+  void _openListing(StayListing l) => Navigator.of(context).pushNamed(
+        StayRoutes.listing,
+        arguments: <String, dynamic>{'listingId': l.id},
+      );
+
+  Widget _horizontalRow(List<StayListing> items) {
     return SizedBox(
-      height: 240,
+      height: 262,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: items.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final StayListing l = items[index];
-          final List<StayPhoto> photos = List<StayPhoto>.from(l.photos)
-            ..sort((a, b) => a.order.compareTo(b.order));
-          final int partners =
-              l.locationContext?.partnerCounts.halfMile ?? 0;
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemBuilder: (context, i) {
+          final StayListing l = items[i];
+          final int partners = l.locationContext?.partnerCounts.halfMile ?? 0;
 
           return InkWell(
-            // The tap that did not exist. Every card is a real listing id, so
-            // this opens THAT property rather than a fixed one.
-            onTap: () => Navigator.of(context).pushNamed(
-              StayRoutes.listing,
-              arguments: <String, dynamic>{'listingId': l.id},
-            ),
-            borderRadius: BorderRadius.circular(12),
+            onTap: () => _openListing(l),
+            borderRadius: BorderRadius.circular(14),
             child: Container(
-              width: 200,
+              width: 230,
               decoration: BoxDecoration(
                 color: GoOutsColors.cardSurface,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: const <BoxShadow>[
+                  BoxShadow(
+                    color: GoOutsColors.cardShadow,
+                    blurRadius: 10,
+                    offset: Offset(0, 3),
+                  ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+                children: <Widget>[
                   ClipRRect(
                     borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(12)),
-                    child: photos.isEmpty
-                        ? Container(
-                            height: 120,
-                            width: double.infinity,
-                            color: GoOutsColors.paleBlueTint,
-                            child: const Icon(Icons.home_outlined,
-                                size: 36, color: GoOutsColors.primaryBlue),
-                          )
-                        : Image.network(
-                            photos.first.url,
-                            height: 120,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              height: 120,
-                              width: double.infinity,
-                              color: GoOutsColors.paleBlueTint,
-                              child: const Icon(Icons.home_outlined,
-                                  size: 36, color: GoOutsColors.primaryBlue),
-                            ),
-                          ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                l.address.town.isEmpty
-                                    ? l.title
-                                    : l.address.town,
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.inter(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: GoOutsColors.deepNavy,
-                                ),
-                              ),
-                            ),
-                            // A property with no reviews shows nothing here
-                            // rather than a 0.0 beside a star, which reads as
-                            // a bad property instead of a new one.
-                            if (l.ratingCount > 0) ...[
-                              const Icon(Icons.star,
-                                  size: 14, color: GoOutsColors.warning),
-                              const SizedBox(width: 4),
-                              Text(
-                                l.ratingAvg.toStringAsFixed(1),
-                                style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500),
-                              ),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Text(
-                              '${l.nightlyRate.compact} per night',
-                              style: GoogleFonts.inter(
-                                fontSize: 13.5,
-                                color: GoOutsColors.bodyText,
-                              ),
-                            ),
-                            // The cashback the guest actually earns on this
-                            // stay, at THEIR rate — Plus members see theirs.
-                            // Hidden when the server did not supply a rate,
-                            // rather than falling back to a plausible number
-                            // nobody promised.
-                            if (_rate.isKnown) ...[
-                              const SizedBox(width: 6),
-                              Flexible(
-                                child: Text(
-                                  '· ${_rate.label} back',
-                                  overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 13.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: GoOutsColors.tealSecondary,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 8),
+                        const BorderRadius.vertical(top: Radius.circular(14)),
+                    child: Stack(
+                      children: <Widget>[
+                        _photo(l, h: 140, w: 230),
                         // Hidden entirely until the location engine has run.
                         // "0 partners nearby" would not be true — it is not
                         // known yet — and this figure is the whole proposition.
                         if (partners > 0)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: GoOutsColors.primaryBlue,
-                              borderRadius: BorderRadius.circular(20),
+                          Positioned(
+                            left: 8,
+                            top: 8,
+                            child: _photoChip(
+                              '$partners nearby',
+                              colour: GoOutsColors.deepNavy
+                                  .withValues(alpha: 0.82),
+                              icon: Icons.local_offer_outlined,
                             ),
-                            child: Text(
-                              '$partners '
-                              '${partners == 1 ? 'partner' : 'partners'} '
-                              'nearby',
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
+                          ),
+                        if (_rate.isKnown)
+                          Positioned(
+                            right: 8,
+                            top: 8,
+                            child: _photoChip(
+                              '${_rate.label} back',
+                              colour: GoOutsColors.tealSecondary,
                             ),
                           ),
                       ],
+                    ),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(
+                            l.address.town.isEmpty ? l.title : l.address.town,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w700,
+                              color: GoOutsColors.deepNavy,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            l.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                                fontSize: 12, color: GoOutsColors.bodyText),
+                          ),
+                          const Spacer(),
+                          Row(
+                            children: <Widget>[
+                              Text(
+                                l.nightlyRate.compact,
+                                style: GoogleFonts.inter(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: GoOutsColors.deepNavy,
+                                ),
+                              ),
+                              Text(
+                                ' / night',
+                                style: GoogleFonts.inter(
+                                    fontSize: 11.5,
+                                    color: GoOutsColors.bodyText),
+                              ),
+                              const Spacer(),
+                              _ratingRow(l),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -699,6 +1016,145 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _wideCard(StayListing l) {
+    final int partners = l.locationContext?.partnerCounts.halfMile ?? 0;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: InkWell(
+        onTap: () => _openListing(l),
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          decoration: BoxDecoration(
+            color: GoOutsColors.cardSurface,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: const <BoxShadow>[
+              BoxShadow(
+                color: GoOutsColors.cardShadow,
+                blurRadius: 10,
+                offset: Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              ClipRRect(
+                borderRadius:
+                    const BorderRadius.horizontal(left: Radius.circular(14)),
+                child: SizedBox(
+                  width: 116,
+                  child: _photo(l, h: 116, w: 116),
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: <Widget>[
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Row(
+                            children: <Widget>[
+                              Expanded(
+                                child: Text(
+                                  l.address.town.isEmpty
+                                      ? l.title
+                                      : l.address.town,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: GoOutsColors.deepNavy,
+                                  ),
+                                ),
+                              ),
+                              _ratingRow(l),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            l.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                                fontSize: 12, color: GoOutsColors.bodyText),
+                          ),
+                          if (partners > 0) ...<Widget>[
+                            const SizedBox(height: 6),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: <Widget>[
+                                const Icon(Icons.local_offer_outlined,
+                                    size: 12,
+                                    color: GoOutsColors.primaryBlue),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '$partners GoOuts '
+                                  '${partners == 1 ? 'partner' : 'partners'} '
+                                  'within half a mile',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: GoOutsColors.primaryBlue,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: <Widget>[
+                          Text(
+                            l.nightlyRate.compact,
+                            style: GoogleFonts.inter(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: GoOutsColors.deepNavy,
+                            ),
+                          ),
+                          Text(
+                            ' / night',
+                            style: GoogleFonts.inter(
+                                fontSize: 11.5, color: GoOutsColors.bodyText),
+                          ),
+                          const Spacer(),
+                          if (_rate.isKnown)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: GoOutsColors.paleBlueTint,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                '${_rate.label} back',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: GoOutsColors.tealSecondary,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

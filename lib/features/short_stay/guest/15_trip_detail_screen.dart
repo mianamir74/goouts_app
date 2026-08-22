@@ -115,6 +115,8 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
               const SizedBox(height: 16),
               _addressCard(),
               const SizedBox(height: 16),
+              _contactHostCard(b),
+              const SizedBox(height: 16),
               _photosCard(b),
               if (_listing?.locationContext != null) ...[
                 const SizedBox(height: 16),
@@ -305,6 +307,60 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
   }
 
   // ── Photographs ──────────────────────────────────────────────────────────
+
+  /// ── REACHING THE HOST DURING THE STAY ────────────────────────────────────
+  ///
+  /// Placed directly under the address, because the moments this is needed
+  /// are the moments the address is not enough: the key box code is wrong,
+  /// the door will not open, the heating is off. Before this screen existed
+  /// the only contact route in the whole app was GoOuts support, who do not
+  /// know where the key is.
+  ///
+  /// Offered whatever the status. A guest standing outside a property at
+  /// eleven at night is not helped by a button that checks whether their
+  /// booking is in the right state first.
+  Widget _contactHostCard(StayBooking b) => _card(
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Need something?',
+              style: GoogleFonts.inter(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: GoOutsColors.deepNavy,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Message your host about arrival, keys, parking or anything '
+              'that is not right. They see it in their GoOuts Host app.',
+              style: GoogleFonts.inter(
+                fontSize: 13.5,
+                height: 1.4,
+                color: GoOutsColors.bodyText,
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () => Navigator.of(context).pushNamed(
+                  StayRoutes.messageHost,
+                  arguments: <String, dynamic>{'bookingId': b.id},
+                ),
+                icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+                label: const Text('Message your host'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 46),
+                  backgroundColor: GoOutsColors.primaryBlue,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
 
   Widget _photosCard(StayBooking b) {
     return StreamBuilder<List<StayEvidence>>(

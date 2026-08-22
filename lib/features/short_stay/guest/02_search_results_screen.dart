@@ -56,23 +56,41 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     _load();
   }
 
+  /// cashbackRate swallows its own failures and returns `unknown`, so a
+  /// cashback outage costs the chip on each card and nothing else.
+  Future<void> _loadRate() async {
+    final StayCashbackRate r =
+        await StayBookingService.instance.cashbackRate();
+    if (!mounted) return;
+    setState(() => _rate = r);
+  }
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
+      // ── ⚠ THE RATE IS NOT AWAITED HERE. Fixed 22 August 2026. ─────────
+      //
+      // It used to be `await search(...)` and then `await cashbackRate()`, in
+      // sequence, with _loading staying true until both returned. The search
+      // is a Firestore read; cashbackRate is a Cloud Function, and a function
+      // idle for fifteen minutes COLD STARTS — seconds, not milliseconds. So
+      // the results sat behind a spinner waiting for a label.
+      //
+      // Started here, applied whenever it lands. _rate defaults to
+      // StayCashbackRate.unknown and every use of it is behind
+      // `_rate.isKnown`, so arriving late costs a chip appearing a moment
+      // after the cards.
+      _loadRate();
+
       final page = await StayAvailabilityService.instance
           .search(_criteria)
           .timeout(const Duration(seconds: 20));
-      // After the search, not alongside it. The results are what this screen
-      // is for; the rate decorates them, and cashbackRate is cached after the
-      // first call so re-filtering does not re-fetch it.
-      final rate = await StayBookingService.instance.cashbackRate();
       if (!mounted) return;
       setState(() {
         _page = page;
-        _rate = rate;
         _loading = false;
       });
     } catch (e) {
@@ -148,9 +166,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   }
 
   Widget _body() {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    if (_loading) return _skeletons();
     if (_error != null) {
       return _message(
         Icons.error_outline,
@@ -166,13 +182,72 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         'Try widening the filters, or searching a different town.',
       );
     }
+    final int n = _page.listings.length;
     return RefreshIndicator(
+      color: GoOutsColors.primaryBlue,
       onRefresh: _load,
       child: ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: _page.listings.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 16),
-        itemBuilder: (context, i) => _buildPropertyCard(_page.listings[i]),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        // One extra row at the top for the count.
+        itemCount: n + 1,
+        separatorBuilder: (_, __) => const SizedBox(height: 14),
+        itemBuilder: (context, i) {
+          if (i == 0) {
+            return Text(
+              // The real number, from the real result set. A search that
+              // found three places says three.
+              n == 1 ? '1 place to stay' : '$n places to stay',
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: GoOutsColors.bodyText,
+              ),
+            );
+          }
+          return _buildPropertyCard(_page.listings[i - 1]);
+        },
+      ),
+    );
+  }
+
+  /// Blocks in the shape of the cards. A bare spinner gives no sense of what
+  /// is coming, and the page jumps when the results replace it.
+  Widget _skeletons() {
+    Widget box(double h, double w, [double r = 8]) => Container(
+          height: h,
+          width: w,
+          decoration: BoxDecoration(
+            color: GoOutsColors.dividerGray,
+            borderRadius: BorderRadius.circular(r),
+          ),
+        );
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      itemCount: 3,
+      separatorBuilder: (_, __) => const SizedBox(height: 14),
+      itemBuilder: (_, __) => Container(
+        decoration: BoxDecoration(
+          color: GoOutsColors.cardSurface,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            box(180, double.infinity, 14),
+            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: box(15, 220),
+            ),
+            const SizedBox(height: 10),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: box(12, 140),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
       ),
     );
   }
@@ -325,6 +400,33 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     );
   }
 
+  Widget _photoChip(String text,
+          {required Color colour, IconData? icon}) =>
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        decoration: BoxDecoration(
+          color: colour,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            if (icon != null) ...<Widget>[
+              Icon(icon, size: 12, color: Colors.white),
+              const SizedBox(width: 5),
+            ],
+            Text(
+              text,
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      );
+
   Widget _buildPropertyCard(StayListing l) {
     final cover = l.photos.isNotEmpty ? l.photos.first.url : '';
     final headline = l.locationContext?.partnerCounts.headline;
@@ -335,19 +437,27 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         StayRoutes.listing,
         arguments: {'listingId': l.id},
       ),
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(14),
       child: Container(
         decoration: BoxDecoration(
           color: GoOutsColors.cardSurface,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: const <BoxShadow>[
+            BoxShadow(
+              color: GoOutsColors.cardShadow,
+              blurRadius: 10,
+              offset: Offset(0, 3),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ClipRRect(
               borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(12)),
-              child: cover.isEmpty
+                  const BorderRadius.vertical(top: Radius.circular(14)),
+              child: Stack(children: <Widget>[
+              cover.isEmpty
                   ? Container(
                       height: 200,
                       color: GoOutsColors.dividerGray,
@@ -370,6 +480,32 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                             color: GoOutsColors.outlineVariant),
                       ),
                     ),
+              // ── OVERLAY CHIPS ────────────────────────────────────────
+              //
+              // Both hidden when the data behind them is absent. headline is
+              // null when there is nothing nearby to claim, and _rate is
+              // unknown until the server tells us — see the note at the top
+              // of this file about the mock card that always said 18.
+              if (headline != null)
+                Positioned(
+                  left: 10,
+                  top: 10,
+                  child: _photoChip(
+                    headline,
+                    colour: GoOutsColors.deepNavy.withValues(alpha: 0.82),
+                    icon: Icons.local_offer_outlined,
+                  ),
+                ),
+              if (_rate.isKnown)
+                Positioned(
+                  right: 10,
+                  top: 10,
+                  child: _photoChip(
+                    '${_rate.label} back',
+                    colour: GoOutsColors.tealSecondary,
+                  ),
+                ),
+              ]),
             ),
             Padding(
               padding: const EdgeInsets.all(16),
