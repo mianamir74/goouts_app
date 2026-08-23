@@ -8,9 +8,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
+
+import '../services/image_orientation.dart';
+import '../services/liveness_ring_controller.dart';
+import '../widgets/liveness_ring.dart';
 import '../services/id_quality_inspector.dart';
 import '../services/biometric_selfie_inspector.dart';
 import '../services/auto_selfie_controller.dart';
+// FaceCheckResult, for the onResult closure that feeds the liveness ring.
+import '../services/face_check_service.dart';
 import '../services/document_quality_inspector.dart';
 // user_service import removed 4 August 2026. Both uses were
 // UserService().updateUser({'kycStatus': 'pending'}), which is now the
@@ -53,6 +59,21 @@ class _KycScreenState extends State<KycScreen> {
   // ── Inspector results ──────────────────────────────────────────────────────
   bool _idValid = false;
   bool _selfieValid = false;
+
+  /// The quality warning, when the photo was accepted despite one. Stored with
+  /// the record so an admin sees what the app thought.
+  String? _selfieAdvice;
+
+  /// Whether the head sweep completed, or the shutter was released by the
+  /// timeout instead. Sent with the submission so a reviewer knows which.
+  bool _livenessComplete = false;
+
+  /// Why the sweep did not finish, if it did not. Sent with the submission.
+  String _livenessNote = '';
+
+  /// The instructions sheet is shown once per visit to this screen.
+  bool _introShown = false;
+  Map<String, double> _selfieScores = const <String, double>{};
   bool _checking = false;
   String _feedbackMsg = '';
 
@@ -60,6 +81,14 @@ class _KycScreenState extends State<KycScreen> {
   /// Null whenever the front camera is not running, or on a device where image
   /// streaming is unavailable — the manual shutter still works in both cases.
   AutoSelfieController? _autoSelfie;
+
+  /// The head sweep that must finish before the shutter is allowed.
+  ///
+  /// ⚠ IT SHARES THE AUTO-SELFIE'S DETECTOR. It is fed from
+  /// AutoSelfieController.onResult rather than running a second face detector
+  /// on the same stream — two detectors would double the CPU cost and could
+  /// disagree about whether a face is even present.
+  LivenessRingController? _liveness;
 
   // ── Inspectors ────────────────────────────────────────────────────────────
   final _idInspector       = IdQualityInspector();
@@ -149,16 +178,102 @@ class _KycScreenState extends State<KycScreen> {
         controller: ctrl,
         onCaptured: _acceptSelfie,
       );
+      final ring = LivenessRingController();
+
+      // ── THE FLOW ────────────────────────────────────────────────────────
+      //
+      //   1. sweep      the ring fills as the head turns. Shutter held.
+      //   2. complete   or timed out — the shutter is released either way.
+      //   3. capture    the EXISTING auto-capture takes the photo, straight
+      //                 on, once the framing settles.
+      //
+      // Two separate things on purpose. The ring needs the head TURNING; the
+      // photograph needs it STRAIGHT, because an admin compares it against a
+      // passport. A frame grabbed mid-sweep would be a profile shot that
+      // matches nothing.
+      auto.holdShutter = true;
+      auto.onResult = (FaceCheckResult r) {
+        ring.onFrame(
+          faceFound: r.available && r.faceCount == 1,
+          // ⚠ PASSED THROUGH AS NULL WHEN NOT MEASURED. Never `?? 0`, which
+          // would read as "facing dead ahead" and peg the sweep for ever.
+          yaw: r.yaw,
+        );
+      };
+      ring.state.addListener(() {
+        final LivenessRingState s = ring.state.value;
+        if (s == LivenessRingState.complete ||
+            s == LivenessRingState.timedOut) {
+          // Released on BOTH outcomes. A timeout must not trap anybody — the
+          // photo is taken and the record carries `livenessComplete: false`
+          // for the admin. See the note on the controller.
+          auto.holdShutter = false;
+          _livenessComplete = s == LivenessRingState.complete;
+          // The same sentence the person was shown. A reviewer seeing
+          // "turned left but not right" knows to look at the photo rather
+          // than assume a failed check means a fraudulent one.
+          _livenessNote = ring.failureReason.value;
+          if (mounted) setState(() {});
+        }
+      });
+
       _autoSelfie = auto;
+      _liveness = ring;
       await auto.start();
       if (mounted) setState(() {});
+
+      // ── TELL THEM WHAT IS COMING, BEFORE IT COMES ────────────────────────
+      //
+      // Shown AFTER the camera is live so it opens over a working preview
+      // rather than a black rectangle — people trust a screen that is
+      // visibly ready more than one that is visibly loading.
+      //
+      // Once per visit to this screen, not once per attempt: re-reading the
+      // same instructions after a retry is nagging, not helping.
+      if (mounted && !_introShown) {
+        _introShown = true;
+        await _showLivenessIntro();
+      }
     }
   }
+
+  /// The single instruction line over the preview.
+  ///
+  /// Extracted so the sweep hint and the framing hint render IDENTICALLY —
+  /// two copies of this styling would eventually drift and the line would
+  /// visibly change shape as the screen handed over from one to the other.
+  Widget _hintPill(String msg) => AnimatedOpacity(
+        opacity: msg.isEmpty ? 0.0 : 1.0,
+        duration: const Duration(milliseconds: 180),
+        child: Container(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Text(
+            msg.isEmpty ? ' ' : msg,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      );
 
   Future<void> _disposeAutoSelfie() async {
     final auto = _autoSelfie;
     _autoSelfie = null;
+    // Cleared first: the controller's onResult closure holds the ring, so
+    // disposing the ring while frames are still arriving would fire listeners
+    // on a disposed ValueNotifier.
+    auto?.onResult = null;
     await auto?.dispose();
+    _liveness?.dispose();
+    _liveness = null;
   }
 
   Future<void> _stopCamera() async {
@@ -253,7 +368,10 @@ class _KycScreenState extends State<KycScreen> {
     try {
       final picked = await ImagePicker().pickImage(
         source: ImageSource.gallery,
-        imageQuality: 90,
+        // ⚠ NO imageQuality / maxWidth. The re-encode drops the EXIF
+        // orientation tag WITHOUT rotating the pixels, and a sideways ID
+        // fails the aspect-ratio check — it measures the wrong dimension on
+        // a rotated card. The resize happens in normaliseOrientation instead.
       );
       if (picked == null) return;
 
@@ -268,12 +386,17 @@ class _KycScreenState extends State<KycScreen> {
         _feedbackMsg = 'Analysing document…';
       });
 
-      final result = await _idInspector.inspectDocument(picked.path);
+      // Baked upright before anything reads the pixels. See
+      // services/image_orientation.dart.
+      final String uprightId = await normaliseOrientation(picked.path);
+      if (!mounted) return;
+
+      final result = await _idInspector.inspectDocument(uprightId);
       if (!mounted) return;
 
       if (result['isValid'] == true) {
         setState(() {
-          _idImagePath = picked.path;
+          _idImagePath = uprightId;
           _idValid     = true;
           _feedbackMsg = '';
           _checking    = false;
@@ -316,22 +439,48 @@ class _KycScreenState extends State<KycScreen> {
       final result = await _selfieInspector.inspectSelfie(path);
       if (!mounted) return false;
 
-      if (result['isValid'] == true) {
+      // ── ⚠ ACCEPT UNLESS IT IS UNUSABLE. Changed 22 August 2026. ────────
+      //
+      // This used to require isValid == true. A well lit, centred,
+      // straight-on selfie was refused ten times in a row: the face filled
+      // the on-screen bracket exactly as instructed, but the size check
+      // measures the face against the WHOLE frame and the bracket is only
+      // the middle of it. Auto-capture then gave up and manual capture failed
+      // the same check, so there was no way through the screen at all.
+      //
+      // Now only 'blocking' stops it — no face in the photograph, two people
+      // in it, or a file that will not decode. Everything else is ADVICE: the
+      // photo is kept, the warning is shown once, and the quality score goes
+      // to the admin with the record.
+      //
+      // ⚠ DO NOT RESTORE THE isValid GATE. The app assists; the admin judges.
+      final bool blocking = result['blocking'] == true;
+
+      if (result['isValid'] == true || !blocking) {
+        final String? advice =
+            result['isValid'] == true ? null : result['errorMessage'] as String?;
         setState(() {
           _selfieImagePath = path;
           _selfieValid = true;
-          _feedbackMsg = '';
+          // Shown briefly on the way through rather than as a refusal. They
+          // are not being asked to do anything about it.
+          _feedbackMsg = advice ?? '';
+          _selfieAdvice = advice;
+          _selfieScores = (result['scores'] as Map?)?.map(
+                  (k, v) => MapEntry(k.toString(), (v as num).toDouble())) ??
+              const <String, double>{};
           _checking = false;
         });
         await _goTo(3);
         return true;
       }
 
-      final bool auto = _autoSelfie != null;
+      // Genuinely unusable. Say so whether the shutter was theirs or ours —
+      // "automatic capture could not get a clear photo" on a photo with
+      // nobody in it told them nothing.
       setState(() {
-        _feedbackMsg = auto
-            ? ''
-            : (result['errorMessage'] as String? ?? 'Please retake.');
+        _feedbackMsg = (result['errorMessage'] as String?) ??
+            'We could not use that photo. Please take it again.';
         _checking = false;
       });
       return false;
@@ -443,6 +592,22 @@ class _KycScreenState extends State<KycScreen> {
               .call(<String, dynamic>{
             'idFrontUrl': idFrontUrl,
             'selfieUrl': selfieUrl,
+            // ── WHAT THE APP THOUGHT OF THE SELFIE ────────────────────────
+            //
+            // Sent because the app no longer refuses an imperfect photo — it
+            // accepts it and passes its own opinion along. Without this the
+            // admin sees a picture with no idea whether the phone flagged
+            // anything, which is exactly the blind approval the on-device
+            // checks were added to prevent.
+            //
+            // Empty when the photo passed cleanly.
+            if (_selfieAdvice != null) 'selfieAdvice': _selfieAdvice,
+            if (_selfieScores.isNotEmpty) 'selfieScores': _selfieScores,
+            // False means the ring timed out and the photo was taken anyway.
+            // Not a rejection — a note for the reviewer that the movement
+            // check did not finish, so they may want to look harder.
+            'livenessComplete': _livenessComplete,
+            if (_livenessNote.isNotEmpty) 'livenessNote': _livenessNote,
           });
         } catch (_) {
           // Upload failed — continue anyway, CF will still run
@@ -675,6 +840,205 @@ class _KycScreenState extends State<KycScreen> {
   // ─────────────────────────────────────────────────────────────────────────
   // Step 1 & 2: Camera steps
   // ─────────────────────────────────────────────────────────────────────────
+  /// Title and one supporting line, styled once.
+  ///
+  /// Extracted because five states now need it and five copies would drift —
+  /// the heading would visibly change size as the screen moved between them.
+  /// What is about to happen, before it happens.
+  ///
+  /// ── WHY A SHEET AND NOT MORE TEXT ON THE SCREEN ──────────────────────────
+  ///
+  /// The camera screen has room for one instruction at a time, and it has to
+  /// be the one that applies right now. Everything else — how many steps,
+  /// how long it takes, what to do about glasses — has nowhere to live there
+  /// and would crowd out the line that matters.
+  ///
+  /// A sheet read at your own pace, dismissed when YOU are ready, solves both:
+  /// the full picture up front, then a clean screen with one instruction.
+  ///
+  /// ⚠ DISMISSIBLE EVERY WAY. Close button, the ready button, tapping outside,
+  /// and the system back gesture all work. A modal somebody cannot leave on a
+  /// verification screen is how an account never gets created.
+  Future<void> _showLivenessIntro() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    'Before you start',
+                    style: GoogleFonts.inter(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: _dark,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Close',
+                  onPressed: () => Navigator.pop(ctx),
+                  icon: Icon(Icons.close_rounded, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'This takes about fifteen seconds and proves you are a real '
+              'person, not a photograph.',
+              style: GoogleFonts.inter(
+                  fontSize: 13.5, height: 1.5, color: Colors.grey[700]),
+            ),
+            const SizedBox(height: 22),
+            _introStep(1, Icons.face_retouching_natural_rounded,
+                'Put your face in the circle',
+                'Hold the phone at arm\'s length, in good light.'),
+            _introStep(2, Icons.touch_app_outlined, 'Press start',
+                'Nothing begins until you do. You will get a short countdown.'),
+            _introStep(3, Icons.rotate_right_rounded,
+                'Turn your head slowly',
+                'Left, then all the way right. The green ring fills as you go.'),
+            _introStep(4, Icons.photo_camera_rounded, 'Hold still',
+                'The photo is taken for you once the ring is complete.'),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  const Icon(Icons.info_outline_rounded,
+                      size: 17, color: _primary),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Text(
+                      // Said plainly, because being unable to finish is the
+                      // fear people actually have on this screen.
+                      'If the ring does not fill in time we will still take '
+                      'your photo and a person will review it. You will not '
+                      'get stuck here.',
+                      style: GoogleFonts.inter(
+                          fontSize: 12, height: 1.45, color: _dark),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 52),
+                  backgroundColor: _primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(26)),
+                ),
+                child: Text(
+                  "I'm ready",
+                  style: GoogleFonts.inter(
+                      fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _introStep(int n, IconData icon, String title, String detail) =>
+      Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE0F3FB),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, size: 18, color: _primary),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    '$n. $title',
+                    style: GoogleFonts.inter(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                        color: _dark),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    detail,
+                    style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        height: 1.45,
+                        color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+
+  Widget _stepHeading(String title, String subtitle) => Column(
+        children: <Widget>[
+          Text(
+            title,
+            style: GoogleFonts.inter(
+                fontSize: 20, fontWeight: FontWeight.w800, color: _dark),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 6),
+          SizedBox(
+            // Fixed height so the camera below does not jump up and down as
+            // the wording changes between states.
+            height: 38,
+            child: Text(
+              subtitle,
+              style: GoogleFonts.inter(
+                  fontSize: 13, color: Colors.grey[600], height: 1.5),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
+      );
+
   Widget _buildCameraStep({required bool isId}) => Column(
         children: [
           _buildProgressDots(),
@@ -686,23 +1050,64 @@ class _KycScreenState extends State<KycScreen> {
                     ? Icons.badge_outlined
                     : Icons.face_retouching_natural_rounded),
                 const SizedBox(height: 12),
-                Text(
-                  isId ? 'Scan Your ID Document' : 'Take a Live Selfie',
-                  style: GoogleFonts.inter(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: _dark),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  isId
-                      ? 'Place your passport or driving licence within the frame. Ensure all text is clearly visible.'
-                      : 'Look directly at the camera, keep your eyes open and ensure your face is well lit.',
-                  style: GoogleFonts.inter(
-                      fontSize: 13, color: Colors.grey[600], height: 1.5),
-                  textAlign: TextAlign.center,
-                ),
+
+                // ── ⚠ THE HEADING FOLLOWS THE STATE ────────────────────
+                //
+                // It used to read "Look directly at the camera, keep your
+                // eyes open" throughout — which flatly CONTRADICTS the ring
+                // the moment it asks for a turn. Two instructions telling
+                // somebody opposite things is the fastest way to make a
+                // screen feel broken, and they will believe the big text
+                // over the small one.
+                if (isId)
+                  _stepHeading(
+                    'Scan your ID document',
+                    'Place your passport or driving licence within the '
+                        'frame. Make sure all the text is readable.',
+                  )
+                else if (_liveness == null)
+                  _stepHeading(
+                    'Take a live selfie',
+                    'Hold the phone at arm\'s length in good light.',
+                  )
+                else
+                  ValueListenableBuilder<LivenessRingState>(
+                    valueListenable: _liveness!.state,
+                    builder: (_, LivenessRingState st, __) {
+                      switch (st) {
+                        case LivenessRingState.centring:
+                          return _stepHeading(
+                            'Take a live selfie',
+                            'Put your face inside the circle, at about '
+                                'arm\'s length.',
+                          );
+                        case LivenessRingState.ready:
+                          return _stepHeading(
+                            'Ready when you are',
+                            'You will turn your head slowly to the left, '
+                                'then to the right. Press start.',
+                          );
+                        case LivenessRingState.countdown:
+                          return _stepHeading(
+                            'Get ready',
+                            'Turn slowly left, then slowly right. Keep your '
+                                'face in the circle.',
+                          );
+                        case LivenessRingState.sweeping:
+                          return _stepHeading(
+                            'Turn your head slowly',
+                            'The green ring fills as you go. Left first, '
+                                'then all the way back to the right.',
+                          );
+                        case LivenessRingState.complete:
+                        case LivenessRingState.timedOut:
+                          return _stepHeading(
+                            'Almost done',
+                            'Look straight at the camera and hold still.',
+                          );
+                      }
+                    },
+                  ),
               ],
             ),
           ),
@@ -714,15 +1119,43 @@ class _KycScreenState extends State<KycScreen> {
               alignment: Alignment.center,
               children: [
                 // Camera preview
-                _cameraReady && _cameraCtrl != null
-                    ? ClipRect(child: CameraPreview(_cameraCtrl!))
-                    : Container(
-                        color: Colors.black,
-                        child: const Center(
-                          child: CircularProgressIndicator(
-                              color: Colors.white),
-                        ),
-                      ),
+                // ── THE VIEWPORT ────────────────────────────────────
+                //
+                // Inset and rounded rather than bleeding to the screen edge.
+                // A full-bleed preview with black bars reads as an unstyled
+                // camera; a framed one reads as part of the product, which
+                // matters on the screen where somebody is deciding whether
+                // to trust us with their passport.
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: SizedBox.expand(
+                      child: _cameraReady && _cameraCtrl != null
+                          ? FittedBox(
+                              // Fills the rounded frame without squashing the
+                              // face — an aspect-distorted preview makes the
+                              // face detector's own numbers misleading.
+                              fit: BoxFit.cover,
+                              clipBehavior: Clip.hardEdge,
+                              child: SizedBox(
+                                width: _cameraCtrl!.value.previewSize?.height ??
+                                    720,
+                                height: _cameraCtrl!.value.previewSize?.width ??
+                                    1280,
+                                child: CameraPreview(_cameraCtrl!),
+                              ),
+                            )
+                          : Container(
+                              color: const Color(0xFF0D1B3E),
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                    color: Colors.white, strokeWidth: 2),
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
 
                 // Overlay mask
                 IgnorePointer(
@@ -747,39 +1180,196 @@ class _KycScreenState extends State<KycScreen> {
                             ),
                 ),
 
+                // ── THE LIVENESS RING ────────────────────────────────────
+                //
+                // Drawn only while the sweep is unfinished. Once it completes
+                // it disappears, so the last thing on screen before the
+                // shutter is a clean preview rather than a ring nobody needs
+                // any more.
+                if (!isId && _liveness != null)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: ValueListenableBuilder<LivenessRingState>(
+                        valueListenable: _liveness!.state,
+                        builder: (_, LivenessRingState st, __) {
+                          if (st == LivenessRingState.complete) {
+                            return const SizedBox.shrink();
+                          }
+                          return Center(
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: <Widget>[
+                                ValueListenableBuilder<List<bool>>(
+                                  valueListenable: _liveness!.lit,
+                                  builder: (_, List<bool> lit, __) =>
+                                      LivenessRing(lit: lit),
+                                ),
+                                // 3 · 2 · 1, big, in the middle of the ring.
+                                if (st == LivenessRingState.countdown)
+                                  ValueListenableBuilder<int>(
+                                    valueListenable: _liveness!.count,
+                                    builder: (_, int n, __) => Container(
+                                      width: 96,
+                                      height: 96,
+                                      alignment: Alignment.center,
+                                      decoration: BoxDecoration(
+                                        color: Colors.black
+                                            .withValues(alpha: 0.55),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Text(
+                                        '$n',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 52,
+                                          fontWeight: FontWeight.w800,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+
                 // ── Live guidance, selfie step only ──────────────────────
                 //
                 // Comes from AutoSelfieController, which gets it from the same
                 // check that judges the final photo. So what it tells you to
                 // fix is exactly what would otherwise have rejected you.
-                if (!isId && _autoSelfie != null)
+                if (!isId && _autoSelfie != null && _liveness != null)
                   Positioned(
                     top: 20,
                     left: 24,
                     right: 24,
-                    child: ValueListenableBuilder<String>(
-                      valueListenable: _autoSelfie!.guidance,
-                      builder: (_, msg, __) => AnimatedOpacity(
-                        opacity: msg.isEmpty ? 0.0 : 1.0,
-                        duration: const Duration(milliseconds: 180),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.72),
-                            borderRadius: BorderRadius.circular(24),
+                    // ⚠ THE SWEEP HINT WINS WHILE THE RING IS RUNNING.
+                    //
+                    // Two sources want this one line: the ring says "turn your
+                    // head to the left", the framing check says "move closer".
+                    // Showing both alternately is how a screen becomes
+                    // impossible to follow, so while the sweep is unfinished
+                    // the ring's instruction is the only one displayed. The
+                    // framing hints return the moment the ring is done, in
+                    // time to matter for the actual photograph.
+                    // ⚠ _liveness! is safe: the enclosing `if` requires it.
+                    // It used to fall back to `ValueNotifier(...)` inline,
+                    // which allocated — and leaked — a new notifier on every
+                    // single rebuild of this screen.
+                    child: ValueListenableBuilder<LivenessRingState>(
+                      valueListenable: _liveness!.state,
+                      builder: (_, LivenessRingState st, __) {
+                        final bool sweeping =
+                            st != LivenessRingState.complete;
+                        return ValueListenableBuilder<String>(
+                          valueListenable: sweeping && _liveness != null
+                              ? _liveness!.hint
+                              : _autoSelfie!.guidance,
+                          builder: (_, msg, __) => _hintPill(msg),
+                        );
+                      },
+                    ),
+                  ),
+
+
+                // ── START BUTTON ────────────────────────────────────────
+                //
+                // The sweep begins when the person says so, never when their
+                // face happens to drift into centre. Shown only in `ready`,
+                // so it cannot be pressed before the face is found or after
+                // the sweep is under way.
+                if (!isId && _liveness != null)
+                  Positioned(
+                    left: 24,
+                    right: 24,
+                    bottom: 24,
+                    child: ValueListenableBuilder<LivenessRingState>(
+                      valueListenable: _liveness!.state,
+                      builder: (_, LivenessRingState st, __) {
+                        if (st != LivenessRingState.ready) {
+                          return const SizedBox.shrink();
+                        }
+                        return FilledButton(
+                          onPressed: _liveness!.start,
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 52),
+                            backgroundColor: const Color(0xFF0392CA),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(26)),
                           ),
                           child: Text(
-                            msg.isEmpty ? ' ' : msg,
-                            textAlign: TextAlign.center,
+                            'Start',
                             style: GoogleFonts.inter(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
+                                fontSize: 16, fontWeight: FontWeight.w700),
                           ),
-                        ),
-                      ),
+                        );
+                      },
+                    ),
+                  ),
+
+                // ── WHY IT DID NOT FINISH ───────────────────────────────
+                //
+                // Named specifically — "you turned left but not right", not
+                // "verification failed". A person told only that it failed
+                // repeats exactly what they just did.
+                //
+                // The photo has ALREADY been taken by this point. This is an
+                // explanation, not a refusal, and the wording says so.
+                if (!isId && _liveness != null)
+                  Positioned(
+                    left: 20,
+                    right: 20,
+                    bottom: 92,
+                    child: ValueListenableBuilder<String>(
+                      valueListenable: _liveness!.failureReason,
+                      builder: (_, String reason, __) {
+                        if (reason.isEmpty) return const SizedBox.shrink();
+                        return Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.8),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                'The movement check did not finish',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                reason,
+                                style: GoogleFonts.inter(
+                                  fontSize: 12.5,
+                                  height: 1.45,
+                                  color: Colors.white
+                                      .withValues(alpha: 0.85),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Your photo was still taken and sent for '
+                                'review. You can retake it if you prefer.',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11.5,
+                                  height: 1.4,
+                                  color: Colors.white
+                                      .withValues(alpha: 0.6),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
                     ),
                   ),
 

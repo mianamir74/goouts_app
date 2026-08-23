@@ -70,6 +70,8 @@ import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
 class FaceCheckResult {
   const FaceCheckResult({
+    this.yaw,
+    this.blocking = false,
     required this.available,
     required this.isValid,
     this.errorMessage,
@@ -77,6 +79,40 @@ class FaceCheckResult {
     this.faceCount = 0,
     this.faceBox,
   });
+
+  /// TRUE only when the photograph cannot be used AT ALL — no face in it, or
+  /// more than one person. Everything else (pose, size, eyes, lighting,
+  /// sharpness) is ADVICE.
+  ///
+  /// ── WHY, 22 August 2026 ──────────────────────────────────────────────────
+  ///
+  /// A well lit, centred, straight-on selfie was refused ten times running.
+  /// The face filled the on-screen bracket exactly as instructed, but the size
+  /// check measures the face against the WHOLE frame and the bracket is only
+  /// the middle of it — so "fill the box" and "pass the check" were different
+  /// things and nothing on screen said so.
+  ///
+  /// Industry data is unambiguous about the cost of that: people asked to
+  /// retake are three times more likely to abandon, and most give up on any
+  /// verification that runs past three minutes. An app that refuses a good
+  /// photograph is worse than one that accepts a mediocre one, because a
+  /// mediocre photograph reaches an admin who can look at it and decide.
+  ///
+  /// So the app now ASSISTS rather than JUDGES. The score still travels with
+  /// the record and the admin still sees it — the decision simply moved to
+  /// the person qualified to make it.
+  final bool blocking;
+
+  /// Head rotation left/right in degrees, or null when ML Kit did not report
+  /// it. Positive is looking to the camera's right.
+  ///
+  /// ⚠ NULL IS NOT ZERO. Google's own documentation is explicit that the Euler
+  /// angles come back null when performanceMode is fast AND landmarks and
+  /// classification are both off. Our live detector enables both, so it is
+  /// populated — but anything reading this must treat null as "not measured"
+  /// and stop, never as "facing straight ahead". A liveness ring that treats
+  /// null as 0 sits at dead centre for ever and never fills.
+  final double? yaw;
 
   /// False when ML Kit itself could not run. The caller should ignore this
   /// result entirely rather than treat it as a failed check.
@@ -221,6 +257,8 @@ class FaceCheckService {
         return const FaceCheckResult(
           available: true,
           isValid: false,
+          // The one genuine hard stop: there is nobody in this photograph.
+          blocking: true,
           errorMessage:
               "We couldn't find a face in that photo. Hold the phone at arm's "
               'length, look straight at the camera and take it again.',
@@ -238,6 +276,7 @@ class FaceCheckService {
           available: true,
           isValid: false,
           faceCount: faces.length,
+          blocking: true,
           errorMessage:
               'More than one person is in the photo. Take it again with only '
               'yourself in the frame.',
@@ -389,6 +428,7 @@ class FaceCheckService {
       return FaceCheckResult(
         available: true,
         isValid: true,
+        yaw: yaw,
         faceCount: 1,
         faceBox: box,
         scores: <String, double>{

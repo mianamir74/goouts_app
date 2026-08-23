@@ -90,6 +90,8 @@ class BiometricSelfieInspector {
     if (original == null) {
       return {
         'isValid': false,
+        // Nothing decodable here at all. Genuinely unusable.
+        'blocking': true,
         'errorMessage': 'Could not read selfie. Please retake.',
         'scores': scores,
       };
@@ -148,6 +150,12 @@ class BiometricSelfieInspector {
         scores['overall'] = 0.0;
         return {
           'isValid': false,
+          // ⚠ ONLY "no face" AND "more than one face" STOP THE FLOW.
+          // Pose, size, eyes and occlusion are advice — see the note on
+          // FaceCheckResult.blocking. A good selfie was being refused ten
+          // times in a row because the size check and the on-screen bracket
+          // measured different things.
+          'blocking': faceResult.blocking,
           'errorMessage': faceResult.errorMessage ??
               'We could not verify your face in that photo. Please retake it.',
           'scores': scores,

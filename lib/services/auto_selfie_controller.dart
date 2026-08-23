@@ -129,6 +129,23 @@ class AutoSelfieController {
   /// screen says why rather than pretending nothing happened.
   final ValueNotifier<bool> gaveUp = ValueNotifier<bool>(false);
 
+  /// Every face result, pass or fail, handed straight to whoever wants it.
+  ///
+  /// Added 22 August 2026 so the liveness ring can read the head angle from
+  /// the SAME detector and the SAME frames this controller is already
+  /// running. A second detector on a second stream would double the CPU cost
+  /// and — worse — the two could disagree about whether a face is present.
+  void Function(FaceCheckResult result)? onResult;
+
+  /// While true the shutter is held, no matter how good the framing is.
+  ///
+  /// ⚠ THIS IS WHAT MAKES THE SWEEP HAPPEN BEFORE THE PHOTO. The liveness
+  /// ring sets this false only once it has finished, so the auto-capture
+  /// cannot fire mid-turn and photograph a profile. It is a gate on the
+  /// SHUTTER, never on the guidance: the hints keep working throughout, which
+  /// is what stops the screen feeling frozen while the ring is being filled.
+  bool holdShutter = false;
+
   DateTime _lastCheck = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime _cooldownUntil = DateTime.fromMillisecondsSinceEpoch(0);
   int _goodFrames = 0;
@@ -215,6 +232,11 @@ class AutoSelfieController {
 
   void _onResult(FaceCheckResult? result) {
     if (result == null || _stopped || !_streaming) return;
+
+    // Published BEFORE the early returns below, so the ring keeps receiving
+    // frames even while this controller is busy capturing or has given up.
+    onResult?.call(result);
+
     if (state.value == AutoSelfieState.capturing) return;
 
     // ML Kit unavailable on this device. Say nothing, change nothing, and let
@@ -249,6 +271,16 @@ class AutoSelfieController {
     }
 
     _goodFrames++;
+
+    // Framing is fine but the sweep is not finished. Do not count towards the
+    // shutter and do not clear the guidance — the ring is showing its own
+    // instruction and this must not fight it.
+    if (holdShutter) {
+      _goodFrames = 0;
+      _cancelHold();
+      return;
+    }
+
     guidance.value = '';
     if (_goodFrames >= _neededGoodFrames &&
         state.value != AutoSelfieState.holdStill) {
