@@ -423,8 +423,22 @@ class _KycScreenState extends State<KycScreen> {
     });
 
     try {
-      final file = await _cameraCtrl!.takePicture();
-      final result = await _idInspector.inspectDocument(file.path);
+      // ── ⚠ THE CAMERA PATH WAS NEVER NORMALISED EITHER ──────────────────────
+      //
+      // Found 24 August 2026 while fixing the selfie. The GALLERY path below
+      // (_pickId) has called normaliseOrientation since 22 August; this one,
+      // eleven lines away in the same file, never did.
+      //
+      // Same consequence, and slightly worse here: id_quality_inspector checks
+      // the ASPECT RATIO of a card. On a photograph whose orientation lives in
+      // an EXIF tag that decodeImage ignores, that check measures the wrong
+      // dimension — a correctly held driving licence reads as the wrong shape
+      // and is refused. The sideways file was also what went to Storage, so
+      // the admin reviewed a rotated document.
+      final XFile raw = await _cameraCtrl!.takePicture();
+      final String uprightPath = await normaliseOrientation(raw.path);
+      if (!mounted) return;
+      final result = await _idInspector.inspectDocument(uprightPath);
 
       // Taking a photograph and running the document inspector together take
       // seconds, and a user who gets bored or takes a call in that window
@@ -434,7 +448,10 @@ class _KycScreenState extends State<KycScreen> {
 
       if (result['isValid'] == true) {
         setState(() {
-          _idImagePath = file.path;
+          // ⚠ THE UPRIGHT FILE, not raw.path. This is the one that gets
+          // uploaded and re-inspected at submit; storing the raw path here
+          // would undo the normalisation for everything downstream.
+          _idImagePath = uprightPath;
           _idValid = true;
           _feedbackMsg = '';
           _checking = false;
@@ -522,12 +539,52 @@ class _KycScreenState extends State<KycScreen> {
   /// rejection path below does NOT say "Please retake" when the shutter fired
   /// by itself. Nobody chose to take that photo, so there is nothing for them
   /// to do again.
-  Future<bool> _acceptSelfie(String path) async {
+  Future<bool> _acceptSelfie(String rawPath) async {
     if (!mounted) return false;
     setState(() {
       _checking = true;
       _feedbackMsg = 'Checking…';
     });
+
+    // ── ⚠ BAKE THE ROTATION IN BEFORE ANYTHING READS THIS FILE ──────────────
+    //
+    // ADDED 24 August 2026. Reported from a real device: the liveness ring
+    // completed, the brackets were green over a perfectly framed face, and
+    // three consecutive photographs came back "We couldn't find a face in that
+    // photo."
+    //
+    // ⚠ THIS IS THE SAME BUG normaliseOrientation WAS WRITTEN FOR ON 22
+    // AUGUST, AND IT WAS ONLY EVER APPLIED TO THE ID PHOTOGRAPH. _captureId
+    // normalises; the selfie did not. One fix, three call sites, one of them
+    // done — which is this codebase's oldest and most expensive habit.
+    //
+    // Why it makes a face vanish:
+    //
+    //   biometric_selfie_inspector decodes with img.decodeImage, which IGNORES
+    //   the EXIF orientation tag, and then hands ML Kit the width and height it
+    //   got from that decode — the RAW SENSOR dimensions, which on a portrait
+    //   iPhone photo are landscape.
+    //
+    //   ML Kit, meanwhile, reads the file through InputImage.fromFilePath,
+    //   which DOES honour the tag. So it finds the face in a correctly upright
+    //   image and reports the box in portrait coordinates.
+    //
+    //   evaluate() then measures a portrait face box against a landscape
+    //   frame. The face-area fraction is computed against the wrong
+    //   denominator and the box can sit outside the frame it is being compared
+    //   with — so a photograph containing an obvious, well lit, centred face is
+    //   judged to contain no usable face at all.
+    //
+    // Baking the rotation into the pixels and dropping the tag removes the
+    // disagreement at source: after this there is nothing left for the two
+    // readers to interpret differently.
+    //
+    // ⚠ COVERS BOTH ROUTES. Auto-capture and the manual Take Selfie button
+    // both arrive here, so this is the one place it needs to happen. It also
+    // never throws — a failure returns the original path.
+    final String path = await normaliseOrientation(rawPath);
+    if (!mounted) return false;
+
     try {
       final result = await _selfieInspector.inspectSelfie(path);
       if (!mounted) return false;
@@ -1379,11 +1436,21 @@ class _KycScreenState extends State<KycScreen> {
                         if ((_liveness?.failureReason.value ?? '').isNotEmpty) {
                           return const SizedBox.shrink();
                         }
-                        return ValueListenableBuilder<String>(
-                          valueListenable: sweeping && _liveness != null
-                              ? _liveness!.hint
-                              : _autoSelfie!.guidance,
-                          builder: (_, msg, __) => _hintPill(msg),
+                        return ValueListenableBuilder<bool>(
+                          valueListenable: _autoSelfie!.gaveUp,
+                          builder: (_, bool up, __) {
+                            // ⚠ THE THIRD BOX. Once auto-capture has given up
+                            // the panel lower down already says "use the
+                            // button below", and this pill said the same thing
+                            // again, higher up, in its own black rectangle.
+                            if (up) return const SizedBox.shrink();
+                            return ValueListenableBuilder<String>(
+                              valueListenable: sweeping && _liveness != null
+                                  ? _liveness!.hint
+                                  : _autoSelfie!.guidance,
+                              builder: (_, msg, __) => _hintPill(msg),
+                            );
+                          },
                         );
                       },
                     ),
@@ -1562,8 +1629,21 @@ class _KycScreenState extends State<KycScreen> {
                 // Both used to render at bottom: 90 and bottom: 92, so they
                 // printed straight over each other and neither was readable.
                 // The liveness box is the more specific message, so it wins.
+                // ⚠ AND HIDDEN WHILE A SPECIFIC REASON IS SHOWING.
+                //
+                // 24 August 2026, from a real device: this panel, the feedback
+                // panel and the guidance pill all rendered at once, overlapping
+                // and unreadable — "Automatic capture could not get a clear
+                // photo" printed straight through "We couldn't find a face in
+                // that photo".
+                //
+                // They are not three messages. They are one event described
+                // three times, at three levels of usefulness. The specific
+                // reason wins; this generic one only appears when there is no
+                // specific one to show.
                 if (!isId &&
                     _autoSelfie != null &&
+                    _feedbackMsg.isEmpty &&
                     (_liveness?.failureReason.value ?? '').isEmpty)
                   Positioned(
                     bottom: 90,
