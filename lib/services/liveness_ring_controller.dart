@@ -136,7 +136,27 @@ class LivenessRingController {
   static const double extremeFraction = 0.75;
 
   /// After this, give up and let the screen capture anyway.
-  static const int timeoutMs = 12000;
+  ///
+  /// ── ⚠ RAISED FROM 12s TO 20s ON 24 August 2026 ───────────────────────────
+  ///
+  /// From a real device: "left side was smooth but as I turn to right the
+  /// message appear". The ring was two thirds full and still travelling when
+  /// the clock ran out — the check was working and simply not given enough
+  /// time to finish.
+  ///
+  /// 12 seconds sounded generous and was not, because the sweep is not one
+  /// movement. The person reads "turn to the left", turns, reads "now turn to
+  /// the right", then travels the FULL WIDTH of the sweep — from one extreme
+  /// through centre to the other, twice the distance of the first leg — while
+  /// reading a second instruction mid-turn. A first-timer needs eight to
+  /// twelve seconds for that and someone unhurried needs more.
+  ///
+  /// ⚠ THIS IS NOT A SECURITY PARAMETER. Nothing is proved by cutting somebody
+  /// off sooner; a slow head is not a fraudulent one. The things that decide
+  /// whether the check passes are reach (sweepDegrees), coverage
+  /// (completeFraction) and continuity (minSweepFrames). Time is only what
+  /// stops the screen hanging for ever.
+  static const int timeoutMs = 20000;
 
   /// The fewest analysed frames a completed sweep may be built from.
   ///
@@ -339,10 +359,22 @@ class LivenessRingController {
     final bool rightDone =
         next.reversed.take(edge).any((bool b) => b);
 
+    // ── ⚠ ASK FOR REACH, NOT FOR CARE ────────────────────────────────────
+    //
+    // These said "turn your head slowly" until 24 August 2026, and on a real
+    // device that instruction cost somebody the check: they turned left
+    // carefully, read the next instruction, and were still travelling back
+    // through centre when the clock ran out at two thirds full.
+    //
+    // Slowness helped the OLD implementation, which sampled single points and
+    // needed the head to pause on each one. It does nothing now — the arc
+    // between samples is filled either way — and it actively hurts, because
+    // the only way to fail a working sweep is to run out of time before
+    // reaching the far side. So the words point at distance instead.
     if (!leftDone) {
-      hint.value = 'Turn your head to the left';
+      hint.value = 'Turn your head left, as far as you comfortably can';
     } else if (!rightDone) {
-      hint.value = 'Now turn your head to the right';
+      hint.value = 'Now all the way to the right';
     } else {
       hint.value = 'Almost there';
     }
@@ -368,7 +400,7 @@ class LivenessRingController {
     count.value = countdownFrom;
     // Shown DURING the countdown, so the instruction is read before it is
     // needed rather than at the moment of acting on it.
-    hint.value = 'Get ready to turn your head slowly, left then right';
+    hint.value = 'Get ready to turn your head left, then right';
 
     _countdown = Timer.periodic(const Duration(seconds: 1), (Timer t) {
       if (_finished) {
@@ -392,7 +424,8 @@ class LivenessRingController {
     // Nothing to bridge from on the very first sample of a sweep.
     _lastYaw = null;
     state.value = LivenessRingState.sweeping;
-    hint.value = 'Turn your head slowly to the left';
+    // See the note in _light: reach, not care.
+    hint.value = 'Turn your head left, as far as you comfortably can';
     // ⚠ THE CLOCK STARTS HERE, not when a face was first seen. It is now
     // twelve seconds the person chose to begin.
     _timeout = Timer(const Duration(milliseconds: timeoutMs), _giveUp);
@@ -438,18 +471,24 @@ class LivenessRingController {
     }
 
     if (on <= 2) {
-      return 'We did not see your head move. Next time turn slowly to the '
-          'left, then slowly to the right, keeping your face in the circle.';
+      return 'We did not see your head move. Next time turn to the left, then '
+          'all the way to the right, keeping your face in the circle.';
     }
 
+    // ⚠ NO "SLOWLY" HERE EITHER — see the note in _light. This is the exact
+    // message a real device produced on 24 August 2026, and the advice in it
+    // was the reason the second attempt would have failed the same way: the
+    // person had already run out of time, and was being told to take longer.
     if (left && !right) {
       return 'You turned to the left but not to the right. The circle needs '
-          'both sides — turn slowly all the way back the other way.';
+          'both sides — go straight back the other way without pausing in '
+          'the middle.';
     }
 
     if (right && !left) {
       return 'You turned to the right but not to the left. The circle needs '
-          'both sides — turn slowly all the way back the other way.';
+          'both sides — go straight back the other way without pausing in '
+          'the middle.';
     }
 
     // ⚠ DO NOT PUT "MORE SLOWLY" BACK IN THIS SENTENCE. It was here until 24

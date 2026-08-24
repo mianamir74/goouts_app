@@ -290,6 +290,54 @@ class _KycScreenState extends State<KycScreen> {
         ),
       );
 
+  /// Puts the movement check back to the beginning, in place.
+  ///
+  /// ── ⚠ WHY THIS EXISTS ────────────────────────────────────────────────────
+  ///
+  /// Reported from a real device, 24 August 2026: "there is no way to retry on
+  /// the screen unless close and open again which is weird."
+  ///
+  /// It was exactly that. LivenessRingController.reset() had been written and
+  /// NOTHING EVER CALLED IT. So the panel explained precisely what had gone
+  /// wrong — "you turned to the left but not to the right" — and then offered
+  /// no way to act on the explanation. The only route back was to leave the
+  /// screen and re-enter, which also discarded the ID photograph taken on the
+  /// step before.
+  ///
+  /// Diagnosing a problem and then not letting the person fix it is worse than
+  /// not diagnosing it, because it proves the app knew.
+  Future<void> _retryLiveness() async {
+    final AutoSelfieController? auto = _autoSelfie;
+    final LivenessRingController? ring = _liveness;
+    if (auto == null || ring == null) return;
+
+    ring.reset();
+    // Held again from the very start: the shutter must not fire while the new
+    // sweep is under way, or the photograph is a profile shot.
+    auto.holdShutter = true;
+    // The resting rate. The sweep's own listener raises it again when the
+    // person presses start, exactly as it does on a first attempt.
+    auto.checkEveryMs = AutoSelfieController.framingCheckEveryMs;
+
+    setState(() {
+      // ⚠ THE PREVIOUS ATTEMPT'S VERDICT MUST GO WITH IT. Leaving
+      // _livenessNote set would file the new attempt under the old attempt's
+      // failure, and an admin would read a note that describes a sweep that
+      // was replaced.
+      _livenessComplete = false;
+      _livenessNote = '';
+      _selfieAdvice = null;
+      _selfieScores = const <String, double>{};
+      _selfieImagePath = null;
+      _selfieValid = false;
+      _feedbackMsg = '';
+      _checking = false;
+    });
+
+    await auto.restart();
+    if (mounted) setState(() {});
+  }
+
   Future<void> _disposeAutoSelfie() async {
     final auto = _autoSelfie;
     _autoSelfie = null;
@@ -1425,13 +1473,54 @@ class _KycScreenState extends State<KycScreen> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'Your photo was still taken and sent for '
-                                'review. You can retake it if you prefer.',
+                                // ⚠ "SAVED", NOT "SENT". Nothing is uploaded
+                                // at this point — the photo is held on the
+                                // device and goes up with the rest of the form
+                                // at the end. Telling somebody their picture
+                                // has already been sent for review, when they
+                                // can still replace it, is a small lie that
+                                // makes the retry button look pointless.
+                                'Your photo was still saved and will go for '
+                                'review. You can carry on, or try the movement '
+                                'check again.',
                                 style: GoogleFonts.inter(
                                   fontSize: 11.5,
                                   height: 1.4,
                                   color: Colors.white
                                       .withValues(alpha: 0.6),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              // ── ⚠ THE WAY BACK. See _retryLiveness. ───────
+                              //
+                              // In the panel itself, not down with the other
+                              // controls, because this is the answer to the
+                              // sentence directly above it. A person reading
+                              // "turn all the way back the other way" should
+                              // find the button that lets them do so without
+                              // moving their eyes.
+                              SizedBox(
+                                width: double.infinity,
+                                child: FilledButton.icon(
+                                  onPressed: _retryLiveness,
+                                  icon: const Icon(
+                                      Icons.refresh_rounded, size: 18),
+                                  label: Text(
+                                    'Try the movement check again',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  style: FilledButton.styleFrom(
+                                    minimumSize:
+                                        const Size(double.infinity, 44),
+                                    backgroundColor: const Color(0xFF22C55E),
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(22)),
+                                  ),
                                 ),
                               ),
                             ],

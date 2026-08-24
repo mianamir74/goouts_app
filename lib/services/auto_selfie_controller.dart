@@ -211,6 +211,40 @@ class AutoSelfieController {
     }
   }
 
+  /// Puts the controller back to scanning and restarts the frame stream.
+  ///
+  /// ── ⚠ WHY A RESTART IS NOT JUST start() ──────────────────────────────────
+  ///
+  /// Added 24 August 2026 so the liveness check can be retried without leaving
+  /// the screen.
+  ///
+  /// By the time somebody asks to try again, this controller has usually
+  /// finished: _capture() stopped the stream and left the state on `captured`,
+  /// where _onFrame returns immediately. Calling start() alone would restart
+  /// the stream into a controller that ignores every frame it receives — a
+  /// live preview with nothing reading it, which looks exactly like working.
+  ///
+  /// The attempt counter is cleared too. Three auto-attempts is a limit on one
+  /// try, not a budget for the session; a person who deliberately asked to go
+  /// again should not inherit the previous attempt's exhaustion.
+  Future<void> restart() async {
+    if (_stopped) return;
+    _holdTimer?.cancel();
+    _holdTimer = null;
+    _goodFrames = 0;
+    _autoAttempts = 0;
+    _cooldownUntil = DateTime.fromMillisecondsSinceEpoch(0);
+    _lastCheck = DateTime.fromMillisecondsSinceEpoch(0);
+    holdProgress.value = 0.0;
+    gaveUp.value = false;
+    faceBox.value = null;
+    guidance.value = '';
+    // Back to idle so start() is willing to move it on to scanning, and so a
+    // frame arriving in the meantime is not discarded as post-capture.
+    state.value = AutoSelfieState.idle;
+    await start();
+  }
+
   Future<void> stop() async {
     _holdTimer?.cancel();
     _holdTimer = null;
