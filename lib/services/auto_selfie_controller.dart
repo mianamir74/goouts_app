@@ -20,10 +20,13 @@
 //
 //  ── FOUR THINGS THAT MAKE IT FEEL RIGHT RATHER THAN CLEVER ──────────────────
 //
-//  1. THROTTLED to ~3 checks a second. ML Kit cannot run at 30fps and trying
-//     cooks the battery. Frames arriving while one is in flight are DROPPED,
-//     not queued — a queue on a live stream grows for ever and the guidance
-//     ends up describing where the face was two seconds ago.
+//  1. THROTTLED. ML Kit cannot run at 30fps and trying cooks the battery.
+//     Frames arriving while one is in flight are DROPPED, not queued — a queue
+//     on a live stream grows for ever and the guidance ends up describing
+//     where the face was two seconds ago.
+//
+//     The interval is not fixed: see checkEveryMs. Framing needs ~3 checks a
+//     second; a MOVING head needs far more, so the liveness sweep raises it.
 //
 //  2. CONSECUTIVE good frames, not one. A single lucky frame between two blinks
 //     is not a person holding still, and a shutter that fires on it produces
@@ -72,7 +75,39 @@ class AutoSelfieController {
   final Future<bool> Function(String path) onCaptured;
 
   // ── Tuning. See the numbered notes at the top. ────────────────────────────
-  static const int _checkEveryMs = 300;
+
+  /// Rest between analysed frames, in milliseconds. NOT const — the liveness
+  /// ring turns this down while it is sweeping.
+  ///
+  /// ── ⚠ WHY THIS IS ADJUSTABLE, ADDED 24 AUGUST 2026 ────────────────────────
+  ///
+  /// 300ms is right for FRAMING. The face is roughly still, the guidance only
+  /// has to say "move closer", and three checks a second is more than enough
+  /// to feel responsive while leaving the battery alone.
+  ///
+  /// It is far too slow for MEASURING A MOVING HEAD. The ring paints the arc
+  /// between consecutive samples, so the sample rate sets how finely the head's
+  /// path is known — at 300ms a normal head turn is described by four or five
+  /// points, and the ring lurches round in visible jumps even when it is
+  /// filling correctly. The person reads that stutter as the app struggling
+  /// with them and slows down, which is the opposite of what helps.
+  ///
+  /// So the sweep raises the rate for the few seconds it is running and puts it
+  /// back afterwards. kyc_screen owns that, because it owns both controllers.
+  int checkEveryMs = framingCheckEveryMs;
+
+  /// The resting rate, used for framing. Named rather than written as a bare
+  /// 300 at each site, because the sweep has to put it BACK and a literal in
+  /// two files is how these two numbers would quietly stop matching.
+  static const int framingCheckEveryMs = 300;
+
+  /// What [checkEveryMs] should be while the liveness ring is sweeping.
+  ///
+  /// Not lower than this: ML Kit in fast mode takes roughly 30–80ms a frame on
+  /// a mid-range Android, and asking for frames faster than it can answer just
+  /// grows the number DROPPED by the isBusy guard — more heat, no more data.
+  static const int sweepCheckEveryMs = 120;
+
   static const int _neededGoodFrames = 3;
   static const int _holdStillMs = 700;
 
@@ -208,7 +243,7 @@ class AutoSelfieController {
 
     final DateTime now = DateTime.now();
     if (now.isBefore(_cooldownUntil)) return;
-    if (now.difference(_lastCheck).inMilliseconds < _checkEveryMs) return;
+    if (now.difference(_lastCheck).inMilliseconds < checkEveryMs) return;
     _lastCheck = now;
 
     final InputImageLike? converted = _convert(image);

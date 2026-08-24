@@ -110,7 +110,13 @@ class LivenessRingController {
 
   /// Half-width of the sweep, in degrees. See the header for why this is not
   /// 180. Raising it past about 40 starts losing the face on real phones.
-  static const double sweepDegrees = 30.0;
+  ///
+  /// LOWERED FROM 30 TO 25 on 24 August 2026. The extremes have to be REACHED
+  /// for the ring to close, and ML Kit's angle estimate gets noticeably shakier
+  /// as it approaches 30 — so the last few segments were the hardest ones to
+  /// light at exactly the moment the person was trying hardest. 25 is a
+  /// comfortable head turn that the detector reads confidently throughout.
+  static const double sweepDegrees = 25.0;
 
   /// How straight the head must be before the sweep begins. Without this the
   /// ring starts half filled because the user was already turned when the
@@ -131,6 +137,25 @@ class LivenessRingController {
 
   /// After this, give up and let the screen capture anyway.
   static const int timeoutMs = 12000;
+
+  /// The fewest analysed frames a completed sweep may be built from.
+  ///
+  /// ── ⚠ WHY A FLOOR EXISTS AT ALL, ADDED 24 August 2026 ────────────────────
+  ///
+  /// _light now paints the arc BETWEEN two samples rather than the single
+  /// point each sample sat on — without that the ring could not be closed at
+  /// any head speed. But it means the ring could in principle be filled from
+  /// two data points: one reading at each extreme, with nothing in between.
+  ///
+  /// A real person turning their head produces a dozen or more readings in the
+  /// time it takes, so this costs them nothing. It exists so that "the ring
+  /// filled" cannot mean "we saw a face twice, briefly, at two angles" — which
+  /// is roughly what a photograph being waved about would produce.
+  ///
+  /// ⚠ THIS IS A FLOOR, NOT A DEFENCE. It raises the cost of the crudest
+  /// attack and nothing more. See the header: without depth sensing this check
+  /// does not defeat a prepared attacker, and the admin still judges the photo.
+  static const int minSweepFrames = 8;
 
   final ValueNotifier<LivenessRingState> state =
       ValueNotifier<LivenessRingState>(LivenessRingState.centring);
@@ -175,6 +200,13 @@ class LivenessRingController {
   bool _started = false;
   bool _finished = false;
 
+  /// Where the head was on the previous ANALYSED frame, so the arc between
+  /// that position and this one can be painted. See the note in [_light].
+  ///
+  /// ⚠ CLEARED WHENEVER THE FACE IS LOST. A null here means "we did not watch
+  /// the head get from there to here", and nothing is bridged.
+  double? _lastYaw;
+
   /// Counted so the timeout message can tell the difference between "you did
   /// not move" and "we kept losing sight of you", which need opposite advice.
   int _framesWithFace = 0;
@@ -195,6 +227,10 @@ class LivenessRingController {
 
     if (!faceFound) {
       _steadySince = null;
+      // ⚠ The bridge is broken here, deliberately. We stop being able to say
+      // where the head went, so the next sample paints only its own segment
+      // rather than an arc we never actually watched.
+      _lastYaw = null;
       // Losing the face mid-sweep is not a failure — a hand moved, the light
       // changed. The lit segments are KEPT so the person carries on from where
       // they were rather than starting again, which is the single most
@@ -241,19 +277,58 @@ class LivenessRingController {
     _light(yaw);
   }
 
-  void _light(double yaw) {
+  /// -sweep..+sweep mapped onto 0..segments-1.
+  int _indexFor(double yaw) {
     final double clamped = yaw.clamp(-sweepDegrees, sweepDegrees);
-
-    // -sweep..+sweep mapped onto 0..segments-1.
     final double t = (clamped + sweepDegrees) / (2 * sweepDegrees);
-    final int index =
-        (t * (segments - 1)).round().clamp(0, segments - 1);
+    return (t * (segments - 1)).round().clamp(0, segments - 1);
+  }
+
+  void _light(double yaw) {
+    final int index = _indexFor(yaw);
+
+    // ── ⚠ PAINT THE ARC TRAVELLED, NOT THE POINT SAMPLED ──────────────────
+    //
+    // FIXED 24 August 2026, reported as "the camera liveness test is not good
+    // as it should be". THE RING WAS ARITHMETICALLY IMPOSSIBLE TO CLOSE.
+    //
+    // The old line was `next[index] = true` — ONE segment per analysed frame.
+    // Closing the ring needs 20 of 24 DISTINCT segments. Frames are analysed
+    // at most once every AutoSelfieController.checkEveryMs, and the clock runs
+    // for timeoutMs, so the absolute ceiling was a few dozen samples — of
+    // which many landed on segments already lit, because the head passes back
+    // through the middle on its return journey.
+    //
+    // Worse, a head moving at any natural speed crosses several segments
+    // BETWEEN two samples, and a segment skipped that way could only ever be
+    // filled by a later sample landing exactly on it. So turning briskly left
+    // permanent holes in the ring, and turning slowly enough to avoid them ran
+    // out the clock. THERE WAS NO HEAD SPEED AT WHICH THIS PASSED. Every
+    // report of it "not working" was correct and none of them were user error.
+    //
+    // Now each sample fills every segment between where the head was and where
+    // it is. That is also what the person already believes is happening — they
+    // swept across an arc, so the arc lights — which is why the old behaviour
+    // read as broken rather than as strict.
+    //
+    // ⚠ ONLY ACROSS CONTINUOUS TRACKING. _lastYaw is cleared the moment the
+    // face is lost, so an arc is never painted across a gap we could not see.
+    // A printed photograph still cannot fill the ring: it cannot turn.
+    final int from = _lastYaw == null ? index : _indexFor(_lastYaw!);
+    _lastYaw = yaw;
+
+    final int lo = from < index ? from : index;
+    final int hi = from < index ? index : from;
 
     final List<bool> next = List<bool>.from(lit.value);
-    if (!next[index]) {
-      next[index] = true;
-      lit.value = next;
+    bool changed = false;
+    for (int i = lo; i <= hi; i++) {
+      if (!next[i]) {
+        next[i] = true;
+        changed = true;
+      }
     }
+    if (changed) lit.value = next;
 
     final int on = next.where((bool b) => b).length;
     progress.value = on / segments;
@@ -272,7 +347,13 @@ class LivenessRingController {
       hint.value = 'Almost there';
     }
 
-    if (on >= (segments * completeFraction) && leftDone && rightDone) {
+    if (on >= (segments * completeFraction) &&
+        leftDone &&
+        rightDone &&
+        // See minSweepFrames. A real sweep passes this long before the ring
+        // is full, so it never delays anybody — it only refuses a ring that
+        // was filled from too few readings to be a head turning.
+        _framesWithFace >= minSweepFrames) {
       _finish(LivenessRingState.complete);
       hint.value = 'Hold still';
     }
@@ -308,6 +389,8 @@ class LivenessRingController {
     _started = true;
     _framesWithFace = 0;
     _framesNoFace = 0;
+    // Nothing to bridge from on the very first sample of a sweep.
+    _lastYaw = null;
     state.value = LivenessRingState.sweeping;
     hint.value = 'Turn your head slowly to the left';
     // ⚠ THE CLOCK STARTS HERE, not when a face was first seen. It is now
@@ -336,8 +419,20 @@ class LivenessRingController {
 
     // Face kept leaving the frame — nothing about turning will help until
     // that is fixed, so it is checked first.
+    // ── ⚠ 0.18, LOWERED FROM 0.35 ON 24 August 2026 ──────────────────────────
+    //
+    // The old threshold was set by eye and was too high to be useful. Now that
+    // the arc between samples is what fills the ring, losing the face BREAKS
+    // THE BRIDGE — the next reading paints only its own segment — so lost
+    // tracking hurts far more than it used to.
+    //
+    // Simulated: a sweep losing 20% of its frames does not close the ring. At
+    // the old 0.35 threshold that person was told "turn your head further each
+    // way", which is wrong and unfollowable — they turned perfectly well and
+    // the camera kept losing them. A clean sweep loses only a few per cent, so
+    // 0.18 separates the two cases without catching normal jitter.
     final int total = _framesWithFace + _framesNoFace;
-    if (total > 0 && _framesNoFace > total * 0.35) {
+    if (total > 0 && _framesNoFace > total * 0.18) {
       return 'Your face kept going out of view. Hold the phone at arm\'s '
           'length, keep it still, and turn only your head.';
     }
@@ -357,8 +452,14 @@ class LivenessRingController {
           'both sides — turn slowly all the way back the other way.';
     }
 
-    return 'The circle did not quite fill. Turn a little further each way, '
-        'and more slowly — it needs a moment to read each position.';
+    // ⚠ DO NOT PUT "MORE SLOWLY" BACK IN THIS SENTENCE. It was here until 24
+    // August 2026 and it was wrong advice given confidently: the ring now
+    // paints the whole arc the head travels, so speed is not what was missing.
+    // What is missing at this point is always REACH — the head stopped short
+    // of the ends. Telling somebody to slow down when they need to turn
+    // further makes the next attempt worse than the last.
+    return 'The circle did not quite fill. Turn your head a little further '
+        'each way — all the way until you can no longer see the screen.';
   }
 
   void _finish(LivenessRingState s) {
@@ -378,6 +479,7 @@ class LivenessRingController {
     _countdown?.cancel();
     _countdown = null;
     _steadySince = null;
+    _lastYaw = null;
     _framesWithFace = 0;
     _framesNoFace = 0;
     count.value = countdownFrom;

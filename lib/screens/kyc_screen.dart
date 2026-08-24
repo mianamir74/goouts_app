@@ -73,6 +73,11 @@ class _KycScreenState extends State<KycScreen> {
 
   /// The instructions sheet is shown once per visit to this screen.
   bool _introShown = false;
+
+  /// Stand-in for a ring that does not exist, so the bracket builder above has
+  /// a notifier to listen to without allocating one on every rebuild.
+  final ValueNotifier<LivenessRingState> _completedRing =
+      ValueNotifier<LivenessRingState>(LivenessRingState.complete);
   Map<String, double> _selfieScores = const <String, double>{};
   bool _checking = false;
   String _feedbackMsg = '';
@@ -202,12 +207,33 @@ class _KycScreenState extends State<KycScreen> {
       };
       ring.state.addListener(() {
         final LivenessRingState s = ring.state.value;
+
+        // ── ⚠ THE FAST SAMPLE RATE IS TIED TO THE SWEEP, NOT TO THE SCREEN ──
+        //
+        // The ring needs far more samples than framing does: at the resting
+        // 300ms a whole head turn is described by four or five points and the
+        // ring lurches round in steps instead of sweeping.
+        //
+        // But it is raised HERE, when the sweep actually starts, and not when
+        // the camera opens. Raising it at setup meant a person who opened the
+        // instruction sheet and read it — or who simply hesitated before
+        // pressing start — had ML Kit running at eight frames a second the
+        // whole time, for no benefit, warming the phone before the check had
+        // even begun. Nothing is moving during centring; 300ms is plenty.
+        if (s == LivenessRingState.sweeping) {
+          auto.checkEveryMs = AutoSelfieController.sweepCheckEveryMs;
+          return;
+        }
+
         if (s == LivenessRingState.complete ||
             s == LivenessRingState.timedOut) {
           // Released on BOTH outcomes. A timeout must not trap anybody — the
           // photo is taken and the record carries `livenessComplete: false`
           // for the admin. See the note on the controller.
           auto.holdShutter = false;
+          // Back to the framing rate. The head is meant to be STILL from here
+          // on, so the extra frames would buy nothing and cost battery.
+          auto.checkEveryMs = AutoSelfieController.framingCheckEveryMs;
           _livenessComplete = s == LivenessRingState.complete;
           // The same sentence the person was shown. A reviewer seeing
           // "turned left but not right" knows to look at the photo rather
@@ -285,11 +311,30 @@ class _KycScreenState extends State<KycScreen> {
 
   @override
   void dispose() {
+    _completedRing.dispose();
     _firstNameCtrl.dispose();
     _lastNameCtrl.dispose();
     _dobCtrl.dispose();
     _cameraCtrl?.dispose();
+    // ── ⚠ THE RING WAS LEAKING ON THIS PATH. FIXED 24 August 2026. ──────────
+    //
+    // _disposeAutoSelfie() clears onResult and disposes BOTH controllers, but
+    // this method never called it — it disposed the auto-selfie controller and
+    // stopped. So whenever the screen was destroyed without passing through
+    // _stopCamera (backing out mid-check, the app being killed from the
+    // recents list), the LivenessRingController survived with six live
+    // ValueNotifiers and, mid-sweep, a twelve-second Timer still counting
+    // down against a screen that no longer exists.
+    //
+    // onResult is cleared FIRST for the reason given in _disposeAutoSelfie: a
+    // frame already in flight would otherwise call ring.onFrame after the ring
+    // had gone. Both are null-guarded, so this is safe if _stopCamera already
+    // ran and left them null.
+    _autoSelfie?.onResult = null;
     _autoSelfie?.dispose();
+    _autoSelfie = null;
+    _liveness?.dispose();
+    _liveness = null;
     _idInspector.dispose();
     _selfieInspector.dispose();
     super.dispose();
@@ -1164,19 +1209,36 @@ class _KycScreenState extends State<KycScreen> {
                           painter: _RoundedRectOverlay(),
                           child: const SizedBox.expand(),
                         )
+                      // ── ⚠ ONE SHAPE AT A TIME ──────────────────────────
+                      //
+                      // The corner bracket and the liveness ring were BOTH
+                      // being painted, so the screen showed a square and a
+                      // circle fighting over the same face. The bracket is
+                      // suppressed until the sweep is done; after that it
+                      // comes back to frame the actual photograph.
                       : _autoSelfie == null
                           ? CustomPaint(
                               painter: _FaceBracketOverlay(framed: false),
                               child: const SizedBox.expand(),
                             )
-                          : ValueListenableBuilder<Rect?>(
-                              valueListenable: _autoSelfie!.faceBox,
-                              builder: (_, box, __) => CustomPaint(
-                                painter: _FaceBracketOverlay(
-                                  framed: _autoSelfie!.isFramed(box),
-                                ),
-                                child: const SizedBox.expand(),
-                              ),
+                          : ValueListenableBuilder<LivenessRingState>(
+                              valueListenable: _liveness?.state ??
+                                  _completedRing,
+                              builder: (_, LivenessRingState st, __) {
+                                if (st != LivenessRingState.complete &&
+                                    st != LivenessRingState.timedOut) {
+                                  return const SizedBox.expand();
+                                }
+                                return ValueListenableBuilder<Rect?>(
+                                  valueListenable: _autoSelfie!.faceBox,
+                                  builder: (_, box, __) => CustomPaint(
+                                    painter: _FaceBracketOverlay(
+                                      framed: _autoSelfie!.isFramed(box),
+                                    ),
+                                    child: const SizedBox.expand(),
+                                  ),
+                                );
+                              },
                             ),
                 ),
 
@@ -1263,6 +1325,12 @@ class _KycScreenState extends State<KycScreen> {
                       builder: (_, LivenessRingState st, __) {
                         final bool sweeping =
                             st != LivenessRingState.complete;
+                        // The failure box already explains what happened in
+                        // full. "Taking your photo anyway" above it as well
+                        // was two panels saying one thing.
+                        if ((_liveness?.failureReason.value ?? '').isNotEmpty) {
+                          return const SizedBox.shrink();
+                        }
                         return ValueListenableBuilder<String>(
                           valueListenable: sweeping && _liveness != null
                               ? _liveness!.hint
@@ -1400,7 +1468,14 @@ class _KycScreenState extends State<KycScreen> {
                 // ParentDataWidget" at runtime — invisible to the analyzer,
                 // and it would have fired exactly when auto-capture gave up,
                 // which is the moment the person most needs the screen to work.
-                if (!isId && _autoSelfie != null)
+                // ⚠ HIDDEN WHILE THE LIVENESS FAILURE BOX IS SHOWING.
+                //
+                // Both used to render at bottom: 90 and bottom: 92, so they
+                // printed straight over each other and neither was readable.
+                // The liveness box is the more specific message, so it wins.
+                if (!isId &&
+                    _autoSelfie != null &&
+                    (_liveness?.failureReason.value ?? '').isEmpty)
                   Positioned(
                     bottom: 90,
                     left: 24,
@@ -1427,8 +1502,12 @@ class _KycScreenState extends State<KycScreen> {
                     ),
                   ),
 
-                // Feedback message
-                if (_feedbackMsg.isNotEmpty)
+                // Feedback message.
+                //
+                // Also suppressed while the liveness box is up — three
+                // stacked black panels is what the screen looked like before.
+                if (_feedbackMsg.isNotEmpty &&
+                    (_liveness?.failureReason.value ?? '').isEmpty)
                   Positioned(
                     bottom: 24,
                     left: 24,

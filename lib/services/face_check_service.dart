@@ -492,7 +492,9 @@ class FaceCheckService {
 //
 //    performanceMode.fast   accurate cannot keep up with a live stream. Fast is
 //                           slightly more willing to miss a face, which costs a
-//                           frame, not a decision — the next frame is 300ms away.
+//                           frame, not a decision — another is along shortly.
+//                           See AutoSelfieController.checkEveryMs for how
+//                           shortly, which the liveness sweep changes.
 //
 //    enableTracking: true   lets ML Kit follow the same face between frames
 //                           instead of re-finding it, which is both cheaper and
