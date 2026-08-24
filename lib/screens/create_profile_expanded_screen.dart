@@ -619,8 +619,11 @@ class _CreateProfileExpandedScreenState
                   TextFormField(
                     controller: _dobController,
                     keyboardType: TextInputType.number,
-                    validator: (v) =>
-                        v == null || v.isEmpty ? 'Date of birth is required' : null,
+                    // ⚠ NOT `isEmpty`. The registration screen had the same
+                    // presence-only check as the KYC screen, so a partial date
+                    // typed here reached the user record too. Shared validator
+                    // so the two cannot drift — see validateDob.
+                    validator: validateDob,
                     style: _inputStyle(),
                     onChanged: (val) {
                       final formatted = formatDobInput(val);

@@ -106,6 +106,29 @@ class _KycScreenState extends State<KycScreen> {
   // GREEN | AMBER | RED — set by kycAutoDecision CF response
   String _kycDecisionTier  = 'GREEN';
 
+  /// The composite score kycAutoDecision actually calculated, and the sentence
+  /// it wrote to explain the outcome.
+  ///
+  /// ── ⚠ THESE WERE BEING THROWN AWAY ───────────────────────────────────────
+  ///
+  /// 24 August 2026. kycAutoDecision returns
+  /// { decision, tier, overallScore, newKycStatus, reason } and this screen
+  /// read exactly one field of it — tier. The number that DECIDED the outcome,
+  /// and the sentence explaining it, were discarded on arrival.
+  ///
+  /// So a submission where every on-device check showed green landed in manual
+  /// review and NOBODY COULD SEE WHY: not the applicant, not the admin, not
+  /// me reading the code afterwards. The threshold for auto-approval is 0.85
+  /// and there was no way to know whether a given attempt scored 0.84 or 0.66
+  /// — which is the difference between "adjust the calibration slightly" and
+  /// "something is badly wrong".
+  ///
+  /// Auto-approval exists to keep applications off the admin's desk. A gate
+  /// that silently sends everybody to manual review is indistinguishable from
+  /// having no gate at all, and this was the missing instrument.
+  double? _kycAutoScore;
+  String  _kycAutoReason = '';
+
   @override
   void initState() {
     super.initState();
@@ -780,6 +803,9 @@ class _KycScreenState extends State<KycScreen> {
       if (mounted) {
         setState(() {
           _kycDecisionTier = tier;
+          // Kept, not discarded. See the field declarations.
+          _kycAutoScore  = (data['overallScore'] as num?)?.toDouble();
+          _kycAutoReason = (data['reason'] as String?) ?? '';
           _submitting      = false;
           _submitted       = true;
         });
@@ -936,10 +962,9 @@ class _KycScreenState extends State<KycScreen> {
                       );
                     }
                   },
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Required';
-                    return null;
-                  }),
+                  // ⚠ NOT `isEmpty`. That let "01 / 06 / 974" through the whole
+                  // of KYC on 24 August. See validateDob.
+                  validator: validateDob),
               const SizedBox(height: 32),
               _primaryButton('Continue to ID Scan', onPressed: () async {
                 if (!_formKey.currentState!.validate()) return;
@@ -1068,8 +1093,9 @@ class _KycScreenState extends State<KycScreen> {
             _introStep(2, Icons.touch_app_outlined, 'Press start',
                 'Nothing begins until you do. You will get a short countdown.'),
             _introStep(3, Icons.rotate_right_rounded,
-                'Turn your head slowly',
-                'Left, then all the way right. The green ring fills as you go.'),
+                'Turn your head',
+                'Left, then all the way right. The ring fills as you go, and '
+                    'the arrows below it show which side is done.'),
             _introStep(4, Icons.photo_camera_rounded, 'Hold still',
                 'The photo is taken for you once the ring is complete.'),
             const SizedBox(height: 8),
@@ -1234,20 +1260,20 @@ class _KycScreenState extends State<KycScreen> {
                         case LivenessRingState.ready:
                           return _stepHeading(
                             'Ready when you are',
-                            'You will turn your head slowly to the left, '
-                                'then to the right. Press start.',
+                            'You will turn your head to the left, then all '
+                                'the way to the right. Press start.',
                           );
                         case LivenessRingState.countdown:
                           return _stepHeading(
                             'Get ready',
-                            'Turn slowly left, then slowly right. Keep your '
+                            'Turn left, then all the way right. Keep your '
                                 'face in the circle.',
                           );
                         case LivenessRingState.sweeping:
                           return _stepHeading(
-                            'Turn your head slowly',
+                            'Turn your head',
                             'The green ring fills as you go. Left first, '
-                                'then all the way back to the right.',
+                                'then straight back across to the right.',
                           );
                         case LivenessRingState.complete:
                         case LivenessRingState.timedOut:
@@ -1363,7 +1389,10 @@ class _KycScreenState extends State<KycScreen> {
                             return const SizedBox.shrink();
                           }
                           return Center(
-                            child: Stack(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: <Widget>[
+                            Stack(
                               alignment: Alignment.center,
                               children: <Widget>[
                                 ValueListenableBuilder<List<bool>>(
@@ -1394,6 +1423,30 @@ class _KycScreenState extends State<KycScreen> {
                                       ),
                                     ),
                                   ),
+                              ],
+                                ),
+
+                                // ── WHICH WAY NOW ─────────────────────────
+                                //
+                                // The ring says how much is done; these say
+                                // which side still needs doing, without asking
+                                // anybody to read a sentence while they are
+                                // concentrating on holding a phone steady.
+                                //
+                                // ⚠ FED THE SAME `lit` LIST THE RING PAINTS.
+                                // Never the head angle — the preview is
+                                // mirrored and ML Kit's sign convention is not
+                                // worth guessing at. This way the chevrons
+                                // cannot contradict the ring, and if the ring
+                                // is ever found to fill the wrong way round on
+                                // a real handset, that is one fix in the
+                                // controller and these follow it for free.
+                                const SizedBox(height: 18),
+                                ValueListenableBuilder<List<bool>>(
+                                  valueListenable: _liveness!.lit,
+                                  builder: (_, List<bool> lit, __) =>
+                                      LivenessArrows(lit: lit),
+                                ),
                               ],
                             ),
                           );
@@ -2071,6 +2124,11 @@ class _KycScreenState extends State<KycScreen> {
                   _selfieImagePath = null;
                   _feedbackMsg     = '';
                   _kycDecisionTier = 'GREEN';
+                  // ⚠ The previous attempt's score goes with the previous
+                  // attempt. Left behind, the next submission would display a
+                  // number that was never calculated for it.
+                  _kycAutoScore    = null;
+                  _kycAutoReason   = '';
                 });
               }),
               const SizedBox(height: 12),
@@ -2118,6 +2176,49 @@ class _KycScreenState extends State<KycScreen> {
                   fontSize: 14, color: Colors.grey[600], height: 1.6),
               textAlign: TextAlign.center,
             ),
+            // ── WHY THIS ONE NEEDED A HUMAN ──────────────────────────────────
+            //
+            // Only shown when the score came back, so it never appears on the
+            // fallback path where the function could not be reached at all.
+            //
+            // Deliberately quiet — grey, small, below the explanation. The
+            // applicant does not need to care, and reads past it. The person
+            // who does need it is whoever is calibrating the 0.85 threshold,
+            // and today that means asking somebody to submit and read this
+            // line back.
+            if (_kycAutoScore != null) ...[
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F4F6),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      'Automated score '
+                      '${_kycAutoScore!.toStringAsFixed(2)} — needs 0.85 to '
+                      'approve without a reviewer',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[700]),
+                    ),
+                    if (_kycAutoReason.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        _kycAutoReason,
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.inter(
+                            fontSize: 11, height: 1.4, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 36),
             _primaryButton('Back to Profile', onPressed: () {
               if (Navigator.canPop(context)) {
@@ -2126,6 +2227,56 @@ class _KycScreenState extends State<KycScreen> {
                 Navigator.pushNamedAndRemoveUntil(context, '/home', (_) => false);
               }
             }),
+            const SizedBox(height: 8),
+            // ── ⚠ A WAY BACK FROM "SUBMITTED", ADDED 24 August 2026 ───────────
+            //
+            // The rejected branch above has offered "Try Again" all along. This
+            // one — the branch almost everybody lands on — offered nothing but
+            // a way out of the screen.
+            //
+            // So somebody who noticed a mistake the moment they submitted, a
+            // mistyped date of birth or a photograph of the wrong page, had to
+            // WAIT TO BE REFUSED before they were allowed to correct it. A day
+            // of an admin's attention spent rejecting a submission the
+            // applicant already knew was wrong, and a day of the applicant's
+            // waiting to be told something they told us first.
+            //
+            // Re-submitting overwrites the same record, so there is nothing to
+            // clean up and no second entry for the admin to reconcile.
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _step            = 0;
+                  _idValid         = false;
+                  _selfieValid     = false;
+                  _submitted       = false;
+                  _idImagePath     = null;
+                  _selfieImagePath = null;
+                  _feedbackMsg     = '';
+                  _kycDecisionTier = 'GREEN';
+                  // ⚠ The previous attempt's score goes with the previous
+                  // attempt. Left behind, the next submission would display a
+                  // number that was never calculated for it.
+                  _kycAutoScore    = null;
+                  _kycAutoReason   = '';
+                  // The liveness verdict belonged to the submission being
+                  // replaced. Carrying it forward would file the new attempt
+                  // under the old attempt's evidence.
+                  _livenessComplete = false;
+                  _livenessNote     = '';
+                  _selfieAdvice     = null;
+                  _selfieScores     = const <String, double>{};
+                });
+              },
+              child: Text(
+                'Something wrong? Submit again',
+                style: GoogleFonts.inter(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                  color: _primary,
+                ),
+              ),
+            ),
           ],
         ),
       ),

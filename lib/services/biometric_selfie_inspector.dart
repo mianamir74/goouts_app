@@ -45,7 +45,29 @@ class BiometricSelfieInspector {
   static const double _maxBrightness    = 220.0;
   static const double _idealBrightness  = 130.0; // photometric ideal
   static const int    _minFileSizeBytes = 40000;  // 40 KB minimum
-  static const int    _idealFileSize    = 250000; // 250 KB = ideal quality
+
+  /// File size at which fileQuality reaches 1.0.
+  ///
+  /// ── ⚠ RECALIBRATED 24 August 2026. 250 KB WAS MEASURED ON A DIFFERENT
+  ///    PIPELINE AND SILENTLY BECAME UNREACHABLE. ─────────────────────────────
+  ///
+  /// fileQuality is fileSize / this, clamped. 250 KB was chosen when the file
+  /// reaching here was the camera's own output — an iPhone selfie of 1.5 to 3
+  /// MB, which clamps to 1.0 without trying.
+  ///
+  /// normaliseOrientation now sits in front of this: it re-encodes at quality
+  /// 90 and caps the longest edge at 1600px, so the same selfie arrives at
+  /// roughly 150–250 KB. Against a 250 KB ideal that is a fileQuality of 0.6 to
+  /// 1.0 instead of a certain 1.0 — a real drop in the auto-approval score,
+  /// caused by a change that had nothing to do with quality and everything to
+  /// do with rotation.
+  ///
+  /// ⚠ THE FLOOR ABOVE IS THE ACTUAL PROTECTION. _minFileSizeBytes rejects
+  /// genuine rubbish outright. This constant only decides where a good file
+  /// stops earning more credit for being bigger, and a well compressed sharp
+  /// image is not worse than a bloated one — sharpness is measured directly,
+  /// on its own, at more than twice this weight.
+  static const int    _idealFileSize    = 120000; // 120 KB, post-normalisation
 
   /// Inspects selfie and returns confidence scores for each signal.
   ///
