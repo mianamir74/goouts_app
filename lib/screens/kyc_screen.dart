@@ -1087,17 +1087,35 @@ class _KycScreenState extends State<KycScreen> {
                   fontSize: 13.5, height: 1.5, color: Colors.grey[700]),
             ),
             const SizedBox(height: 22),
-            _introStep(1, Icons.face_retouching_natural_rounded,
+            // ── ⚠ THE SHEET DESCRIBES THE FLOW THAT ACTUALLY RUNS ───────────
+            //
+            // Rewritten 24 August 2026 after a device test. It was describing
+            // a four-step flow that no longer existed: it never mentioned
+            // coming back to the centre — which is now the step that decides
+            // when the photograph is taken — and it said nothing about
+            // glasses, which are refused outright when the lenses catch the
+            // light.
+            //
+            // An instruction sheet that is out of date is worse than none. The
+            // person follows it, the app does something else, and they
+            // conclude the app is broken rather than that the sheet is.
+            _introStep(1, Icons.remove_red_eye_outlined,
+                'Take your glasses off',
+                'Lenses catching the light hide your eyes, and the photo will '
+                    'be refused.'),
+            _introStep(2, Icons.face_retouching_natural_rounded,
                 'Put your face in the circle',
                 'Hold the phone at arm\'s length, in good light.'),
-            _introStep(2, Icons.touch_app_outlined, 'Press start',
+            _introStep(3, Icons.touch_app_outlined, 'Press start',
                 'Nothing begins until you do. You will get a short countdown.'),
-            _introStep(3, Icons.rotate_right_rounded,
-                'Turn your head',
-                'Left, then all the way right. The ring fills as you go, and '
-                    'the arrows below it show which side is done.'),
-            _introStep(4, Icons.photo_camera_rounded, 'Hold still',
-                'The photo is taken for you once the ring is complete.'),
+            _introStep(4, Icons.rotate_right_rounded,
+                'Turn your head, left then right',
+                'Go as far as is comfortable each way. The ring fills as you '
+                    'go and the arrows show which side is done.'),
+            _introStep(5, Icons.center_focus_strong_rounded,
+                'Come back to the middle',
+                'Line up with the mark at the bottom of the circle and look '
+                    'straight ahead. The photo is taken for you.'),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(12),
@@ -1249,7 +1267,7 @@ class _KycScreenState extends State<KycScreen> {
                 else
                   ValueListenableBuilder<LivenessRingState>(
                     valueListenable: _liveness!.state,
-                    builder: (_, LivenessRingState st, __) {
+                    builder: (_, LivenessRingState st, Widget? child) {
                       switch (st) {
                         case LivenessRingState.centring:
                           return _stepHeading(
@@ -1274,6 +1292,12 @@ class _KycScreenState extends State<KycScreen> {
                             'Turn your head',
                             'The green ring fills as you go. Left first, '
                                 'then straight back across to the right.',
+                          );
+                        case LivenessRingState.returnToCentre:
+                          return _stepHeading(
+                            'Now back to the centre',
+                            'Bring your face back to the middle of the circle '
+                                'and look straight at the camera.',
                           );
                         case LivenessRingState.complete:
                         case LivenessRingState.timedOut:
@@ -1340,37 +1364,26 @@ class _KycScreenState extends State<KycScreen> {
                           painter: _RoundedRectOverlay(),
                           child: const SizedBox.expand(),
                         )
-                      // ── ⚠ ONE SHAPE AT A TIME ──────────────────────────
+                      // ── ⚠ THE SELFIE STEP IS A CIRCLE, START TO FINISH ──
                       //
-                      // The corner bracket and the liveness ring were BOTH
-                      // being painted, so the screen showed a square and a
-                      // circle fighting over the same face. The bracket is
-                      // suppressed until the sweep is done; after that it
-                      // comes back to frame the actual photograph.
-                      : _autoSelfie == null
-                          ? CustomPaint(
-                              painter: _FaceBracketOverlay(framed: false),
-                              child: const SizedBox.expand(),
-                            )
-                          : ValueListenableBuilder<LivenessRingState>(
-                              valueListenable: _liveness?.state ??
-                                  _completedRing,
-                              builder: (_, LivenessRingState st, __) {
-                                if (st != LivenessRingState.complete &&
-                                    st != LivenessRingState.timedOut) {
-                                  return const SizedBox.expand();
-                                }
-                                return ValueListenableBuilder<Rect?>(
-                                  valueListenable: _autoSelfie!.faceBox,
-                                  builder: (_, box, __) => CustomPaint(
-                                    painter: _FaceBracketOverlay(
-                                      framed: _autoSelfie!.isFramed(box),
-                                    ),
-                                    child: const SizedBox.expand(),
-                                  ),
-                                );
-                              },
-                            ),
+                      // Reported from a device on 24 August 2026: "about 20%
+                      // left Square line shows — this should not be, it should
+                      // remain circle".
+                      //
+                      // The bracket used to reappear the instant the ring
+                      // closed, so the guide the person had spent five seconds
+                      // filling was replaced by a different shape at the exact
+                      // moment they succeeded. It reads as the app changing its
+                      // mind, and it happened while the ring still had visible
+                      // dark segments — because completion is 85% coverage, not
+                      // 100% — so it looked like the square arrived to say the
+                      // circle had failed.
+                      //
+                      // ⚠ THE SQUARE IS NOW ONLY FOR THE ID STEP, where a card
+                      // is genuinely rectangular. A face gets a circle and
+                      // keeps it. The ring stays on screen through the capture,
+                      // fully lit, with the centre mark showing where to look.
+                      : const SizedBox.expand(),
                 ),
 
                 // ── THE LIVENESS RING ────────────────────────────────────
@@ -1384,10 +1397,15 @@ class _KycScreenState extends State<KycScreen> {
                     child: IgnorePointer(
                       child: ValueListenableBuilder<LivenessRingState>(
                         valueListenable: _liveness!.state,
-                        builder: (_, LivenessRingState st, __) {
-                          if (st == LivenessRingState.complete) {
-                            return const SizedBox.shrink();
-                          }
+                        builder: (_, LivenessRingState st, Widget? child) {
+                          // ⚠ NO EARLY RETURN ON complete ANY MORE.
+                          //
+                          // The ring used to vanish the moment the sweep
+                          // finished, which is what let the square bracket take
+                          // its place — the complaint that started this. The
+                          // circle now stays for the whole selfie step: filled,
+                          // with the centre mark lit, right through the
+                          // photograph being taken. One shape, start to finish.
                           return Center(
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
@@ -1397,14 +1415,18 @@ class _KycScreenState extends State<KycScreen> {
                               children: <Widget>[
                                 ValueListenableBuilder<List<bool>>(
                                   valueListenable: _liveness!.lit,
-                                  builder: (_, List<bool> lit, __) =>
-                                      LivenessRing(lit: lit),
+                                  builder: (_, List<bool> lit, Widget? child) =>
+                                      LivenessRing(
+                                    lit: lit,
+                                    centreActive: st ==
+                                        LivenessRingState.returnToCentre,
+                                  ),
                                 ),
                                 // 3 · 2 · 1, big, in the middle of the ring.
                                 if (st == LivenessRingState.countdown)
                                   ValueListenableBuilder<int>(
                                     valueListenable: _liveness!.count,
-                                    builder: (_, int n, __) => Container(
+                                    builder: (_, int n, Widget? child) => Container(
                                       width: 96,
                                       height: 96,
                                       alignment: Alignment.center,
@@ -1444,7 +1466,7 @@ class _KycScreenState extends State<KycScreen> {
                                 const SizedBox(height: 18),
                                 ValueListenableBuilder<List<bool>>(
                                   valueListenable: _liveness!.lit,
-                                  builder: (_, List<bool> lit, __) =>
+                                  builder: (_, List<bool> lit, Widget? child) =>
                                       LivenessArrows(lit: lit),
                                 ),
                               ],
@@ -1480,7 +1502,7 @@ class _KycScreenState extends State<KycScreen> {
                     // single rebuild of this screen.
                     child: ValueListenableBuilder<LivenessRingState>(
                       valueListenable: _liveness!.state,
-                      builder: (_, LivenessRingState st, __) {
+                      builder: (_, LivenessRingState st, Widget? child) {
                         final bool sweeping =
                             st != LivenessRingState.complete;
                         // The failure box already explains what happened in
@@ -1491,7 +1513,7 @@ class _KycScreenState extends State<KycScreen> {
                         }
                         return ValueListenableBuilder<bool>(
                           valueListenable: _autoSelfie!.gaveUp,
-                          builder: (_, bool up, __) {
+                          builder: (_, bool up, Widget? child) {
                             // ⚠ THE THIRD BOX. Once auto-capture has given up
                             // the panel lower down already says "use the
                             // button below", and this pill said the same thing
@@ -1501,7 +1523,7 @@ class _KycScreenState extends State<KycScreen> {
                               valueListenable: sweeping && _liveness != null
                                   ? _liveness!.hint
                                   : _autoSelfie!.guidance,
-                              builder: (_, msg, __) => _hintPill(msg),
+                              builder: (_, msg, Widget? child) => _hintPill(msg),
                             );
                           },
                         );
@@ -1523,7 +1545,7 @@ class _KycScreenState extends State<KycScreen> {
                     bottom: 24,
                     child: ValueListenableBuilder<LivenessRingState>(
                       valueListenable: _liveness!.state,
-                      builder: (_, LivenessRingState st, __) {
+                      builder: (_, LivenessRingState st, Widget? child) {
                         if (st != LivenessRingState.ready) {
                           return const SizedBox.shrink();
                         }
@@ -1561,7 +1583,7 @@ class _KycScreenState extends State<KycScreen> {
                     bottom: 92,
                     child: ValueListenableBuilder<String>(
                       valueListenable: _liveness!.failureReason,
-                      builder: (_, String reason, __) {
+                      builder: (_, String reason, Widget? child) {
                         if (reason.isEmpty) return const SizedBox.shrink();
                         return Container(
                           padding: const EdgeInsets.all(14),
@@ -1657,7 +1679,7 @@ class _KycScreenState extends State<KycScreen> {
                   IgnorePointer(
                     child: ValueListenableBuilder<double>(
                       valueListenable: _autoSelfie!.holdProgress,
-                      builder: (_, p, __) => p <= 0.0
+                      builder: (_, p, Widget? child) => p <= 0.0
                           ? const SizedBox.shrink()
                           : CustomPaint(
                               painter: _HoldStillBar(p),
@@ -1704,7 +1726,7 @@ class _KycScreenState extends State<KycScreen> {
                     right: 24,
                     child: ValueListenableBuilder<bool>(
                       valueListenable: _autoSelfie!.gaveUp,
-                      builder: (_, up, __) => !up
+                      builder: (_, up, Widget? child) => !up
                           ? const SizedBox.shrink()
                           : Container(
                               padding: const EdgeInsets.symmetric(
@@ -2019,25 +2041,73 @@ class _KycScreenState extends State<KycScreen> {
             _checkRow('Document framing', _idValid),
             _checkRow('Face detected', _selfieValid),
             _checkRow('Eyes open & clear', _selfieValid),
+            // ── ⚠ THE MOVEMENT CHECK IS LISTED HONESTLY. ────────────────────
+            //
+            // Reported from a device on 24 August 2026, and the reporter was
+            // right to call it the real one: "if i do not do the face
+            // verification and press take selfie it by pass the live test and
+            // capture with green tick".
+            //
+            // The manual shutter has to stay — it is the guarantee that a
+            // camera, a face detector or a phone we did not anticipate cannot
+            // trap somebody on this screen for ever. That is not negotiable.
+            //
+            // What was wrong was the SCREEN, not the button. Four green ticks
+            // and no mention of liveness reads as "everything passed", so
+            // skipping the movement check looked identical to completing it —
+            // to the applicant AND to the reviewer, since nothing on this panel
+            // said otherwise.
+            //
+            // Now it is a row like any other, and it shows the truth. Amber,
+            // not red: an unverified movement check is a reason to look harder
+            // at the photograph, not grounds to refuse it.
+            _checkRow(
+              _livenessComplete
+                  ? 'Movement check passed'
+                  : 'Movement check not completed',
+              _livenessComplete,
+              warnWhenFalse: true,
+            ),
           ],
         ),
       );
 
-  Widget _checkRow(String label, bool passed) => Padding(
+  /// One line of the on-device checks panel.
+  ///
+  /// [warnWhenFalse] draws the unfinished state in amber with a warning icon
+  /// instead of a grey empty circle. A grey circle in a list of green ticks
+  /// reads as "still loading"; amber reads as "look at this", which is the
+  /// difference between a panel that informs and one that reassures falsely.
+  Widget _checkRow(String label, bool passed,
+          {bool warnWhenFalse = false}) =>
+      Padding(
         padding: const EdgeInsets.symmetric(vertical: 5),
         child: Row(
           children: [
             Icon(
               passed
                   ? Icons.check_circle_rounded
-                  : Icons.radio_button_unchecked_rounded,
-              color: passed ? _green : Colors.grey[300],
+                  : warnWhenFalse
+                      ? Icons.error_outline_rounded
+                      : Icons.radio_button_unchecked_rounded,
+              color: passed
+                  ? _green
+                  : warnWhenFalse
+                      ? const Color(0xFFD97706)
+                      : Colors.grey[300],
               size: 20,
             ),
             const SizedBox(width: 10),
-            Text(label,
-                style: GoogleFonts.inter(
-                    fontSize: 13, color: Colors.grey[700])),
+            Expanded(
+              child: Text(label,
+                  style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight:
+                          (!passed && warnWhenFalse) ? FontWeight.w600 : null,
+                      color: (!passed && warnWhenFalse)
+                          ? const Color(0xFFB45309)
+                          : Colors.grey[700])),
+            ),
           ],
         ),
       );
@@ -2484,51 +2554,17 @@ class _RoundedRectOverlay extends CustomPainter {
 /// Corners rather than a closed shape because a bracket says "put it between
 /// these" without drawing an outline the face is meant to trace. A circle
 /// invites people to match its edge, which is not what is measured.
-class _FaceBracketOverlay extends CustomPainter {
-  _FaceBracketOverlay({required this.framed});
-
-  /// True when the face is inside the zone at roughly the right size.
-  final bool framed;
-
-  static const Color _ok = Color(0xFF0A7A3E);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final Rect zone = Rect.fromCenter(
-      center: Offset(size.width / 2, size.height * 0.46),
-      width: size.width * 0.55,
-      height: size.height * 0.40,
-    );
-
-    final Path mask = Path()
-      ..addRect(Rect.fromLTWH(0, 0, size.width, size.height))
-      ..addRRect(RRect.fromRectAndRadius(zone, const Radius.circular(24)))
-      ..fillType = PathFillType.evenOdd;
-    canvas.drawPath(
-        mask, Paint()..color = Colors.black.withValues(alpha: 0.55));
-
-    final Paint stroke = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = framed ? 5 : 3.5
-      ..strokeCap = StrokeCap.round
-      ..color = framed ? _ok : Colors.white.withValues(alpha: 0.92);
-
-    final double arm = zone.width * 0.22;
-
-    void corner(Offset c, double dx, double dy) {
-      canvas.drawLine(c, c.translate(arm * dx, 0), stroke);
-      canvas.drawLine(c, c.translate(0, arm * dy), stroke);
-    }
-
-    corner(zone.topLeft, 1, 1);
-    corner(zone.topRight, -1, 1);
-    corner(zone.bottomLeft, 1, -1);
-    corner(zone.bottomRight, -1, -1);
-  }
-
-  @override
-  bool shouldRepaint(_FaceBracketOverlay old) => old.framed != framed;
-}
+// ⚠ _FaceBracketOverlay WAS DELETED ON 24 August 2026.
+//
+// It drew the corner brackets around the selfie, and the selfie step is a
+// circle from start to finish now — the liveness ring stays on screen through
+// the capture instead of handing over to a square halfway. Reported from a
+// device as "about 20% left Square line shows, this should not be, it should
+// remain circle".
+//
+// The ID step still uses _RoundedRectOverlay, which is correct: a passport
+// IS a rectangle. Left as a private unused class it would have failed CI as a
+// warning, and warnings are still fatal there. Git has it if it is ever wanted.
 
 /// Hold-still progress, drawn as a bar beneath the brackets.
 ///
