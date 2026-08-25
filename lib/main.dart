@@ -139,6 +139,22 @@ void routeFromMessage(RemoteMessage msg) {
     case 'refer_friend':
       nav.pushNamed('/refer-friend');
       break;
+    // ⚠ THE KEY IS 'stay_claim' AND IT IS SET IN stay_claims.js _notify().
+    //
+    // Added 25 August 2026 with the claims flow. Without this case the tap does
+    // nothing at all — silently, with no error — and the notification is the
+    // ONLY way a guest learns a claim has been made against them and that a 72
+    // hour clock is running. A dead tap here is somebody missing their window
+    // to answer.
+    //
+    // ⚠ ARGUMENTS ARE A MAP. StayRoutes.onGenerateRoute reads
+    // (settings.arguments as Map<String, dynamic>)['claimId']; a bare string
+    // silently becomes null and the screen opens blank.
+    case 'stay_claim':
+      nav.pushNamed('/stay/claim', arguments: <String, dynamic>{
+        'claimId': (data['claimId'] ?? '').toString(),
+      });
+      break;
     // ⚠ THE KEY IS SET IN stay_messages.js AS 'stay_message_thread' AND THE
     // ARGUMENT SHAPE IS StayRoutes' Map, not a bare string. Tapping the
     // notification lands in the conversation it is about; without this case

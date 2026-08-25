@@ -467,7 +467,10 @@ class LivenessRingController {
       progress.value = 1.0;
       _steadySince = null;
       state.value = LivenessRingState.returnToCentre;
-      hint.value = 'Now look straight at the camera';
+      // Names the TARGET, not the feeling. "Look straight at the camera"
+      // describes how it should feel; "the middle of the circle" is somewhere
+      // they can actually aim, and there is a mark there now to aim at.
+      hint.value = 'Bring your face back to the middle of the circle';
     }
   }
 

@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'dart:async';
+
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -257,6 +259,25 @@ class _KycScreenState extends State<KycScreen> {
           // Back to the framing rate. The head is meant to be STILL from here
           // on, so the extra frames would buy nothing and cost battery.
           auto.checkEveryMs = AutoSelfieController.framingCheckEveryMs;
+
+          // ── ⚠ COMPLETE MEANS TAKE IT. NOT "START LOOKING FOR A REASON TO".
+          //
+          // 25 August 2026: "once the face is in centre it detects and trigger
+          // selfie automatically — at this moment it is manual".
+          //
+          // Releasing the shutter was not the same as firing it. The ring had
+          // just PROVEN the face was centred and held steady, and then the
+          // auto-capture controller started the question again from zero
+          // against its own separate thresholds — and where those did not
+          // agree, nothing happened at all and the person was left pressing a
+          // button. Two gates, one fact.
+          //
+          // ⚠ timedOut DELIBERATELY DOES NOT DO THIS. There the head could be
+          // anywhere, so the normal framing gate should wait for a frame worth
+          // keeping rather than photographing a shrug.
+          if (s == LivenessRingState.complete) {
+            unawaited(auto.captureNow());
+          }
           _livenessComplete = s == LivenessRingState.complete;
           // The same sentence the person was shown. A reviewer seeing
           // "turned left but not right" knows to look at the photo rather
@@ -1785,10 +1806,55 @@ class _KycScreenState extends State<KycScreen> {
                   : Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _primaryButton(
-                          isId ? 'Capture Document' : 'Take Selfie',
-                          onPressed: isId ? _captureId : _captureSelfie,
-                        ),
+                        // ── ⚠ THE MANUAL SHUTTER IS GATED ON THE SWEEP ──────
+                        //
+                        // 25 August 2026: "keep the manual button as well —
+                        // manual button only works when confirm the both sides
+                        // of face is taken and green".
+                        //
+                        // This closes the bypass properly. Before, pressing it
+                        // first skipped the movement check entirely; the review
+                        // panel now says so in amber, but a hole you can see is
+                        // still a hole. Now it simply cannot be pressed until
+                        // the ring has finished with the head.
+                        //
+                        // ⚠ IT UNLOCKS ON TIMEOUT TOO, AND THAT IS NOT A
+                        // LOOPHOLE — IT IS THE POINT. If the ring cannot be
+                        // completed on somebody's phone, the twenty second
+                        // clock releases them and this button is how they
+                        // finish. The record still carries livenessComplete:
+                        // false, so the admin knows. Nobody is ever trapped on
+                        // this screen; they are only ever slowed down by twenty
+                        // seconds and reported honestly.
+                        if (isId || _liveness == null)
+                          _primaryButton(
+                            isId ? 'Capture Document' : 'Take Selfie',
+                            onPressed: isId ? _captureId : _captureSelfie,
+                          )
+                        else
+                          ValueListenableBuilder<LivenessRingState>(
+                            valueListenable: _liveness!.state,
+                            builder: (_, LivenessRingState st, Widget? child) {
+                              final bool sweepDone =
+                                  st == LivenessRingState.returnToCentre ||
+                                      st == LivenessRingState.complete ||
+                                      st == LivenessRingState.timedOut;
+                              if (sweepDone) {
+                                return _primaryButton('Take Selfie',
+                                    onPressed: _captureSelfie);
+                              }
+                              // Disabled, and SAYING WHY. A dead button with no
+                              // explanation is the thing people tap twice and
+                              // then give up on. _primaryButton already greys
+                              // itself when onPressed is null, so no Opacity
+                              // wrapper — two dimming effects on top of each
+                              // other reads as a rendering fault.
+                              return _primaryButton(
+                                'Finish the movement check first',
+                                onPressed: null,
+                              );
+                            },
+                          ),
                         if (isId) ...[
                           const SizedBox(height: 10),
                           SizedBox(

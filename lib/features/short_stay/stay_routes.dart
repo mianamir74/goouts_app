@@ -132,6 +132,19 @@ class StayRoutes {
     final listingId = id('listingId');
     final bookingId = id('bookingId');
 
+    // ⚠ ARGUMENTS IN THIS APP ARE A MAP, NOT A BARE STRING.
+    //
+    // Added 25 August 2026 with the claims wiring. I first wrote these two
+    // screens reading `settings.arguments as String`, copying the host app's
+    // convention — and the host app IS a bare string, so it looked right.
+    // Here it would have been null every single time: the cast fails silently
+    // and both screens would have opened blank, on the one journey where blank
+    // means somebody cannot find out why they are being asked for £150.
+    //
+    // Two apps, two conventions, each internally consistent. Read the
+    // generator, do not assume the other one.
+    final claimId = id('claimId');
+
     // Arrival or departure. Defaults to arrival via CaptureKind.from, which is
     // the safe way round: a missing value sends a guest to the check-in set
     // rather than silently recording arrival photographs as departure ones.
@@ -210,8 +223,14 @@ class StayRoutes {
                 kind: CaptureKind.guestCheckOut,
               ),
           evidencePack      => EvidencePackScreen(bookingId: bookingId),
-          claim             => const ClaimNotificationScreen(),
-          contestClaim      => const ContestClaimScreen(),
+          // ⚠ NOT const, AND THEY TAKE THE CLAIM ID. Wired 25 August 2026 —
+          // these were Stitch shells with empty handlers and a route that
+          // passed them nothing. A claim screen with no claim on it is a blank
+          // page where somebody expected to find out why they are being asked
+          // for £150. Both fall back to settings.arguments so a plain
+          // pushNamed(claim, arguments: id) works from a push notification tap.
+          claim             => ClaimNotificationScreen(claimId: claimId),
+          contestClaim      => ContestClaimScreen(claimId: claimId),
           review            => const ReviewStayScreen(),
           _                 => const _StayRouteMissing(),
         };

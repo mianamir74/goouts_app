@@ -38,6 +38,7 @@ import '../models/stay_enums.dart';
 import '../models/stay_evidence.dart';
 import '../models/stay_listing.dart';
 import '../services/stay_booking_service.dart';
+import '../services/stay_claim_service.dart';
 import '../services/stay_evidence_service.dart';
 import '../services/stay_listing_service.dart';
 import '../stay_routes.dart';
@@ -109,6 +110,16 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              // ── ⚠ A CLAIM MUST BE FINDABLE WITHOUT THE NOTIFICATION ───────
+              //
+              // Added 25 August 2026 with the claims flow. The push is the only
+              // other way a guest learns a claim has been made against them,
+              // and pushes get dismissed, silenced, or never granted at all.
+              //
+              // A 72 hour clock the person cannot see running is not a window,
+              // it is a trapdoor — so it sits at the TOP of this screen, above
+              // the trip itself, for as long as it is waiting on them.
+              _claimBanner(b.id),
               _header(b),
               const SizedBox(height: 16),
               _whenCard(b),
@@ -148,6 +159,84 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
   static String _d(DateTime d) => '${d.day} ${_months[d.month - 1]}';
 
   // ── Header ───────────────────────────────────────────────────────────────
+
+  /// Shows only while a claim on THIS booking is waiting on this guest.
+  ///
+  /// ⚠ SCOPED TO THE BOOKING, NOT TO THE PERSON. watchMyClaims returns every
+  /// claim against them; filtering here means a claim on a different trip does
+  /// not appear on this one, which would be alarming and useless in equal
+  /// measure.
+  ///
+  /// ⚠ SILENT ON ERROR AND WHILE LOADING. A red box saying "could not check
+  /// for claims" on a screen somebody opened to look at their holiday is worse
+  /// than the small chance of a missed banner — and the push notification and
+  /// the claim screen itself are both still there.
+  Widget _claimBanner(String bookingId) => StreamBuilder<List<StayClaim>>(
+        // ⚠ watchAwaitingReplyClaims, NOT watchMyClaims.
+        //
+        // The first version streamed the guest's last 20 claims of any status
+        // on every open of every trip screen, then threw almost all of them
+        // away client-side. This asks the server for the only ones that can
+        // possibly produce a banner — status awaiting_guest — which for nearly
+        // every guest is an empty result set costing one document read.
+        stream: StayClaimService.instance.watchAwaitingReplyClaims(),
+        builder: (BuildContext c, AsyncSnapshot<List<StayClaim>> snap) {
+          if (!snap.hasData || snap.hasError) return const SizedBox.shrink();
+          final Iterable<StayClaim> mine = snap.data!
+              .where((StayClaim x) => x.bookingId == bookingId);
+          if (mine.isEmpty) return const SizedBox.shrink();
+          final StayClaim claim = mine.first;
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: InkWell(
+              onTap: () => Navigator.of(context).pushNamed(
+                StayRoutes.claim,
+                arguments: <String, dynamic>{'claimId': claim.id},
+              ),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF2F2),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFFECACA)),
+                ),
+                child: Row(
+                  children: <Widget>[
+                    const Icon(Icons.report_gmailerrorred_outlined,
+                        color: Color(0xFFB91C1C), size: 22),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text('Your host has made a damage claim',
+                              style: GoogleFonts.inter(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF991B1B))),
+                          const SizedBox(height: 2),
+                          Text(
+                            '£${claim.amount.toStringAsFixed(2)} — tap to read '
+                            'it and respond.',
+                            style: GoogleFonts.inter(
+                                fontSize: 12.5,
+                                height: 1.4,
+                                color: const Color(0xFFB91C1C)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right_rounded,
+                        color: Color(0xFFB91C1C)),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
 
   Widget _header(StayBooking b) {
     final List<StayPhoto> photos =
