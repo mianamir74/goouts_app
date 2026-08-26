@@ -55,6 +55,7 @@ class MrzResult {
     this.expiry,
     this.nationality,
     this.checksumsPassed = false,
+    this.partialMrz = false,
   });
 
   /// An MRZ was located. Says nothing about whether it was trustworthy.
@@ -73,13 +74,42 @@ class MrzResult {
   /// See the header — a bad read produces a mismatch we caused.
   final bool checksumsPassed;
 
+  /// Exactly one machine-readable line was seen where there should be two.
+  ///
+  /// ⚠ THIS MEANS "IT IS A PASSPORT AND THE PHOTO IS CROPPED", which is
+  /// actionable. Zero lines means a driving licence, which is not.
+  final bool partialMrz;
+
   static const MrzResult none = MrzResult(found: false);
+  static const MrzResult partial = MrzResult(found: false, partialMrz: true);
 }
 
 /// How the document compares with what the applicant typed.
 enum MrzMatch {
-  /// No MRZ, or one that failed its own checksums. Not the applicant's problem.
+  /// No MRZ at all — almost always a driving licence, which does not have one.
+  /// Not the applicant's problem and nothing is said.
   notChecked,
+
+  /// ⚠ A PASSPORT WHOSE STRIP COULD NOT BE FULLY READ.
+  ///
+  /// Added 25 August 2026 after a test where a passport belonging to somebody
+  /// else went through with no complaint. Two things had gone wrong; this is
+  /// the second.
+  ///
+  /// The parser needs BOTH machine-readable lines — the surname is on line one,
+  /// but every check digit is on line two, and a read that cannot be verified
+  /// is discarded on purpose. So a photograph that crops the bottom line reads
+  /// half a passport, throws it away, and says NOTHING. The document was never
+  /// checked and nobody was told it had not been.
+  ///
+  /// Silence is the wrong answer there. One MRZ line found means it IS a
+  /// passport and the photograph is cut off — which the person can fix in five
+  /// seconds if anybody asks them to.
+  ///
+  /// ⚠ ONLY WHEN A PARTIAL STRIP WAS SEEN. Zero lines stays silent, because
+  /// that is a driving licence and prompting every licence holder to "include
+  /// the code lines" would be nonsense they cannot act on.
+  unreadable,
 
   /// Everything tested agrees.
   agrees,
@@ -126,6 +156,13 @@ class MrzReader {
     required DateTime? typedDob,
   }) async {
     final MrzResult mrz = await read(imagePath);
+
+    // ⚠ PARTIAL STRIP: SAY SO. See MrzMatch.unreadable — a cropped passport
+    // used to be indistinguishable from a driving licence, and both were met
+    // with silence.
+    if (mrz.partialMrz) {
+      return MrzCheck(match: MrzMatch.unreadable, mrz: mrz);
+    }
     if (!mrz.found || !mrz.checksumsPassed) {
       return MrzCheck(match: MrzMatch.notChecked, mrz: mrz);
     }
@@ -202,7 +239,13 @@ class MrzReader {
           if (s.length >= 40 && s.contains('<')) candidates.add(s);
         }
       }
-      if (candidates.length < 2) return MrzResult.none;
+      // ⚠ ONE LINE IS NOT "NO PASSPORT", IT IS A CROPPED PASSPORT.
+      // Returning `none` here is what let somebody else's passport through in
+      // silence — the surname sits on line one, every check digit sits on line
+      // two, and a photograph missing the bottom edge reads half a document and
+      // discards it without a word. See MrzMatch.unreadable.
+      if (candidates.length == 1) return MrzResult.partial;
+      if (candidates.isEmpty) return MrzResult.none;
 
       // Take the last two of the right shape — on a TD3 passport the MRZ is
       // two lines and nothing else on the page looks like this.

@@ -592,6 +592,25 @@ class _KycScreenState extends State<KycScreen> {
           _feedbackMsg = '';
           _checking    = false;
         });
+
+        // ── ⚠ THE PASSPORT CHECK WAS MISSING FROM THIS PATH ENTIRELY ────────
+        //
+        // Found 25 August 2026, reported as "i upload my friend passport copy
+        // and it doesnot do or reject OCR". It did not, because _runMrzCheck
+        // was wired into _captureId — THE CAMERA PATH — and nowhere else. A
+        // document chosen from the gallery skipped the check completely.
+        //
+        // ⚠ THIS IS THE SAME MISTAKE AS THE ORIENTATION FIX, IN THE SAME FILE.
+        // normaliseOrientation went into the gallery path first and the camera
+        // path second; the MRZ check went into the camera path and not the
+        // gallery. One fix, two call sites, one of them done — twice.
+        //
+        // And it is worse here, because uploading someone else's document from
+        // the gallery is precisely the route a person committing this kind of
+        // fraud would take. The camera path is the honest one.
+        await _runMrzCheck(uprightId);
+        if (!mounted) return;
+
         await _goTo(2);
       } else {
         // crash_scan: ok - sibling branch of the await above, cannot both run
@@ -633,6 +652,49 @@ class _KycScreenState extends State<KycScreen> {
       );
       if (!mounted) return;
       _mrzCheck = check;
+
+      // ⚠ A PASSPORT WE COULD NOT FINISH READING GETS ASKED FOR AGAIN.
+      //
+      // Before this it was silent, and silence is what let somebody else's
+      // passport through: the photo cropped the bottom line, the parser threw
+      // away half a read, and nothing on screen said the document had not been
+      // checked. Five seconds of the applicant's time fixes it.
+      if (check.match == MrzMatch.unreadable) {
+        await showDialog<void>(
+          context: context,
+          builder: (BuildContext ctx) => AlertDialog(
+            title: Text('We could not read your passport',
+                style: GoogleFonts.inter(
+                    fontSize: 17, fontWeight: FontWeight.w700)),
+            content: Text(
+              'The two lines of code along the bottom of the photo page were '
+              'cut off or unclear.\n\n'
+              'Please retake it with the whole page flat in frame, including '
+              'those two lines.',
+              style: GoogleFonts.inter(fontSize: 13.5, height: 1.5),
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  setState(() {
+                    _idImagePath = null;
+                    _idValid = false;
+                  });
+                  _goTo(1);
+                },
+                child: const Text('Retake'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Carry on'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
       if (!check.isProblem) return;
 
       // ⚠ SHOWN, NOT ENFORCED — AND THE FIRST OPTION IS TO FIX THE TYPING.
@@ -813,6 +875,15 @@ class _KycScreenState extends State<KycScreen> {
     // The stream must stop before takePicture — several Android devices fail
     // outright if both run at once.
     await _autoSelfie?.stop();
+    // ⚠ GUARDED. stop() awaits controller.stopImageStream(), which is slow
+    // enough on a real device to matter — and this is the MANUAL shutter, so it
+    // is pressed by people who are already impatient and quite likely to back
+    // out while it runs. Without this, setState lands on a disposed State and
+    // iOS reports a crash whose stack names nothing useful.
+    //
+    // Found in the audit on 25 August 2026. Same fault as the one already fixed
+    // in the host app's liveness screen — which is why it was looked for here.
+    if (!mounted) return;
     setState(() {
       _checking = true;
       _feedbackMsg = 'Analysing selfie…';
@@ -2089,11 +2160,115 @@ class _KycScreenState extends State<KycScreen> {
   // ─────────────────────────────────────────────────────────────────────────
   // Step 3: Review & Submit
   // ─────────────────────────────────────────────────────────────────────────
-  Widget _buildReviewStep() => SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+  // ─────────────────────────────────────────────────────────────────────────
+  // Step 3: Review & Submit — AND the submitted state. ONE SCREEN, TWO MODES.
+  //
+  // ── ⚠ WHY THESE WERE MERGED, 25 August 2026 ──────────────────────────────
+  //
+  // Reported after seeing both on a device: "there is no sence to have same
+  // information with almost 2 screens".
+  //
+  // Correct. Review & Submit and the submitted confirmation showed the SAME
+  // name, the SAME date of birth, the SAME two photographs and the SAME
+  // checks. The only real differences were a heading, a blue header and which
+  // buttons sat at the bottom — and yet they were two separate builds, which
+  // meant every future change had to be made twice or they would drift apart.
+  // That is this project's most expensive habit, so it does not get to start
+  // here.
+  //
+  // Now `submitted` flips the header and the actions. The card between them is
+  // built once and cannot disagree with itself.
+  //
+  // ⚠ NO NAVIGATION HAPPENS ON SUBMIT. The screen does not push anywhere; the
+  // same widget rebuilds with a header. That is also why the back button
+  // behaves sensibly afterwards — there is no second route to get stuck on.
+  // ─────────────────────────────────────────────────────────────────────────
+  Widget _buildReviewStep({bool submitted = false}) => SingleChildScrollView(
+        child: Column(
+          children: <Widget>[
+            if (submitted) _submittedHeader() else _reviewHeader(),
+
+            Transform.translate(
+              offset: Offset(0, submitted ? -40 : 0),
+              child: Container(
+                margin: EdgeInsets.fromLTRB(14, submitted ? 0 : 4, 14, 0),
+                padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: <BoxShadow>[
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 18,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: <Widget>[
+                    _submittedRow(Icons.person_outline_rounded, 'Name',
+                        _fullNameOrFallback()),
+                    Divider(color: Colors.grey[200], height: 18),
+                    _submittedRow(
+                        Icons.cake_outlined,
+                        'Date of birth',
+                        _dobCtrl.text.trim().isEmpty
+                            ? '—'
+                            : _dobCtrl.text.trim()),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                            child: _submittedThumb(
+                                _idImagePath, 'ID document', _idValid)),
+                        const SizedBox(width: 10),
+                        Expanded(
+                            child: _submittedThumb(
+                                _selfieImagePath, 'Selfie', _selfieValid)),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    _submittedChecks(),
+                    if (submitted) ...<Widget>[
+                      Divider(color: Colors.grey[200], height: 26),
+                      Text('Your documents are submitted',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.inter(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w700,
+                              color: _dark)),
+                      const SizedBox(height: 6),
+                      Text(
+                        'We will review your profile and you will be notified '
+                        'if any extra information is needed.',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.inter(
+                            fontSize: 12.5,
+                            height: 1.55,
+                            color: Colors.grey[600]),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+
+            Transform.translate(
+              offset: Offset(0, submitted ? -26 : 0),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
+                child: submitted ? _submittedActions() : _reviewActions(),
+              ),
+            ),
+          ],
+        ),
+      );
+
+  Widget _reviewHeader() => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 0, 24, 4),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+          children: <Widget>[
             _buildProgressDots(),
             _sectionIcon(Icons.fact_check_outlined),
             const SizedBox(height: 16),
@@ -2104,244 +2279,145 @@ class _KycScreenState extends State<KycScreen> {
                     color: _dark)),
             const SizedBox(height: 6),
             Text(
-              'All checks passed on your device. Review below and submit for final verification.',
+              'All checks passed on your device. Review below and submit for '
+              'final verification.',
               style: GoogleFonts.inter(
                   fontSize: 13, color: Colors.grey[600], height: 1.5),
             ),
-            const SizedBox(height: 28),
-
-            // Name summary
-            _reviewTile(
-              icon: Icons.person_rounded,
-              label: 'Name',
-              value:
-                  '${_firstNameCtrl.text} ${_lastNameCtrl.text}',
-            ),
-            _reviewTile(
-              icon: Icons.cake_rounded,
-              label: 'Date of Birth',
-              value: _dobCtrl.text,
-            ),
-
-            const SizedBox(height: 20),
-
-            // Captured images row
-            Row(
-              children: [
-                Expanded(
-                  child: _capturePreview(
-                    path: _idImagePath,
-                    label: 'ID Document',
-                    icon: Icons.badge_outlined,
-                    isValid: _idValid,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _capturePreview(
-                    path: _selfieImagePath,
-                    label: 'Selfie',
-                    icon: Icons.face_retouching_natural_rounded,
-                    isValid: _selfieValid,
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 24),
-
-            // On-device checks summary
-            _checksCard(),
-
-            const SizedBox(height: 24),
-
-            // Submit button — locked until both pass (they always will here
-            // because we only reach step 3 after both pass, but we guard anyway)
-            _primaryButton(
-              'Submit for Verification',
-              onPressed: (_idValid && _selfieValid && !_submitting)
-                  ? _submit
-                  : null,
-              loading: _submitting,
-            ),
-            const SizedBox(height: 16),
-            _infoCard(
-              icon: Icons.verified_user_outlined,
-              text:
-                  // ⚠ REWRITTEN 25 August 2026. It said "typically completed
-                  // within 2 minutes. You will be notified once approved."
-                  //
-                  // Both halves were untrue. It is not two minutes — every
-                  // submission that is not auto-approved waits for a person,
-                  // and the Under Review screen says up to 24 hours. And
-                  // "once approved" tells somebody the answer before anybody
-                  // has looked at it, on the screen immediately before they
-                  // commit. A promise made here is one an admin has to break.
-                  'A member of our team reviews every submission. We will let '
-                  'you know as soon as there is an update.',
-            ),
+            const SizedBox(height: 12),
           ],
         ),
       );
 
-  Widget _reviewTile(
-      {required IconData icon,
-      required String label,
-      required String value}) =>
-      Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 6,
-                offset: const Offset(0, 2))
-          ],
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: _primary, size: 22),
-            const SizedBox(width: 14),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label,
-                    style: GoogleFonts.inter(
-                        fontSize: 11, color: Colors.grey[500])),
-                const SizedBox(height: 2),
-                Text(value,
-                    style: GoogleFonts.inter(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: _dark)),
-              ],
-            ),
-          ],
-        ),
-      );
-
-  Widget _capturePreview({
-    required String? path,
-    required String label,
-    required IconData icon,
-    required bool isValid,
-  }) =>
-      Container(
-        height: 130,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-              color: isValid ? _green : Colors.grey[300]!, width: 1.5),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 6,
-                offset: const Offset(0, 2))
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(11),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              if (path != null)
-                Image.file(File(path), fit: BoxFit.cover)
-              else
-                Center(
-                    child: Icon(icon, size: 36, color: Colors.grey[300])),
-              if (isValid)
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    width: 24,
-                    height: 24,
-                    decoration: const BoxDecoration(
-                        color: _green, shape: BoxShape.circle),
-                    child: const Icon(Icons.check_rounded,
-                        color: Colors.white, size: 16),
-                  ),
-                ),
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Container(
-                  color: Colors.black.withValues(alpha: 0.45),
-                  padding: const EdgeInsets.symmetric(vertical: 5),
-                  child: Text(label,
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600)),
-                ),
-              ),
-            ],
+  Widget _submittedHeader() => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(24, 30, 24, 58),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: <Color>[Color(0xFF0392CA), Color(0xFF0B6FA8)],
           ),
         ),
-      );
-
-  Widget _checksCard() => Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 6,
-                offset: const Offset(0, 2))
-          ],
-        ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('On-Device Checks',
+          children: <Widget>[
+            Text('Selfie submitted successfully',
+                textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: _dark)),
-            const SizedBox(height: 12),
-            _checkRow('Image sharpness', _idValid),
-            _checkRow('Document framing', _idValid),
-            _checkRow('Face detected', _selfieValid),
-            _checkRow('Eyes open & clear', _selfieValid),
-            // ── ⚠ THE MOVEMENT CHECK IS LISTED HONESTLY. ────────────────────
-            //
-            // Reported from a device on 24 August 2026, and the reporter was
-            // right to call it the real one: "if i do not do the face
-            // verification and press take selfie it by pass the live test and
-            // capture with green tick".
-            //
-            // The manual shutter has to stay — it is the guarantee that a
-            // camera, a face detector or a phone we did not anticipate cannot
-            // trap somebody on this screen for ever. That is not negotiable.
-            //
-            // What was wrong was the SCREEN, not the button. Four green ticks
-            // and no mention of liveness reads as "everything passed", so
-            // skipping the movement check looked identical to completing it —
-            // to the applicant AND to the reviewer, since nothing on this panel
-            // said otherwise.
-            //
-            // Now it is a row like any other, and it shows the truth. Amber,
-            // not red: an unverified movement check is a reason to look harder
-            // at the photograph, not grounds to refuse it.
-            _checkRow(
-              _livenessComplete
-                  ? 'Movement check passed'
-                  : 'Movement check not completed',
-              _livenessComplete,
-              warnWhenFalse: true,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white)),
+            const SizedBox(height: 20),
+            Container(
+              width: 84,
+              height: 84,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: <BoxShadow>[
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.16),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              // ⚠ BLUE, NOT GREEN. Green plus a tick is the universal
+              // "approved" signal, and this is a submission, not approval.
+              child: const Icon(Icons.check_rounded,
+                  color: Color(0xFF0392CA), size: 42),
             ),
           ],
         ),
       );
+
+  Widget _reviewActions() => Column(
+        children: <Widget>[
+          _primaryButton(
+            'Submit for Verification',
+            onPressed:
+                (_idValid && _selfieValid && !_submitting) ? _submit : null,
+            loading: _submitting,
+          ),
+          const SizedBox(height: 16),
+          _infoCard(
+            icon: Icons.verified_user_outlined,
+            // ⚠ It said "typically completed within 2 minutes. You will be
+            // notified once approved." Both halves were untrue: it is a person,
+            // up to a day, and "once approved" gives the answer before anybody
+            // has looked. A promise made here is one an admin has to break.
+            text: 'A member of our team reviews every submission. We will let '
+                'you know as soon as there is an update.',
+          ),
+        ],
+      );
+
+  Widget _submittedActions() => Column(
+        children: <Widget>[
+          _primaryButton('Back to Profile', onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushNamedAndRemoveUntil(context, '/home', (_) => false);
+            }
+          }),
+          const SizedBox(height: 4),
+          // ── ⚠ A WAY BACK FROM "SUBMITTED" ──────────────────────────────────
+          //
+          // The rejected branch has offered "Try Again" all along; this one —
+          // the branch almost everybody lands on — offered nothing but a way
+          // out. So anybody who spotted their own mistake had to WAIT TO BE
+          // REFUSED before they could correct it.
+          //
+          // It sits directly under the two photographs on purpose: this is the
+          // screen where a wrong document becomes obvious.
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _step             = 0;
+                _idValid          = false;
+                _selfieValid      = false;
+                _submitted        = false;
+                _idImagePath      = null;
+                _selfieImagePath  = null;
+                _feedbackMsg      = '';
+                _kycDecisionTier  = 'GREEN';
+                // The liveness verdict belonged to the submission being
+                // replaced. Carried forward it would file the new attempt under
+                // the old attempt's evidence.
+                _livenessComplete = false;
+                _livenessNote     = '';
+                _selfieAdvice     = null;
+                _selfieScores     = const <String, double>{};
+                _mrzCheck         = null;
+              });
+            },
+            child: Text(
+              'Something wrong? Submit again',
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: _primary,
+              ),
+            ),
+          ),
+        ],
+      );
+
+
+  // ⚠ _reviewTile, _capturePreview, _checksCard and _checkRow WERE DELETED ON
+  // 25 August 2026.
+  //
+  // They built the old Review & Submit layout. That screen and the submitted
+  // confirmation were merged into one _buildReviewStep(submitted:) using the
+  // compact _submittedRow / _submittedThumb / _submittedChecks helpers, which
+  // left these four referenced by nothing.
+  //
+  // Left in place they would be dead private members — an analyzer warning,
+  // and worse, a second set of review widgets sitting next to the live set for
+  // the next person to edit by mistake. Git has them.
+
+
 
   /// One line of the on-device checks panel.
   ///
@@ -2349,39 +2425,6 @@ class _KycScreenState extends State<KycScreen> {
   /// instead of a grey empty circle. A grey circle in a list of green ticks
   /// reads as "still loading"; amber reads as "look at this", which is the
   /// difference between a panel that informs and one that reassures falsely.
-  Widget _checkRow(String label, bool passed,
-          {bool warnWhenFalse = false}) =>
-      Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5),
-        child: Row(
-          children: [
-            Icon(
-              passed
-                  ? Icons.check_circle_rounded
-                  : warnWhenFalse
-                      ? Icons.error_outline_rounded
-                      : Icons.radio_button_unchecked_rounded,
-              color: passed
-                  ? _green
-                  : warnWhenFalse
-                      ? const Color(0xFFD97706)
-                      : Colors.grey[300],
-              size: 20,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(label,
-                  style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight:
-                          (!passed && warnWhenFalse) ? FontWeight.w600 : null,
-                      color: (!passed && warnWhenFalse)
-                          ? const Color(0xFFB45309)
-                          : Colors.grey[700])),
-            ),
-          ],
-        ),
-      );
 
   // ─────────────────────────────────────────────────────────────────────────
   // Success screen
@@ -2488,195 +2531,14 @@ class _KycScreenState extends State<KycScreen> {
 
     // ── AMBER: manual review pending (default fallback) ───────────────────
     //
-    // ── ⚠ ONE SCREEN, AND IT SAYS WHAT IS TRUE ───────────────────────────────
+    // ⚠ THE SAME BUILDER AS THE REVIEW STEP, WITH submitted: true.
     //
-    // Redesigned 25 August 2026. Two things were wrong before.
-    //
-    // 1. THE REVIEW DETAILS DISAPPEARED AT THE MOMENT THEY MATTERED MOST. The
-    //    Review and Submit step showed the name, the date of birth, both
-    //    photographs and the checks — and then submitting replaced all of it
-    //    with a spinner-ish panel. The one instant somebody wants to confirm
-    //    they sent the right passport is the instant it vanished.
-    //
-    // 2. THE OLD COPY PROMISED AN OUTCOME. "Verification is typically completed
-    //    within 2 minutes. You will be notified once approved." It is not two
-    //    minutes — it is a human, up to a day — and "once approved" tells
-    //    somebody the answer before anybody has looked. Removed.
-    //
-    // The headline names the ACTION COMPLETED, not a verdict. Marking that is
-    // fair; claiming success is not.
-    return SingleChildScrollView(
-      child: Column(
-        children: <Widget>[
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(24, 30, 24, 58),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: <Color>[Color(0xFF0392CA), Color(0xFF0B6FA8)],
-              ),
-            ),
-            child: Column(
-              children: <Widget>[
-                Text('Selfie submitted successfully',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.inter(
-                        fontSize: 19,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white)),
-                const SizedBox(height: 20),
-                Container(
-                  width: 84,
-                  height: 84,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: <BoxShadow>[
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.16),
-                        blurRadius: 20,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  // ⚠ BLUE, NOT GREEN. Green plus a tick is the universal
-                  // "approved" signal and this is not approval.
-                  child: const Icon(Icons.check_rounded,
-                      color: Color(0xFF0392CA), size: 42),
-                ),
-              ],
-            ),
-          ),
-
-          Transform.translate(
-            offset: const Offset(0, -40),
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 14),
-              padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: <BoxShadow>[
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
-                    blurRadius: 18,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: <Widget>[
-                  _submittedRow(Icons.person_outline_rounded, 'Name',
-                      _fullNameOrFallback()),
-                  Divider(color: Colors.grey[200], height: 18),
-                  _submittedRow(Icons.cake_outlined, 'Date of birth',
-                      _dobCtrl.text.trim().isEmpty ? '—' : _dobCtrl.text.trim()),
-
-                  const SizedBox(height: 14),
-                  // ⚠ BOTH DOCUMENTS, SIDE BY SIDE. This is the part that
-                  // answers "did I send the right passport" without making
-                  // anybody go back a step to find out.
-                  Row(
-                    children: <Widget>[
-                      Expanded(
-                          child: _submittedThumb(
-                              _idImagePath, 'ID document', _idValid)),
-                      const SizedBox(width: 10),
-                      Expanded(
-                          child: _submittedThumb(
-                              _selfieImagePath, 'Selfie', _selfieValid)),
-                    ],
-                  ),
-
-                  const SizedBox(height: 14),
-                  _submittedChecks(),
-
-                  Divider(color: Colors.grey[200], height: 26),
-                  Text('Your documents are submitted',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w700,
-                          color: _dark)),
-                  const SizedBox(height: 6),
-                  Text(
-                    'We will review your profile and you will be notified if '
-                    'any extra information is needed.',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.inter(
-                        fontSize: 12.5,
-                        height: 1.55,
-                        color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          Transform.translate(
-            offset: const Offset(0, -26),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-              child: Column(
-                children: <Widget>[
-                  _primaryButton('Back to Profile', onPressed: () {
-                    if (Navigator.canPop(context)) {
-                      Navigator.pop(context);
-                    } else {
-                      Navigator.pushNamedAndRemoveUntil(
-                          context, '/home', (_) => false);
-                    }
-                  }),
-                  const SizedBox(height: 4),
-                  // ── ⚠ A WAY BACK FROM "SUBMITTED", ADDED 24 August 2026 ────
-                  //
-                  // The rejected branch has offered "Try Again" all along. This
-                  // one — the branch almost everybody lands on — offered nothing
-                  // but a way out of the screen, so anybody who spotted their
-                  // own mistake had to WAIT TO BE REFUSED before they could
-                  // correct it.
-                  //
-                  // It sits directly under the two photographs on purpose: this
-                  // is the screen where a wrong document becomes obvious.
-                  TextButton(
-                    onPressed: () {
-                      setState(() {
-                        _step             = 0;
-                        _idValid          = false;
-                        _selfieValid      = false;
-                        _submitted        = false;
-                        _idImagePath      = null;
-                        _selfieImagePath  = null;
-                        _feedbackMsg      = '';
-                        _kycDecisionTier  = 'GREEN';
-                        // The liveness verdict belonged to the submission being
-                        // replaced. Carried forward, it would file the new
-                        // attempt under the old attempt's evidence.
-                        _livenessComplete = false;
-                        _livenessNote     = '';
-                        _selfieAdvice     = null;
-                        _selfieScores     = const <String, double>{};
-                        _mrzCheck         = null;
-                      });
-                    },
-                    child: Text(
-                      'Something wrong? Submit again',
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: _primary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+    // Merged 25 August 2026. These were two screens showing identical
+    // information — same name, same date of birth, same two photographs, same
+    // checks — differing only in a heading and which buttons sat at the bottom.
+    // Two builds of one thing is how they drift, and drift is what this project
+    // keeps paying for. One method, one card, two headers.
+    return _buildReviewStep(submitted: true);
   }
 
   Widget _submittedRow(IconData icon, String label, String value) => Row(

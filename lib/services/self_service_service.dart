@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'user_service.dart';
 import 'partner_seed_service.dart';
+import '../utils/kyc_status.dart';
 
 /// Fetches user-specific Firestore data based on support topic
 /// so the app can show a self-service resolution before creating a ticket.
@@ -187,14 +188,17 @@ class SelfServiceService {
         FirebaseAuth.instance.currentUser?.phoneNumber ?? 'Not set';
     final fullName = profile['fullName'] as String? ?? '';
 
-    String kycLabel;
-    if (kycStatus == 'verified') {
-      kycLabel = 'Verified ✓';
-    } else if (kycStatus == 'pending') {
-      kycLabel = 'Under Review';
-    } else {
-      kycLabel = 'Not Verified';
-    }
+    // ⚠ PARSED, NOT COMPARED. The backend writes 'approved'; this checked
+    // 'verified', so the support assistant told AUTO-APPROVED users they were
+    // "Not Verified" — the worst possible answer to give somebody who had just
+    // been verified. See utils/kyc_status.dart.
+    final KycStatus kyc = kycStatusFrom(kycStatus);
+    final String kycLabel = switch (kyc) {
+      KycStatus.approved => 'Verified ✓',
+      KycStatus.pending => 'Under Review',
+      KycStatus.rejected => 'Verification unsuccessful',
+      KycStatus.none => 'Not Verified',
+    };
 
     // Fetch recent transactions for phishing/scam reports
     List<Map<String, dynamic>> recentTxns = [];

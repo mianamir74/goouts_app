@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/support_ticket_service.dart';
 import '../services/self_service_service.dart';
 import '../widgets/goouts_sheet.dart';
+import '../utils/kyc_status.dart';
 
 class ContactSupportScreen extends StatefulWidget {
   const ContactSupportScreen({super.key});
@@ -1071,9 +1072,13 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
     final kycStatus = data['kycStatus'] as String? ?? '';
     final email     = data['email']     as String? ?? '';
     final phone     = data['phone']     as String? ?? '';
-    final kycColor  = kycStatus == 'verified'
+    // ⚠ PARSED, NOT COMPARED. The backend writes 'approved'; this checked
+    // 'verified', so a verified user showed grey "unknown" to the support
+    // agent looking at their case. See utils/kyc_status.dart.
+    final KycStatus kyc = kycStatusFrom(kycStatus);
+    final kycColor  = kyc.isApproved
         ? const Color(0xFF388E3C)
-        : kycStatus == 'pending' ? Colors.orange : Colors.grey;
+        : kyc.isPending ? Colors.orange : Colors.grey;
     final recentTxns = data['recentTransactions'] as List? ?? [];
     final isPhishing = sub == 'Phishing / Scam Report';
 

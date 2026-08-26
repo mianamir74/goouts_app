@@ -9,6 +9,7 @@ import '../services/user_service.dart';
 import '../services/support_ticket_service.dart';
 import '../services/message_service.dart';
 import '../utils/pin_hasher.dart';
+import '../utils/kyc_status.dart';
 import '../widgets/goouts_sheet.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -150,8 +151,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _fullName = data['fullName'] ?? '';
         _email = data['email'] ?? '';
         _phone = data['phone'] ?? FirebaseAuth.instance.currentUser?.phoneNumber ?? '';
-        _kycSubmitted = kycStatus == 'verified';
-        _kycPending = kycStatus == 'pending';
+        // ⚠ PARSED, NOT COMPARED. This read `kycStatus == 'verified'` while the
+        // backend writes 'approved' — so an AUTO-APPROVED applicant was shown
+        // "Verify your identity" for ever and would submit the whole thing
+        // again. See utils/kyc_status.dart.
+        final KycStatus kyc = kycStatusFrom(kycStatus);
+        _kycSubmitted = kyc.isApproved;
+        _kycPending = kyc.isPending;
         _walletBalance = raw is num ? raw.toDouble() : 0.0;
         _reviewPoints  = (data['reviewPoints'] as num?)?.toInt() ?? 0;
         _firstCashbackEarned = data['firstCashbackEarned'] as bool? ?? false;
