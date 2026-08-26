@@ -28,7 +28,12 @@ class LivenessRing extends StatelessWidget {
     required this.lit,
     this.diameter = 260,
     this.ringColour = const Color(0xFF22C55E),
-    this.trackColour = const Color(0x33FFFFFF),
+    // ⚠ RAISED FROM 0x33 TO 0x4D DELIBERATELY, EVEN THOUGH THE TRACK IS NOW
+    // QUIETER OVERALL. The stroke dropped from 6px to 3.5px, and a thin line at
+    // the old opacity disappears against a bright window or a pale wall — which
+    // is exactly the lighting people are told to stand in. Slightly more opaque
+    // and much thinner nets out fainter, and survives a real background.
+    this.trackColour = const Color(0x4DFFFFFF),
     this.centreActive = false,
   });
 
@@ -157,6 +162,85 @@ class LivenessArrows extends StatelessWidget {
       );
 }
 
+/// A radial darkening that fades in from the edges of the preview.
+///
+/// ── ⚠ WHY A VIGNETTE AND NOT A CIRCULAR CUTOUT ──────────────────────────────
+///
+/// Chosen 25 August 2026 over a hard-edged spotlight, which is the stronger
+/// look. A cutout has to sit EXACTLY over the ring, and the ring is not exactly
+/// centred — it shares a column with the direction arrows, so it floats about
+/// 26px above the middle. A mask that misses by a few pixels reads as broken
+/// rather than deliberate, and this same file runs in four apps on every phone
+/// size nobody here owns.
+///
+/// A gradient has no boundary to misalign. It gets most of the effect and
+/// cannot be wrong.
+///
+/// ⚠ THIS IS PAINT, NOT EXPOSURE. It is drawn over the preview and changes
+/// nothing about the frames ML Kit receives — the brightness and glare checks
+/// still see the original image. Dimming what the person sees must never dim
+/// what the checks measure, or a dark room would start passing.
+class LivenessVignette extends StatelessWidget {
+  const LivenessVignette({
+    super.key,
+    this.colour = const Color(0xFF0A1018),
+    this.strength = 0.80,
+  });
+
+  /// Near-black with a blue cast rather than pure black — pure black against a
+  /// camera preview looks like a dead pixel region on OLED.
+  final Color colour;
+
+  /// Opacity at the very corners. The centre is always fully clear.
+  final double strength;
+
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+        child: CustomPaint(
+          size: Size.infinite,
+          painter: _VignettePainter(colour: colour, strength: strength),
+        ),
+      );
+}
+
+class _VignettePainter extends CustomPainter {
+  _VignettePainter({required this.colour, required this.strength});
+
+  final Color colour;
+  final double strength;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Rect rect = Offset.zero & size;
+    // Centred on the face, which sits slightly ABOVE the middle of the preview
+    // — the same place the ring is. 0.47 rather than 0.5 for that reason.
+    final Offset centre = Offset(size.width / 2, size.height * 0.47);
+    final double radius = size.shortestSide * 0.72;
+
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = RadialGradient(
+          colors: <Color>[
+            colour.withValues(alpha: 0),
+            colour.withValues(alpha: 0),
+            colour.withValues(alpha: strength * 0.52),
+            colour.withValues(alpha: strength),
+          ],
+          // ⚠ THE FIRST STOP IS NOT ZERO. The clear area has to be wide enough
+          // to hold the whole ring plus the arrows, or the guide the person is
+          // filling sits in the shadow. 0.42 keeps the circle fully lit and
+          // starts the fall-off outside it.
+          stops: const <double>[0.0, 0.42, 0.72, 1.0],
+        ).createShader(Rect.fromCircle(center: centre, radius: radius)),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _VignettePainter old) =>
+      old.colour != colour || old.strength != strength;
+}
+
 class _RingPainter extends CustomPainter {
   _RingPainter({
     required this.lit,
@@ -179,20 +263,65 @@ class _RingPainter extends CustomPainter {
     if (lit.isEmpty) return;
 
     final Rect rect = Rect.fromLTWH(0, 0, size.width, size.height)
-        .deflate(6);
+        .deflate(10);
     final double sweep = (2 * math.pi) / lit.length;
+
+    // ── ⚠ THE UNLIT TRACK IS QUIETER THAN THE LIT ARC, NOT EQUAL TO IT ───────
+    //
+    // Reworked 25 August 2026: "it is too simple like new trainee build the UI".
+    //
+    // The old ring drew both states at almost the same weight — 6px grey
+    // against 7px green — so a half-finished sweep read as a grey circle with
+    // some green in it rather than as progress. Making the track thinner and
+    // fainter than the arc is what turns the same data into something you can
+    // judge at a glance from across a room.
+    //
+    // ⚠ NOTHING HERE CHANGES WHAT THE RING MEANS. Same segments, same list,
+    // same completion maths. This is weight and colour only, which is why it
+    // was safe to do without retesting the sweep.
+
+    // A continuous hairline under everything, so the circle is a CIRCLE even
+    // when nothing is lit. Without it, an empty ring is 24 loose dashes and
+    // there is no shape to put your face inside.
+    canvas.drawCircle(
+      rect.center,
+      rect.width / 2,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = Colors.white.withValues(alpha: 0.16),
+    );
 
     final Paint track = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 6
+      ..strokeWidth = 3.5
       ..strokeCap = StrokeCap.round
       ..color = trackColour;
 
+    // The halo. A wide, low-opacity pass UNDER the solid stroke — it is what
+    // makes the lit part look emitted rather than painted on, and it is the
+    // single cheapest thing that separates this from a progress bar bent into
+    // a circle. Drawn first so the crisp stroke sits on top of it.
+    final Paint glow = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 11
+      ..strokeCap = StrokeCap.round
+      ..color = ringColour.withValues(alpha: 0.22);
+
     final Paint on = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 7
+      ..strokeWidth = 6
       ..strokeCap = StrokeCap.round
       ..color = ringColour;
+
+    // ⚠ TWO PASSES, NOT ONE. Every halo is laid down before any solid segment,
+    // so a segment's glow cannot paint over its neighbour's crisp edge and
+    // leave the arc looking chewed where two lit segments meet.
+    for (int i = 0; i < lit.length; i++) {
+      if (!lit[i]) continue;
+      final double start = -math.pi / 2 + (i * sweep) + (_gap / 2);
+      canvas.drawArc(rect, start, sweep - _gap, false, glow);
+    }
 
     for (int i = 0; i < lit.length; i++) {
       // ⚠ STARTS AT THE TOP AND RUNS CLOCKWISE.
@@ -242,15 +371,29 @@ class _RingPainter extends CustomPainter {
     final double top = rect.center.dy + r - (centreActive ? 18 : 11);
     final double bottom = rect.center.dy + r + (centreActive ? 10 : 5);
 
+    // The mark gets the same halo treatment when it is the thing being asked
+    // for, so "come back to the middle" has something that visibly wants to be
+    // aimed at rather than a grey tick that happens to be there.
+    if (centreActive) {
+      canvas.drawLine(
+        Offset(cx, top),
+        Offset(cx, bottom),
+        Paint()
+          ..strokeCap = StrokeCap.round
+          ..strokeWidth = 9
+          ..color = ringColour.withValues(alpha: 0.22),
+      );
+    }
+
     final Paint mark = Paint()
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = centreActive ? 4 : 2.5
+      ..strokeWidth = centreActive ? 3.5 : 2
       // Dim until it matters. During the sweep the person is meant to be
       // looking AWAY from centre, and a bright marker there would be arguing
       // with the instruction they are following.
       ..color = centreActive
           ? ringColour
-          : const Color(0xFFFFFFFF).withValues(alpha: 0.55);
+          : const Color(0xFFFFFFFF).withValues(alpha: 0.42);
 
     canvas.drawLine(Offset(cx, top), Offset(cx, bottom), mark);
   }

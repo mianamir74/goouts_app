@@ -163,6 +163,39 @@ class AutoSelfieController {
   /// screen says why rather than pretending nothing happened.
   final ValueNotifier<bool> gaveUp = ValueNotifier<bool>(false);
 
+  /// True when the eye region of the live preview is blown out — which in
+  /// practice means spectacle lenses catching the light.
+  ///
+  /// ── ⚠ CAUGHT BEFORE THE SWEEP, NOT AFTER THE PHOTOGRAPH ──────────────────
+  ///
+  /// Added 25 August 2026. The glare check already existed, in
+  /// BiometricSelfieInspector — but it ran on the finished photograph, so the
+  /// person turned their head, held still, had their picture taken, and was
+  /// THEN told to remove their glasses and start again. Correct check, cruel
+  /// timing.
+  ///
+  /// ⚠ IT IS A GLARE MEASUREMENT, NOT GLASSES DETECTION. ML Kit has no
+  /// "wearing glasses" signal and inventing one would mean guessing. What is
+  /// measurable is the thing that actually defeats an identity check: a band of
+  /// near-white where the eyes should be. Clear thin frames pass, and they
+  /// should — that is the same line UK passport rules draw.
+  ///
+  /// ⚠ REQUIRES CONSECUTIVE FRAMES. A single bright frame is somebody walking
+  /// past a window. _glareStreak stops a passing reflection telling a person to
+  /// remove glasses they are not wearing.
+  final ValueNotifier<bool> glare = ValueNotifier<bool>(false);
+
+  /// Proportion of the eye band that may be blown out before it counts.
+  /// Matches BiometricSelfieInspector._maxEyeGlare so the live warning and the
+  /// still-photo refusal cannot disagree about what "too bright" means.
+  static const double maxEyeGlare = 0.18;
+
+  /// How many analysed frames in a row must be over the line.
+  static const int glareFramesNeeded = 3;
+
+  int _glareStreak = 0;
+  int _clearStreak = 0;
+
   /// Every face result, pass or fail, handed straight to whoever wants it.
   ///
   /// Added 22 August 2026 so the liveness ring can read the head angle from
@@ -300,6 +333,7 @@ class AutoSelfieController {
     holdProgress.dispose();
     faceBox.dispose();
     gaveUp.dispose();
+    glare.dispose();
   }
 
   void _onFrame(CameraImage image) {
@@ -319,10 +353,45 @@ class AutoSelfieController {
     final InputImageLike? converted = _convert(image);
     if (converted == null) return; // unsupported frame, not a failed check
 
+    // ⚠ MEASURED HERE, WHILE THE FRAME IS STILL IN HAND. _onResult receives a
+    // FaceCheckResult and no pixels, so the glare reading has to be taken
+    // before the frame goes out of scope. Uses the PREVIOUS frame's face box,
+    // which is a few hundred milliseconds old — a head does not move far in
+    // that time, and waiting a frame is far cheaper than running the detector
+    // twice.
+    _updateGlare(image, faceBox.value);
+
     _detector
         .check(converted.image,
             imageWidth: converted.width, imageHeight: converted.height)
         .then(_onResult);
+  }
+
+  /// Debounced both ways. See the note on [glare].
+  void _updateGlare(CameraImage image, Rect? box) {
+    if (box == null) {
+      // No face means nothing to measure. Do NOT clear the warning here — a
+      // person who turns away for a second should not see "take your glasses
+      // off" flicker out and back.
+      return;
+    }
+    final double g = CameraFrameConverter.eyeGlare(image, box);
+    if (g > maxEyeGlare) {
+      _clearStreak = 0;
+      _glareStreak++;
+      if (_glareStreak >= glareFramesNeeded && !glare.value) {
+        glare.value = true;
+      }
+      return;
+    }
+    _glareStreak = 0;
+    _clearStreak++;
+    // ⚠ SLOWER TO CLEAR THAN TO SET. Somebody removing their glasses should see
+    // the warning go within a second; somebody wearing them should not get a
+    // gap to press Start in because one frame happened to be dim.
+    if (_clearStreak >= glareFramesNeeded * 2 && glare.value) {
+      glare.value = false;
+    }
   }
 
   InputImageLike? _convert(CameraImage image) {

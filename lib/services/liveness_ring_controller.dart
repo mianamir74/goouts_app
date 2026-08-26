@@ -313,6 +313,16 @@ class LivenessRingController {
         hint.value = 'When you are ready, press start';
       }
       return;
+      // ⚠ THE GLASSES CHECK IS NOT HERE, AND THAT IS DELIBERATE.
+      //
+      // It belongs to the SCREEN, not to this controller: the measurement comes
+      // off the camera frame (AutoSelfieController.glare) and this class has
+      // never seen a pixel — it takes a yaw angle and nothing else. Reaching
+      // for the camera from in here to save one wire would give the ring two
+      // jobs and make it untestable without a phone.
+      //
+      // The screen holds Start disabled while auto.glare is true. See the
+      // start button in kyc_screen and liveness_selfie_screen.
     }
 
     // ── THE SWEEP IS DONE. NOW COME BACK TO THE MIDDLE. ───────────────────

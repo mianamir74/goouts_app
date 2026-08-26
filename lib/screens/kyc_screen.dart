@@ -25,6 +25,7 @@ import '../services/document_quality_inspector.dart';
 // markKycSubmitted Cloud Function — kycStatus is no longer client writable.
 import '../widgets/goouts_sheet.dart';
 import '../utils/dob_input_formatter.dart';
+import '../services/mrz_reader.dart';
 
 class KycScreen extends StatefulWidget {
   const KycScreen({super.key});
@@ -108,6 +109,15 @@ class _KycScreenState extends State<KycScreen> {
   // GREEN | AMBER | RED — set by kycAutoDecision CF response
   String _kycDecisionTier  = 'GREEN';
 
+  /// What the passport actually said, when it could be read and verified.
+  ///
+  /// ⚠ GOES TO THE ADMIN, NEVER DRIVES AN AUTOMATIC DECISION. It is produced
+  /// on the applicant's own phone and is therefore forgeable in principle —
+  /// but far more importantly, a driving licence has no machine-readable zone,
+  /// so "not checked" is the normal outcome for a large share of honest
+  /// applicants. Anything automated keyed off this would refuse them.
+  MrzCheck? _mrzCheck;
+
   /// The composite score kycAutoDecision actually calculated, and the sentence
   /// it wrote to explain the outcome.
   ///
@@ -128,8 +138,17 @@ class _KycScreenState extends State<KycScreen> {
   /// Auto-approval exists to keep applications off the admin's desk. A gate
   /// that silently sends everybody to manual review is indistinguishable from
   /// having no gate at all, and this was the missing instrument.
-  double? _kycAutoScore;
-  String  _kycAutoReason = '';
+  // ⚠ _kycAutoScore / _kycAutoReason WERE REMOVED ON 25 August 2026.
+  //
+  // They held kycAutoDecision's composite score and its explanation, and were
+  // briefly rendered on the Under Review screen. Taking that display away left
+  // two fields that were written and never read — which the analyzer reports,
+  // correctly, as dead state.
+  //
+  // Deleting them loses nothing: kycAutoDecision writes kycOverallScore,
+  // kycDecisionTier and identityVerificationReason onto the applicant's record
+  // server side. The admin panel is where a score belongs, because the admin is
+  // the only person who can act on one.
 
   @override
   void initState() {
@@ -500,6 +519,24 @@ class _KycScreenState extends State<KycScreen> {
           _feedbackMsg = '';
           _checking = false;
         });
+
+        // ── ⚠ READ THE DOCUMENT AND COMPARE IT WITH WHAT THEY TYPED ─────────
+        //
+        // Added 25 August 2026. Until now NOTHING READ THE PASSPORT. The app
+        // photographed it, scored the picture for sharpness and brightness, and
+        // then showed the applicant the name and date of birth THEY had typed
+        // beside an image nobody had read. Someone could type one name and
+        // photograph a different person's passport and only an admin comparing
+        // the two by eye would ever notice.
+        //
+        // ⚠ THIS RUNS AFTER ACCEPTANCE, NOT AS A GATE. The photo is already
+        // kept and the step already advanced. A driving licence has no
+        // machine-readable zone at all, and a passport at an awkward angle may
+        // not read — neither is the applicant's fault and neither may stop
+        // them. See MrzReader: a read it cannot verify is discarded.
+        await _runMrzCheck(uprightPath);
+        if (!mounted) return;
+
         await _goTo(2);
       } else {
         // crash_scan: ok - sibling branch of the await above, cannot both run
@@ -583,6 +620,83 @@ class _KycScreenState extends State<KycScreen> {
   /// rejection path below does NOT say "Please retake" when the shutter fired
   /// by itself. Nobody chose to take that photo, so there is nothing for them
   /// to do again.
+  /// Reads the passport's machine-readable zone and, when it verifies, checks
+  /// it against the typed details. Silent unless there is something to say.
+  Future<void> _runMrzCheck(String path) async {
+    try {
+      final DateTime? typedDob = _parseTypedDob();
+      final MrzCheck check = await MrzReader.checkPassport(
+        imagePath: path,
+        typedFirstName: _firstNameCtrl.text,
+        typedLastName: _lastNameCtrl.text,
+        typedDob: typedDob,
+      );
+      if (!mounted) return;
+      _mrzCheck = check;
+      if (!check.isProblem) return;
+
+      // ⚠ SHOWN, NOT ENFORCED — AND THE FIRST OPTION IS TO FIX THE TYPING.
+      //
+      // By far the likeliest cause of a mismatch is a typo or a shortened
+      // first name, not fraud. Leading with "go back and correct it" treats
+      // the honest case as the default, which it is. Continuing anyway is
+      // allowed and RECORDED, so a reviewer sees both the mismatch and that
+      // the applicant was told and stood by what they entered.
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext ctx) => AlertDialog(
+          title: Text(
+            check.match == MrzMatch.expired
+                ? 'That passport has expired'
+                : 'This does not match your details',
+            style: GoogleFonts.inter(
+                fontSize: 17, fontWeight: FontWeight.w700),
+          ),
+          content: Text(
+            check.match == MrzMatch.expired
+                ? 'We read an expiry date that has already passed. Please use '
+                    'a current document.'
+                : <String>[
+                    if (check.nameNote != null) check.nameNote!,
+                    if (check.dobNote != null) check.dobNote!,
+                    '',
+                    'If you mistyped something, go back and correct it. If '
+                        'your details are right, carry on — we will look at '
+                        'this ourselves.',
+                  ].join('\n'),
+            style: GoogleFonts.inter(fontSize: 13.5, height: 1.5),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                _goTo(0);
+              },
+              child: const Text('Fix my details'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Carry on'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      // ⚠ NEVER BLOCKS. A model that will not load must not be able to stop
+      // somebody finishing their verification.
+      debugPrint('mrz check: $e');
+    }
+  }
+
+  DateTime? _parseTypedDob() {
+    final String d = _dobCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (d.length != 8) return null;
+    final DateTime v = DateTime(int.parse(d.substring(4, 8)),
+        int.parse(d.substring(2, 4)), int.parse(d.substring(0, 2)));
+    return v;
+  }
+
   Future<bool> _acceptSelfie(String rawPath) async {
     if (!mounted) return false;
     setState(() {
@@ -802,6 +916,25 @@ class _KycScreenState extends State<KycScreen> {
             // check did not finish, so they may want to look harder.
             'livenessComplete': _livenessComplete,
             if (_livenessNote.isNotEmpty) 'livenessNote': _livenessNote,
+            // ── WHAT THE DOCUMENT ITSELF SAID ────────────────────────────
+            //
+            // ⚠ ADVISORY. Read on the applicant's own phone, so forgeable in
+            // principle — and "notChecked" is the ORDINARY result for a
+            // driving licence, which has no machine-readable zone. Nothing
+            // automated may key off this or it would refuse honest people for
+            // carrying the wrong kind of ID.
+            //
+            // It exists so a reviewer opening the record knows whether the
+            // passport agreed with the typing, disagreed, or was never read —
+            // three different things that all used to look identical.
+            if (_mrzCheck != null) 'mrzMatch': _mrzCheck!.match.name,
+            if (_mrzCheck?.nameNote != null)
+              'mrzNameNote': _mrzCheck!.nameNote,
+            if (_mrzCheck?.dobNote != null) 'mrzDobNote': _mrzCheck!.dobNote,
+            if (_mrzCheck?.mrz.documentNumber != null)
+              'mrzDocumentNumber': _mrzCheck!.mrz.documentNumber,
+            if (_mrzCheck?.mrz.nationality != null)
+              'mrzNationality': _mrzCheck!.mrz.nationality,
           });
         } catch (_) {
           // Upload failed — continue anyway, CF will still run
@@ -824,9 +957,6 @@ class _KycScreenState extends State<KycScreen> {
       if (mounted) {
         setState(() {
           _kycDecisionTier = tier;
-          // Kept, not discarded. See the field declarations.
-          _kycAutoScore  = (data['overallScore'] as num?)?.toDouble();
-          _kycAutoReason = (data['reason'] as String?) ?? '';
           _submitting      = false;
           _submitted       = true;
         });
@@ -1404,7 +1534,25 @@ class _KycScreenState extends State<KycScreen> {
                       // is genuinely rectangular. A face gets a circle and
                       // keeps it. The ring stays on screen through the capture,
                       // fully lit, with the centre mark showing where to look.
-                      : const SizedBox.expand(),
+                      //
+                      // ── THE SELFIE STEP GETS A VIGNETTE INSTEAD ───────────
+                      //
+                      // Added 25 August 2026. The whole camera feed was visible
+                      // edge to edge, so the room competed with the face and
+                      // the ring had to fight a busy background for attention.
+                      //
+                      // ⚠ A GRADIENT, NOT A CIRCULAR CUTOUT. A cutout would
+                      // have to sit exactly over the ring, and the ring is not
+                      // exactly centred — it shares a column with the arrows.
+                      // A mask that misses by a few pixels reads as broken, and
+                      // this runs on every phone size nobody here owns.
+                      //
+                      // ⚠ IT IS PAINT, NOT EXPOSURE. Drawn over the preview,
+                      // so ML Kit still receives the original frames — the
+                      // brightness and glare checks are unaffected. Dimming
+                      // what the person sees must never dim what the checks
+                      // measure, or a dark room would start passing.
+                      : const LivenessVignette(),
                 ),
 
                 // ── THE LIVENESS RING ────────────────────────────────────
@@ -1570,7 +1718,52 @@ class _KycScreenState extends State<KycScreen> {
                         if (st != LivenessRingState.ready) {
                           return const SizedBox.shrink();
                         }
-                        return FilledButton(
+                        // ── ⚠ GLASSES ARE STOPPED BEFORE THE SWEEP, NOT AFTER
+                        //    THE PHOTOGRAPH. ─────────────────────────────────
+                        //
+                        // The glare check existed already but ran on the
+                        // finished picture — so somebody turned their head,
+                        // held still, had their photo taken, and was THEN told
+                        // to remove their glasses and do all of it again.
+                        // Right check, cruel timing.
+                        //
+                        // Now Start will not arm while the eye region of the
+                        // live preview is blown out. Debounced over several
+                        // frames in AutoSelfieController so a passing
+                        // reflection cannot tell somebody to remove glasses
+                        // they are not wearing.
+                        return ValueListenableBuilder<bool>(
+                          valueListenable: _autoSelfie!.glare,
+                          builder: (_, bool glare, Widget? child) {
+                            if (glare) {
+                              return Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 14),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.78),
+                                  borderRadius: BorderRadius.circular(26),
+                                ),
+                                child: Row(
+                                  children: <Widget>[
+                                    const Icon(Icons.visibility_off_outlined,
+                                        color: Color(0xFFFBBF24), size: 20),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        'Please take your glasses off — the '
+                                        'lenses are hiding your eyes.',
+                                        style: GoogleFonts.inter(
+                                            fontSize: 13,
+                                            height: 1.4,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.white),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
+                            return FilledButton(
                           onPressed: _liveness!.start,
                           style: FilledButton.styleFrom(
                             minimumSize: const Size(double.infinity, 52),
@@ -1584,6 +1777,8 @@ class _KycScreenState extends State<KycScreen> {
                             style: GoogleFonts.inter(
                                 fontSize: 16, fontWeight: FontWeight.w700),
                           ),
+                            );
+                          },
                         );
                       },
                     ),
@@ -1973,7 +2168,17 @@ class _KycScreenState extends State<KycScreen> {
             _infoCard(
               icon: Icons.verified_user_outlined,
               text:
-                  'Verification is typically completed within 2 minutes. You will be notified once approved.',
+                  // ⚠ REWRITTEN 25 August 2026. It said "typically completed
+                  // within 2 minutes. You will be notified once approved."
+                  //
+                  // Both halves were untrue. It is not two minutes — every
+                  // submission that is not auto-approved waits for a person,
+                  // and the Under Review screen says up to 24 hours. And
+                  // "once approved" tells somebody the answer before anybody
+                  // has looked at it, on the screen immediately before they
+                  // commit. A promise made here is one an admin has to break.
+                  'A member of our team reviews every submission. We will let '
+                  'you know as soon as there is an update.',
             ),
           ],
         ),
@@ -2260,11 +2465,6 @@ class _KycScreenState extends State<KycScreen> {
                   _selfieImagePath = null;
                   _feedbackMsg     = '';
                   _kycDecisionTier = 'GREEN';
-                  // ⚠ The previous attempt's score goes with the previous
-                  // attempt. Left behind, the next submission would display a
-                  // number that was never calculated for it.
-                  _kycAutoScore    = null;
-                  _kycAutoReason   = '';
                 });
               }),
               const SizedBox(height: 12),
@@ -2287,136 +2487,367 @@ class _KycScreenState extends State<KycScreen> {
     }
 
     // ── AMBER: manual review pending (default fallback) ───────────────────
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 90, height: 90,
-              decoration: BoxDecoration(
-                  color: const Color(0xFFFEF3C7), shape: BoxShape.circle),
-              child: const Icon(Icons.hourglass_top_rounded,
-                  color: Color(0xFFD97706), size: 48),
+    //
+    // ── ⚠ ONE SCREEN, AND IT SAYS WHAT IS TRUE ───────────────────────────────
+    //
+    // Redesigned 25 August 2026. Two things were wrong before.
+    //
+    // 1. THE REVIEW DETAILS DISAPPEARED AT THE MOMENT THEY MATTERED MOST. The
+    //    Review and Submit step showed the name, the date of birth, both
+    //    photographs and the checks — and then submitting replaced all of it
+    //    with a spinner-ish panel. The one instant somebody wants to confirm
+    //    they sent the right passport is the instant it vanished.
+    //
+    // 2. THE OLD COPY PROMISED AN OUTCOME. "Verification is typically completed
+    //    within 2 minutes. You will be notified once approved." It is not two
+    //    minutes — it is a human, up to a day — and "once approved" tells
+    //    somebody the answer before anybody has looked. Removed.
+    //
+    // The headline names the ACTION COMPLETED, not a verdict. Marking that is
+    // fair; claiming success is not.
+    return SingleChildScrollView(
+      child: Column(
+        children: <Widget>[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(24, 30, 24, 58),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: <Color>[Color(0xFF0392CA), Color(0xFF0B6FA8)],
+              ),
             ),
-            const SizedBox(height: 28),
-            Text('Under Review',
-                style: GoogleFonts.inter(
-                    fontSize: 24, fontWeight: FontWeight.w800, color: _dark),
-                textAlign: TextAlign.center),
-            const SizedBox(height: 12),
-            Text(
-              'Your documents have been submitted and are being reviewed by our team. This usually takes up to 24 hours. We\'ll notify you once complete.',
-              style: GoogleFonts.inter(
-                  fontSize: 14, color: Colors.grey[600], height: 1.6),
-              textAlign: TextAlign.center,
-            ),
-            // ── WHY THIS ONE NEEDED A HUMAN ──────────────────────────────────
-            //
-            // Only shown when the score came back, so it never appears on the
-            // fallback path where the function could not be reached at all.
-            //
-            // Deliberately quiet — grey, small, below the explanation. The
-            // applicant does not need to care, and reads past it. The person
-            // who does need it is whoever is calibrating the 0.85 threshold,
-            // and today that means asking somebody to submit and read this
-            // line back.
-            if (_kycAutoScore != null) ...[
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF3F4F6),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Column(
-                  children: [
-                    Text(
-                      'Automated score '
-                      '${_kycAutoScore!.toStringAsFixed(2)} — needs 0.85 to '
-                      'approve without a reviewer',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey[700]),
-                    ),
-                    if (_kycAutoReason.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        _kycAutoReason,
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.inter(
-                            fontSize: 11, height: 1.4, color: Colors.grey[600]),
+            child: Column(
+              children: <Widget>[
+                Text('Selfie submitted successfully',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white)),
+                const SizedBox(height: 20),
+                Container(
+                  width: 84,
+                  height: 84,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: <BoxShadow>[
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.16),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
                       ),
                     ],
-                  ],
+                  ),
+                  // ⚠ BLUE, NOT GREEN. Green plus a tick is the universal
+                  // "approved" signal and this is not approval.
+                  child: const Icon(Icons.check_rounded,
+                      color: Color(0xFF0392CA), size: 42),
+                ),
+              ],
+            ),
+          ),
+
+          Transform.translate(
+            offset: const Offset(0, -40),
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 14),
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: <BoxShadow>[
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 18,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: <Widget>[
+                  _submittedRow(Icons.person_outline_rounded, 'Name',
+                      _fullNameOrFallback()),
+                  Divider(color: Colors.grey[200], height: 18),
+                  _submittedRow(Icons.cake_outlined, 'Date of birth',
+                      _dobCtrl.text.trim().isEmpty ? '—' : _dobCtrl.text.trim()),
+
+                  const SizedBox(height: 14),
+                  // ⚠ BOTH DOCUMENTS, SIDE BY SIDE. This is the part that
+                  // answers "did I send the right passport" without making
+                  // anybody go back a step to find out.
+                  Row(
+                    children: <Widget>[
+                      Expanded(
+                          child: _submittedThumb(
+                              _idImagePath, 'ID document', _idValid)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                          child: _submittedThumb(
+                              _selfieImagePath, 'Selfie', _selfieValid)),
+                    ],
+                  ),
+
+                  const SizedBox(height: 14),
+                  _submittedChecks(),
+
+                  Divider(color: Colors.grey[200], height: 26),
+                  Text('Your documents are submitted',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
+                          color: _dark)),
+                  const SizedBox(height: 6),
+                  Text(
+                    'We will review your profile and you will be notified if '
+                    'any extra information is needed.',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        height: 1.55,
+                        color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          Transform.translate(
+            offset: const Offset(0, -26),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              child: Column(
+                children: <Widget>[
+                  _primaryButton('Back to Profile', onPressed: () {
+                    if (Navigator.canPop(context)) {
+                      Navigator.pop(context);
+                    } else {
+                      Navigator.pushNamedAndRemoveUntil(
+                          context, '/home', (_) => false);
+                    }
+                  }),
+                  const SizedBox(height: 4),
+                  // ── ⚠ A WAY BACK FROM "SUBMITTED", ADDED 24 August 2026 ────
+                  //
+                  // The rejected branch has offered "Try Again" all along. This
+                  // one — the branch almost everybody lands on — offered nothing
+                  // but a way out of the screen, so anybody who spotted their
+                  // own mistake had to WAIT TO BE REFUSED before they could
+                  // correct it.
+                  //
+                  // It sits directly under the two photographs on purpose: this
+                  // is the screen where a wrong document becomes obvious.
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _step             = 0;
+                        _idValid          = false;
+                        _selfieValid      = false;
+                        _submitted        = false;
+                        _idImagePath      = null;
+                        _selfieImagePath  = null;
+                        _feedbackMsg      = '';
+                        _kycDecisionTier  = 'GREEN';
+                        // The liveness verdict belonged to the submission being
+                        // replaced. Carried forward, it would file the new
+                        // attempt under the old attempt's evidence.
+                        _livenessComplete = false;
+                        _livenessNote     = '';
+                        _selfieAdvice     = null;
+                        _selfieScores     = const <String, double>{};
+                        _mrzCheck         = null;
+                      });
+                    },
+                    child: Text(
+                      'Something wrong? Submit again',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: _primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _submittedRow(IconData icon, String label, String value) => Row(
+        children: <Widget>[
+          Icon(icon, size: 18, color: _primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(label,
+                    style: GoogleFonts.inter(
+                        fontSize: 10.5, color: Colors.grey[500])),
+                Text(value,
+                    style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: _dark)),
+              ],
+            ),
+          ),
+        ],
+      );
+
+  /// One submitted photograph, with the tick that says it was accepted.
+  ///
+  /// ⚠ A MISSING FILE SHOWS AS MISSING, NOT AS AN EMPTY BOX. The paths point at
+  /// the phone's cache, which the system may clear — so on a screen somebody
+  /// reopens later the image can genuinely be gone. A grey rectangle would read
+  /// as "nothing was sent", which is exactly the wrong conclusion.
+  Widget _submittedThumb(String? path, String label, bool ok) => ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          height: 84,
+          decoration: BoxDecoration(
+            color: const Color(0xFFEDF1F5),
+            border: Border.all(
+                color: ok ? _green : Colors.grey.shade300, width: 1.5),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Stack(
+            fit: StackFit.expand,
+            children: <Widget>[
+              if (path != null)
+                Image.file(File(path),
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, Object __, StackTrace? ___) => const Center(
+                        child: Icon(Icons.image_not_supported_outlined,
+                            color: Colors.grey, size: 22)))
+              else
+                const Center(
+                    child: Icon(Icons.image_not_supported_outlined,
+                        color: Colors.grey, size: 22)),
+              if (ok)
+                Positioned(
+                  top: 5,
+                  right: 5,
+                  child: Container(
+                    width: 19,
+                    height: 19,
+                    decoration:
+                        const BoxDecoration(color: _green, shape: BoxShape.circle),
+                    child: const Icon(Icons.check_rounded,
+                        color: Colors.white, size: 13),
+                  ),
+                ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Text(label,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                          fontSize: 10, color: Colors.white)),
                 ),
               ),
             ],
-            const SizedBox(height: 36),
-            _primaryButton('Back to Profile', onPressed: () {
-              if (Navigator.canPop(context)) {
-                Navigator.pop(context);
-              } else {
-                Navigator.pushNamedAndRemoveUntil(context, '/home', (_) => false);
-              }
-            }),
-            const SizedBox(height: 8),
-            // ── ⚠ A WAY BACK FROM "SUBMITTED", ADDED 24 August 2026 ───────────
-            //
-            // The rejected branch above has offered "Try Again" all along. This
-            // one — the branch almost everybody lands on — offered nothing but
-            // a way out of the screen.
-            //
-            // So somebody who noticed a mistake the moment they submitted, a
-            // mistyped date of birth or a photograph of the wrong page, had to
-            // WAIT TO BE REFUSED before they were allowed to correct it. A day
-            // of an admin's attention spent rejecting a submission the
-            // applicant already knew was wrong, and a day of the applicant's
-            // waiting to be told something they told us first.
-            //
-            // Re-submitting overwrites the same record, so there is nothing to
-            // clean up and no second entry for the admin to reconcile.
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _step            = 0;
-                  _idValid         = false;
-                  _selfieValid     = false;
-                  _submitted       = false;
-                  _idImagePath     = null;
-                  _selfieImagePath = null;
-                  _feedbackMsg     = '';
-                  _kycDecisionTier = 'GREEN';
-                  // ⚠ The previous attempt's score goes with the previous
-                  // attempt. Left behind, the next submission would display a
-                  // number that was never calculated for it.
-                  _kycAutoScore    = null;
-                  _kycAutoReason   = '';
-                  // The liveness verdict belonged to the submission being
-                  // replaced. Carrying it forward would file the new attempt
-                  // under the old attempt's evidence.
-                  _livenessComplete = false;
-                  _livenessNote     = '';
-                  _selfieAdvice     = null;
-                  _selfieScores     = const <String, double>{};
-                });
-              },
-              child: Text(
-                'Something wrong? Submit again',
+          ),
+        ),
+      );
+
+  /// The on-device checks, compact.
+  ///
+  /// ⚠ TWO COLUMNS, SHORT LABELS. Five full-width rows of large green ticks
+  /// took a third of the screen restating what the two photographs above
+  /// already show. The movement check keeps a full-width row of its own because
+  /// it is the one that can come back AMBER, and an amber line squeezed into a
+  /// column beside a green one is not read.
+  Widget _submittedChecks() => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(13, 12, 13, 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF7F9FB),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text('Checked on your device',
                 style: GoogleFonts.inter(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w600,
-                  color: _primary,
-                ),
-              ),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: _dark)),
+            const SizedBox(height: 8),
+            Row(
+              children: <Widget>[
+                Expanded(child: _miniCheck('Sharpness', _idValid)),
+                Expanded(child: _miniCheck('Framing', _idValid)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: <Widget>[
+                Expanded(child: _miniCheck('Face found', _selfieValid)),
+                Expanded(child: _miniCheck('Eyes clear', _selfieValid)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            _miniCheck(
+                _livenessComplete
+                    ? 'Movement check passed'
+                    : 'Movement check not completed',
+                _livenessComplete,
+                warn: true),
+          ],
+        ),
+      );
+
+  Widget _miniCheck(String label, bool ok, {bool warn = false}) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 1),
+        child: Row(
+          children: <Widget>[
+            Icon(
+              ok
+                  ? Icons.check_circle_rounded
+                  : warn
+                      ? Icons.error_outline_rounded
+                      : Icons.radio_button_unchecked_rounded,
+              size: 15,
+              color: ok
+                  ? _green
+                  : warn
+                      ? const Color(0xFFD97706)
+                      : Colors.grey[400],
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(label,
+                  style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight:
+                          (!ok && warn) ? FontWeight.w600 : FontWeight.w400,
+                      color: (!ok && warn)
+                          ? const Color(0xFFB45309)
+                          : Colors.grey[700])),
             ),
           ],
         ),
-      ),
-    );
+      );
+
+  /// The name as typed, falling back to something neutral rather than an empty
+  /// gap. A card headed by blank space where a name should be reads as a
+  /// half-loaded screen at the exact moment somebody wants reassurance that
+  /// their submission landed.
+  String _fullNameOrFallback() {
+    final String n =
+        '${_firstNameCtrl.text.trim()} ${_lastNameCtrl.text.trim()}'.trim();
+    return n.isEmpty ? 'Your details' : n;
   }
 
   // ─────────────────────────────────────────────────────────────────────────

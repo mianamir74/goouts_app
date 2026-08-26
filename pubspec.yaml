@@ -31,6 +31,10 @@ dependencies:
   # every commercial SDK licences per bundle ID.
   # NOT liveness and NOT face recognition — see services/face_check_service.dart.
   google_mlkit_face_detection: ^0.13.2
+  # Reads the two machine-readable lines at the bottom of a passport, so the
+  # name and date of birth on the document can be checked against what the
+  # applicant typed. On device — the image is never sent anywhere to be read.
+  google_mlkit_text_recognition: ^0.15.0
   image_picker: ^1.1.2
   http: ^1.2.0
   geolocator: ^14.0.3

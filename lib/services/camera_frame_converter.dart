@@ -24,7 +24,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'dart:io';
-import 'dart:ui' show Size;
+import 'dart:ui' show Rect, Size;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
@@ -93,6 +93,88 @@ class CameraFrameConverter {
         bytesPerRow: image.planes.first.bytesPerRow,
       ),
     );
+  }
+
+  /// Proportion of near-white pixels across the band where the eyes sit,
+  /// measured straight off the LIVE camera frame.
+  ///
+  /// ── ⚠ WHY THIS RUNS ON THE PREVIEW AND NOT ON THE PHOTOGRAPH ─────────────
+  ///
+  /// Added 25 August 2026: "before starting the live picture verification it
+  /// must check if the user hold any kind of glasses on the face and prompt to
+  /// remove and do the selfie again".
+  ///
+  /// The glare check already existed in BiometricSelfieInspector — but it ran
+  /// on the finished photograph, which means the person completed the whole
+  /// head sweep, held still, had their picture taken, and was THEN told to take
+  /// their glasses off and do all of it again. The check was right and its
+  /// timing made it feel like a punishment.
+  ///
+  /// ⚠ NO DECODE. This reads the luminance bytes the camera already produced.
+  /// Decoding a preview frame to a bitmap thirty times a second is exactly the
+  /// kind of work that turns a smooth screen into a hot phone, and none of it
+  /// is needed — Y in NV21 IS brightness, and BGRA converts with three
+  /// multiplications.
+  ///
+  /// Returns 0 when the frame cannot be read. An unmeasurable frame must never
+  /// refuse somebody on the strength of a measurement that did not happen.
+  static double eyeGlare(CameraImage image, Rect? faceBox) {
+    if (faceBox == null) return 0;
+    try {
+      final int w = image.width;
+      final int h = image.height;
+      if (w <= 0 || h <= 0) return 0;
+
+      // Eyes sit in roughly the upper third of a face box, across the middle
+      // 80% of it. Cropping tighter starts missing the eyes on a head that is
+      // slightly tilted — and would report zero glare on exactly the frames
+      // most likely to have some.
+      final int x0 = (faceBox.left * w + faceBox.width * w * 0.10)
+          .round()
+          .clamp(0, w - 1);
+      final int x1 = (faceBox.left * w + faceBox.width * w * 0.90)
+          .round()
+          .clamp(0, w - 1);
+      final int y0 = (faceBox.top * h + faceBox.height * h * 0.25)
+          .round()
+          .clamp(0, h - 1);
+      final int y1 = (faceBox.top * h + faceBox.height * h * 0.50)
+          .round()
+          .clamp(0, h - 1);
+      if (x1 <= x0 || y1 <= y0) return 0;
+
+      final Plane p = image.planes.first;
+      final Uint8List bytes = p.bytes;
+      final int stride = p.bytesPerRow;
+      // NV21's first plane is one byte of luminance per pixel. BGRA is four
+      // bytes per pixel and needs converting.
+      final bool bgra = !Platform.isAndroid || image.planes.length == 1 &&
+          stride >= w * 4;
+      final int step = bgra ? 4 : 1;
+
+      int bright = 0;
+      int total = 0;
+      // Every fourth pixel in both directions. A sixteenth of the work for a
+      // number that does not measurably change, on a path that runs several
+      // times a second.
+      for (int y = y0; y < y1; y += 4) {
+        final int row = y * stride;
+        for (int x = x0; x < x1; x += 4) {
+          final int i = row + x * step;
+          if (i + step - 1 >= bytes.length) continue;
+          final int lum = bgra
+              ? (0.114 * bytes[i] + 0.587 * bytes[i + 1] + 0.299 * bytes[i + 2])
+                  .round()
+              : bytes[i];
+          if (lum > 235) bright++;
+          total++;
+        }
+      }
+      if (total == 0) return 0;
+      return bright / total;
+    } catch (_) {
+      return 0;
+    }
   }
 
   /// Sensor orientation combined with how the phone is being held.
