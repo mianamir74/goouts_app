@@ -76,7 +76,7 @@ class CaptureChecklistScreen extends StatelessWidget {
         title: Text(
           isCheckOut ? 'Check out photos' : 'Check in photos',
           style: GoogleFonts.inter(
-            fontSize: 18,
+            fontSize: 15,
             fontWeight: FontWeight.w700,
             color: GoOutsColors.primaryBlue,
           ),
@@ -162,7 +162,7 @@ class CaptureChecklistScreen extends StatelessWidget {
                   const SizedBox(width: 4),
                   Text('All done',
                       style: GoogleFonts.inter(
-                        fontSize: 13,
+                        fontSize: 13.5,
                         fontWeight: FontWeight.w600,
                         color: GoOutsColors.success,
                       )),
@@ -187,7 +187,7 @@ class CaptureChecklistScreen extends StatelessWidget {
                 ? 'Thank you. Your host can see these now.'
                 : 'About ten seconds a room. It protects your deposit.',
             style: GoogleFonts.inter(
-              fontSize: 13,
+              fontSize: 13.5,
               color: GoOutsColors.bodyText,
             ),
           ),
@@ -264,7 +264,7 @@ class CaptureChecklistScreen extends StatelessWidget {
               child: Text(
                 'Skip',
                 style: GoogleFonts.inter(
-                  fontSize: 13,
+                  fontSize: 13.5,
                   fontWeight: FontWeight.w600,
                   color: GoOutsColors.bodyText,
                 ),
@@ -284,7 +284,7 @@ class CaptureChecklistScreen extends StatelessWidget {
               ),
               child: Text('Capture',
                   style: GoogleFonts.inter(
-                      fontSize: 13, fontWeight: FontWeight.w600)),
+                      fontSize: 13.5, fontWeight: FontWeight.w600)),
             ),
           ] else
             TextButton(
@@ -292,7 +292,7 @@ class CaptureChecklistScreen extends StatelessWidget {
               child: Text(
                 'Retake',
                 style: GoogleFonts.inter(
-                  fontSize: 13,
+                  fontSize: 13.5,
                   fontWeight: FontWeight.w600,
                   color: GoOutsColors.primaryBlue,
                 ),
@@ -329,7 +329,7 @@ class CaptureChecklistScreen extends StatelessWidget {
                     : 'Photograph the remaining $_remaining rooms to finish.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
-                  fontSize: 13,
+                  fontSize: 13.5,
                   color: GoOutsColors.bodyText,
                 ),
               ),
@@ -359,7 +359,7 @@ class CaptureChecklistScreen extends StatelessWidget {
               child: Text(
                 'Leave without finishing',
                 style: GoogleFonts.inter(
-                  fontSize: 13,
+                  fontSize: 13.5,
                   fontWeight: FontWeight.w600,
                   color: GoOutsColors.bodyText,
                 ),

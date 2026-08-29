@@ -171,7 +171,7 @@ class _SearchFiltersSheetState extends State<SearchFiltersSheet> {
                   : '£${_price.start.round()} to '
                       '£${_price.end.round()}${_price.end >= _maxPounds ? ' or more' : ''} a night',
               style: GoogleFonts.inter(
-                  fontSize: 13, color: GoOutsColors.bodyText),
+                  fontSize: 13.5, color: GoOutsColors.bodyText),
             ),
             RangeSlider(
               values: _price,
@@ -246,7 +246,7 @@ class _SearchFiltersSheetState extends State<SearchFiltersSheet> {
                   ? 'Any number of partners'
                   : 'At least ${_minPartners.round()} within half a mile',
               style: GoogleFonts.inter(
-                  fontSize: 13, color: GoOutsColors.bodyText),
+                  fontSize: 13.5, color: GoOutsColors.bodyText),
             ),
             Slider(
               value: _minPartners,

@@ -51,7 +51,27 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
   bool      _cancelAllowed = false; // false = too late to cancel in-app
   double    _cancelFee     = 0.0;   // 0 = free, >0 = fee amount
   bool      _cancelling    = false;
-  double    _cashbackEarned = 0.0;
+  /// Cashback already earned on this order, which a refund is reduced by.
+  ///
+  /// ── ⚠ ALWAYS ZERO, AND THAT IS NOW DELIBERATE. ───────────────────────────
+  ///
+  /// It used to be zero by accident, and both refund sheets passed it as the
+  /// REFUND AMOUNT, so a customer removing an item or cancelling an order was
+  /// shown £0.00. That was fixed on 27 August 2026 at the two call sites,
+  /// which now compute the real figure from the order.
+  ///
+  /// This field stays zero on purpose. The order document carries no cashback
+  /// value at all: grandTotal, foodTotal, subtotal, deliveryFee and items, and
+  /// nothing else. There is no honest way to compute a clawback here.
+  ///
+  /// Zero means the sheet shows the GROSS refund and hides the "you earned £X
+  /// cashback" note entirely. The server applies the real deduction when it
+  /// processes the refund. Guessing a number here would understate the refund
+  /// on screen, which is the same class of mistake in the other direction.
+  ///
+  /// ⚠ IF A CASHBACK FIELD IS EVER ADDED TO THE ORDER, read it here. Do not
+  /// reintroduce it as a refund amount at the call sites.
+  final double _cashbackEarned = 0.0;
 
   // Substitution request
   bool _subResponding = false;
@@ -220,12 +240,14 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
 
     if (status == 'preparing') {
       // Can still cancel but 75% fee applies — no countdown
-      if (mounted) setState(() {
-        _cancelAllowed       = true;
-        _cancelFree          = false;
-        _cancelFreeRemaining = null;
-        _cancelFee           = double.parse((foodTotal * 0.75).toStringAsFixed(2));
-      });
+      if (mounted) {
+        setState(() {
+          _cancelAllowed       = true;
+          _cancelFree          = false;
+          _cancelFreeRemaining = null;
+          _cancelFee           = double.parse((foodTotal * 0.75).toStringAsFixed(2));
+        });
+      }
     }
   }
 
@@ -251,9 +273,31 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
     );
     if (confirmed != true || !mounted) return;
 
+    // ── ⚠ THE SAME BUG, INVERTED. Fixed 27 August 2026. ────────────────────
+    //
+    // This read:
+    //     _cancelFreeRemaining != null ? grandTotal : 0.0
+    //
+    // _cancelFreeRemaining is the countdown on the free window. Both places
+    // that grant a FREE cancellation set it to null and set _cancelFree true
+    // (lines 191 and 201). The fee bearing branch sets it to Duration.zero.
+    //
+    // So the test was the wrong way round on both sides:
+    //     free cancellation      -> null      -> showed £0.00 refund
+    //     fee bearing cancel     -> not null  -> showed the FULL total, with
+    //                                            the fee not deducted at all
+    //
+    // The first tells somebody entitled to all their money back that they get
+    // nothing. The second promises money that will not arrive, which is worse.
+    //
+    // _cancelFee is already computed and already displayed on the dialog the
+    // customer just agreed to, so the refund is simply the total less that fee.
+    // Free cancellations carry a fee of 0 and fall out of the same expression.
+    final double orderTotal = ((_order?['grandTotal'] as num?) ?? 0).toDouble();
+
     // Step 2: pick refund method
     final refundMethod = await _showRefundMethodSheet(
-      refundAmount: _cancelFreeRemaining != null ? (_order?['grandTotal'] as double?) ?? 0.0 : 0.0,
+      refundAmount: (orderTotal - _cancelFee).clamp(0.0, double.infinity),
       cashbackEarned: _cashbackEarned,
       context: 'cancel',
     );
@@ -301,7 +345,7 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
       context: this.context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => Container(
+      builder: (sheetContext) => Container(
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -343,7 +387,7 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
             amount: netRefund,
             badge: 'INSTANT',
             badgeColor: _green,
-            onTap: () => Navigator.pop(_, 'wallet'),
+            onTap: () => Navigator.pop(sheetContext, 'wallet'),
           ),
           const SizedBox(height: 10),
           // Original payment option
@@ -355,11 +399,11 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
             amount: netRefund,
             badge: '3–5 DAYS',
             badgeColor: _primary,
-            onTap: () => Navigator.pop(_, 'original_payment'),
+            onTap: () => Navigator.pop(sheetContext, 'original_payment'),
           ),
           const SizedBox(height: 14),
           TextButton(
-            onPressed: () => Navigator.pop(_, null),
+            onPressed: () => Navigator.pop(sheetContext, null),
             child: Center(child: Text('Go Back',
                 style: GoogleFonts.inter(fontSize: 14, color: Colors.grey[500]))),
           ),
@@ -759,8 +803,11 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
                       final isSelected = selected.contains(cat);
                       return GestureDetector(
                         onTap: () => setSheet(() {
-                          if (isSelected) selected.remove(cat);
-                          else selected.add(cat);
+                          if (isSelected) {
+                            selected.remove(cat);
+                          } else {
+                            selected.add(cat);
+                          }
                         }),
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -941,7 +988,7 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
     if (selected.isEmpty) return;
 
     final additionalTotal = selected.fold<double>(
-        0, (sum, i) => sum + ((i['subtotal'] as num?)?.toDouble() ?? 0));
+        0, (running, i) => running + ((i['subtotal'] as num?)?.toDouble() ?? 0));
 
     final addition = {
       'additionId'      : DateTime.now().millisecondsSinceEpoch.toString(),
@@ -1416,8 +1463,42 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
     // For decline/cancel ask refund method; accept doesn't involve a refund choice
     String refundMethod = 'wallet';
     if (response != 'accept') {
+      // ── ⚠ THIS SHEET USED TO SHOW THE CUSTOMER £0.00. Fixed 27 Aug 2026. ──
+      //
+      // It passed `refundAmount: _cashbackEarned`, and _cashbackEarned is
+      // declared 0.0 and never assigned by anything, so netRefund came out at
+      // zero every time. Somebody removing an item from their order was offered
+      // a choice between "£0.00 to your wallet" and "£0.00 to your card".
+      //
+      // The money was always correct because respondToSubstitution calculates
+      // it server side. Only the sheet lied, which is the worse half: it is the
+      // number the customer reads before deciding.
+      //
+      // ⚠ TWO DIFFERENT REFUNDS SHARE THIS ONE SHEET, and the dialog above
+      // already says so:
+      //   'decline'      -> "The item will be removed"     -> that item only
+      //   'cancel_order' -> "Your full payment will be refunded" -> everything
+      // Passing one figure for both would have been wrong in one of the cases.
+      //
+      // No fee is deducted for cancel_order here. The restaurant proposed the
+      // substitution; a customer is not charged for refusing it.
+      final Map<String, dynamic> sub =
+          (_order?['substitutionRequest'] as Map?)?.cast<String, dynamic>() ??
+              const <String, dynamic>{};
+
+      final double itemPrice = ((sub['originalPrice'] as num?) ?? 0).toDouble();
+      final int itemQty = ((sub['originalQty'] as num?) ?? 1).toInt();
+      final double orderTotal =
+          ((_order?['grandTotal'] as num?) ?? 0).toDouble();
+
       final chosen = await _showRefundMethodSheet(
-        refundAmount: _cashbackEarned, // approximate; server calculates exact
+        refundAmount:
+            response == 'cancel_order' ? orderTotal : itemPrice * itemQty,
+        // Still zero, and deliberately so. Nothing on the order document
+        // carries the cashback earned, so this client cannot compute a
+        // clawback. Passing a guess would understate the refund on screen;
+        // passing zero shows the gross figure and hides the clawback note,
+        // and the server applies the real deduction either way.
         cashbackEarned: _cashbackEarned,
         context: 'substitution',
       );
@@ -1635,10 +1716,10 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
         builder: (ctx, ss) {
           final pickerTotal = _pickerQty.entries
               .where((e) => e.value > 0)
-              .fold<double>(0, (sum, e) {
+              .fold<double>(0, (running, e) {
             final item = _menuItems.firstWhere((i) => i.id == e.key,
                 orElse: () => _PickerItem(id: '', name: '', price: 0, imageUrl: ''));
-            return sum + item.price * e.value;
+            return running + item.price * e.value;
           });
           final hasItems = _pickerQty.values.any((q) => q > 0);
 

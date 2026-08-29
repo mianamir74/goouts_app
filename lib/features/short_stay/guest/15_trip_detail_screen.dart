@@ -32,6 +32,8 @@
 // directly.
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/stay_booking.dart';
 import '../models/stay_enums.dart';
@@ -43,6 +45,7 @@ import '../services/stay_evidence_service.dart';
 import '../services/stay_listing_service.dart';
 import '../stay_routes.dart';
 import '../theme/stay_colors.dart';
+import '../widgets/stay_bottom_nav.dart';
 
 class TripDetailsScreen extends StatefulWidget {
   const TripDetailsScreen({super.key, required this.bookingId});
@@ -77,17 +80,21 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
           icon: const Icon(Icons.arrow_back, color: GoOutsColors.primaryBlue),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        // "Trip details", matching Stitch. Renamed 27 August 2026.
         title: Text(
-          'Your trip',
+          'Trip details',
           style: GoogleFonts.inter(
             fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: GoOutsColors.deepNavy,
+            height: 28 / 20,
+            fontWeight: FontWeight.w700,
+            color: GoOutsColors.primaryBlue,
           ),
         ),
       ),
-      // The fake bottom navigation bar is gone — four dead labels on a pushed
-      // screen, same as screen 14 had.
+      // A REAL bottom bar as of 28 August 2026. What was removed from here
+      // was four dead labels; StayBottomNav actually navigates, and resets the
+      // stack rather than pushing another copy of a screen you are already on.
+      bottomNavigationBar: const StayBottomNav(current: StayTab.trips),
       body: StreamBuilder<StayBooking?>(
         stream: StayBookingService.instance.watch(widget.bookingId),
         builder: (context, snapshot) {
@@ -119,22 +126,34 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
               // A 72 hour clock the person cannot see running is not a window,
               // it is a trapdoor — so it sits at the TOP of this screen, above
               // the trip itself, for as long as it is waiting on them.
+              // ── Order follows Stitch 15-trip_detail. 27 August 2026. ──────
+              //
+              // Stitch runs: property and address with Directions, the two
+              // check-in and check-out cards, the host, access instructions,
+              // the check-in photos block, then quick links, then a map.
+              //
+              // The claim banner stays ABOVE all of it, for the reason above.
+              // Everything else is Stitch's sequence.
               _claimBanner(b.id),
               _header(b),
+              _addressRow(),
+              const SizedBox(height: 16),
+              _checkTimesRow(),
               const SizedBox(height: 16),
               _whenCard(b),
               const SizedBox(height: 16),
-              _addressCard(),
-              const SizedBox(height: 16),
               _contactHostCard(b),
+              const SizedBox(height: 16),
+              _accessCard(),
               const SizedBox(height: 16),
               _photosCard(b),
               if (_listing?.locationContext != null) ...[
                 const SizedBox(height: 16),
                 _partnersCard(_listing!.locationContext!),
               ],
+              _houseRulesCard(),
               const SizedBox(height: 16),
-              _arrivalNote(),
+              _mapCard(),
               const SizedBox(height: 24),
             ],
           );
@@ -221,7 +240,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
                             '£${claim.amount.toStringAsFixed(2)} — tap to read '
                             'it and respond.',
                             style: GoogleFonts.inter(
-                                fontSize: 12.5,
+                                fontSize: 13.5,
                                 height: 1.4,
                                 color: const Color(0xFFB91C1C)),
                           ),
@@ -275,8 +294,9 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
               child: Text(
                 _listing?.title ?? 'Your stay',
                 style: GoogleFonts.inter(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  height: 20 / 15,
+                  fontWeight: FontWeight.w700,
                   color: Colors.white,
                 ),
               ),
@@ -287,14 +307,109 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
     );
   }
 
+  // ── Address and Directions ────────────────────────────────────────────────
+  //
+  // Stitch puts the address directly under the property with a Directions
+  // button beside it, rather than in a card of its own further down. Folded in
+  // here on 27 August 2026 and _addressCard retired, because two places showing
+  // the same address is how one of them ends up stale.
+  //
+  // ⚠ THE FULL ADDRESS IS SHOWN, unlike screen 05 which deliberately shows only
+  // a 300m circle and the town. That difference is the point: this screen only
+  // opens on a booking the guest holds, so they are entitled to the address.
+  Widget _addressRow() {
+    final StayAddress? a = _listing?.address;
+    if (a == null || (a.line1.isEmpty && a.postcode.isEmpty)) {
+      return const SizedBox.shrink();
+    }
+
+    final String full = <String>[
+      if (a.line1.isNotEmpty) a.line1,
+      if (a.town.isNotEmpty) a.town,
+      if (a.postcode.isNotEmpty) a.postcode,
+    ].join(', ');
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: <Widget>[
+          Expanded(
+            child: Text(
+              full,
+              style: GoogleFonts.inter(
+                  fontSize: 13.5,
+                  height: 20 / 13.5,
+                  color: GoOutsColors.bodyText),
+            ),
+          ),
+          const SizedBox(width: 12),
+          OutlinedButton(
+            onPressed: () => _openMaps(full),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: GoOutsColors.primaryBlue,
+              side: const BorderSide(color: GoOutsColors.outlineVariant),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
+            child: Text('Directions',
+                style: GoogleFonts.inter(
+                    fontSize: 14, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Opens the platform's maps app at the property.
+  ///
+  /// ⚠ COORDINATES WHEN WE HAVE THEM, THE ADDRESS WHEN WE DO NOT. A postcode
+  /// search can land on the wrong side of a large postcode; lat/lng cannot. The
+  /// address is the fallback rather than the first choice.
+  ///
+  /// Never throws. A device with no maps app is not a reason to crash a screen
+  /// somebody opened to look at their holiday.
+  Future<void> _openMaps(String address) async {
+    final double? lat = _listing?.lat;
+    final double? lng = _listing?.lng;
+    final String q = (lat != null && lng != null)
+        ? '$lat,$lng'
+        : Uri.encodeComponent(address);
+
+    final Uri uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$q');
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No maps app could be opened.')),
+      );
+    }
+  }
+
   // ── When ─────────────────────────────────────────────────────────────────
   //
-  // Dates only. NOT times — the listing has no checkInTime or checkOutTime and
-  // the host wizard does not ask for one, so any clock shown here would have
-  // been chosen by this screen rather than by the host.
+  // ⚠ THE TIMES ARE REAL NOW. Updated 27 August 2026.
+  //
+  // This said "Dates only. NOT times — the listing has no checkInTime or
+  // checkOutTime and the host wizard does not ask for one, so any clock shown
+  // here would have been chosen by this screen rather than by the host."
+  //
+  // That was true and it was the right call. Reported as "there is no rules
+  // shows to consumer check in and check out", so it was fixed at the source
+  // rather than papered over here: host wizard step 7 now asks, createStayListing
+  // validates and stores, StayListing parses. See stay_listing.dart.
+  //
+  // ⚠ STILL NOT CHOSEN BY THIS SCREEN. The times come from `_listing`, which
+  // may not have loaded yet or may be null if the read failed — in which case
+  // the rows are simply absent, exactly as before. Nothing here invents 15:00.
 
   Widget _whenCard(StayBooking b) {
     final int nightsLeft = b.checkOut.difference(DateTime.now()).inDays;
+    // `l` was read here for the check-in and check-out times. Those moved out
+    // into _checkTimesRow on 27 August 2026, so nothing in this card needs the
+    // listing any more.
 
     return _card(
       Column(
@@ -315,6 +430,9 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
               ),
             ],
           ),
+          // The times moved OUT of this card on 27 August 2026, into the two
+          // side-by-side cards Stitch draws above it. Left here as a note so
+          // nobody adds them back and shows the same fact twice.
           if (b.status == BookingStatus.inProgress && nightsLeft >= 0) ...[
             const SizedBox(height: 12),
             Text(
@@ -352,62 +470,10 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
   // somebody actually travelling, and it was not on the Stitch version at all
   // — that had a map picture instead.
 
-  Widget _addressCard() {
-    final StayAddress? a = _listing?.address;
-    if (a == null || (a.line1.isEmpty && a.postcode.isEmpty)) {
-      return const SizedBox.shrink();
-    }
+  // _addressCard was retired 27 August 2026. Stitch puts the address under
+  // the property with a Directions button, which is _addressRow above. Two
+  // places rendering one address is how one of them goes stale.
 
-    final String full = <String>[
-      if (a.line1.isNotEmpty) a.line1,
-      if (a.town.isNotEmpty) a.town,
-      if (a.postcode.isNotEmpty) a.postcode,
-    ].join(', ');
-
-    return _card(
-      Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.place_outlined, color: GoOutsColors.primaryBlue),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Address',
-                    style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: GoOutsColors.deepNavy)),
-                const SizedBox(height: 4),
-                SelectableText(
-                  full,
-                  style: GoogleFonts.inter(
-                      fontSize: 14.5,
-                      height: 1.35,
-                      color: GoOutsColors.bodyText),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Photographs ──────────────────────────────────────────────────────────
-
-  /// ── REACHING THE HOST DURING THE STAY ────────────────────────────────────
-  ///
-  /// Placed directly under the address, because the moments this is needed
-  /// are the moments the address is not enough: the key box code is wrong,
-  /// the door will not open, the heating is off. Before this screen existed
-  /// the only contact route in the whole app was GoOuts support, who do not
-  /// know where the key is.
-  ///
-  /// Offered whatever the status. A guest standing outside a property at
-  /// eleven at night is not helped by a button that checks whether their
-  /// booking is in the right state first.
   Widget _contactHostCard(StayBooking b) => _card(
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -599,33 +665,309 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
 
   // ── The honest note ──────────────────────────────────────────────────────
 
-  Widget _arrivalNote() => Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: GoOutsColors.infoBlueBg,
-          borderRadius: BorderRadius.circular(12),
+  // ── Check in / Check out, the two Stitch cards ────────────────────────────
+  //
+  // Stitch gives these their own pair of cards at the top, not a line inside a
+  // details block, because on the day of travel they are the two facts the
+  // guest actually opens this screen for.
+  //
+  // Hidden entirely until the listing loads. Nothing here invents 15:00.
+  Widget _checkTimesRow() {
+    final StayListing? l = _listing;
+    if (l == null) return const SizedBox.shrink();
+
+    Widget box(String label, String value) => Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: GoOutsColors.dividerGray),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(label.toUpperCase(),
+                    style: GoogleFonts.inter(
+                        fontSize: 12,
+                        height: 16 / 12,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.3,
+                        color: GoOutsColors.bodyText)),
+                const SizedBox(height: 4),
+                Text(value,
+                    style: GoogleFonts.inter(
+                        fontSize: 20,
+                        height: 28 / 20,
+                        fontWeight: FontWeight.w700,
+                        color: GoOutsColors.deepNavy)),
+              ],
+            ),
+          ),
+        );
+
+    return Row(children: <Widget>[
+      box('Check in', l.checkInTime),
+      const SizedBox(width: 12),
+      box('Check out', l.checkOutTime),
+    ]);
+  }
+
+  // ── Access instructions ───────────────────────────────────────────────────
+  //
+  // Replaces _arrivalNote, which was an info strip saying the host would be in
+  // touch. Stitch gives this a card with a key icon, because on arrival it is
+  // the most important thing on the screen.
+  //
+  // ⚠ PRIVATE, AND ONLY REACHABLE ON A BOOKING THE GUEST HOLDS. Door codes and
+  // key safe locations are never on the public listing. See stay_listing.dart.
+  //
+  // The fallback stays for every host who left the field blank, which is most
+  // of them and every listing created before 27 August 2026.
+  Widget _accessCard() {
+    final String written = _listing?.arrivalInstructions ?? '';
+    final bool have = written.isNotEmpty;
+
+    return _card(
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              const Icon(Icons.vpn_key_outlined,
+                  size: 20, color: GoOutsColors.primaryBlue),
+              const SizedBox(width: 10),
+              Text('Access instructions',
+                  style: GoogleFonts.inter(
+                      fontSize: 15,
+                      height: 20 / 15,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.3,
+                      color: GoOutsColors.primaryBlue)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            have
+                ? written
+                : 'Your host will send arrival times and how to get in. If you '
+                    'have not heard from them, contact us and we will chase it.',
+            style: GoogleFonts.inter(
+                fontSize: 13.5, height: 20 / 13.5, color: GoOutsColors.bodyText),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Quick links ───────────────────────────────────────────────────────────
+  //
+  // Stitch lists Days out, Partners nearby and House rules.
+  //
+  // ⚠ PARTNERS NEARBY IS NOT A LINK HERE. _partnersCard already renders the
+  // real count above, computed by the location engine. Replacing a live figure
+  // with a chevron would be a downgrade.
+  //
+  // DAYS OUT IS LIVE as of 28 August 2026. It read "opens an empty screen
+  // today" until screen 07 was wired to stay_attractions/{citySlug}, built from
+  // OpenStreetMap. It shows the empty state only for a city we have not built
+  // yet, and says exactly that rather than claiming there is nothing to do.
+  Widget _houseRulesCard() {
+    final StayListing? l = _listing;
+    if (l == null) return const SizedBox.shrink();
+    final StayHouseRules r = l.houseRules;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        const SizedBox(height: 20),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 10),
+          child: Text('Quick links',
+              style: GoogleFonts.inter(
+                  fontSize: 15,
+                  height: 20 / 15,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.3,
+                  color: GoOutsColors.deepNavy)),
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Icon(Icons.info_outline,
-                size: 18, color: GoOutsColors.primaryBlue),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                // True today. Check-in times and access instructions are not
-                // fields on a listing yet, so the host really does send them
-                // directly. Saying so is better than printing a time nobody
-                // agreed to.
-                'Your host will send arrival times and how to get in. If you '
-                'have not heard from them, contact us and we will chase it.',
-                style: GoogleFonts.inter(
-                    fontSize: 13,
-                    height: 1.35,
-                    color: GoOutsColors.bodyText),
+        // ⚠ PASSES THE listingId. Yesterday this pushed the route bare and the
+        // note here said it would open an empty screen. Screen 07 is wired now
+        // and needs the property to know which city to read and which day out
+        // is nearest, so a bare push would still show nothing.
+        _quickLink(Icons.map_outlined, 'Days out',
+            () => Navigator.of(context).pushNamed(
+                  StayRoutes.daysOut,
+                  arguments: <String, dynamic>{'listingId': l.id},
+                )),
+        const SizedBox(height: 8),
+        // House rules are rendered rather than linked: they are four short
+        // lines and there is no house rules screen to open.
+        _rulesTile(r, l),
+      ],
+    );
+  }
+
+  Widget _quickLink(IconData icon, String label, VoidCallback onTap) => Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: <Widget>[
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: GoOutsColors.paleBlueTint,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, size: 20, color: GoOutsColors.primaryBlue),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(label,
+                      style: GoogleFonts.inter(
+                          fontSize: 14,
+                          height: 20 / 14,
+                          fontWeight: FontWeight.w600,
+                          color: GoOutsColors.deepNavy)),
+                ),
+                const Icon(Icons.chevron_right,
+                    color: GoOutsColors.outlineVariant),
+              ],
+            ),
+          ),
+        ),
+      );
+
+  Widget _rulesTile(StayHouseRules r, StayListing l) {
+    Widget line(String text) => Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text('\u2022  $text',
+              style: GoogleFonts.inter(
+                  fontSize: 13.5,
+                  height: 20 / 13.5,
+                  color: GoOutsColors.bodyText)),
+        );
+
+    return _card(
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              const Icon(Icons.rule_rounded,
+                  size: 20, color: GoOutsColors.primaryBlue),
+              const SizedBox(width: 10),
+              Text('House rules',
+                  style: GoogleFonts.inter(
+                      fontSize: 14,
+                      height: 20 / 14,
+                      fontWeight: FontWeight.w600,
+                      color: GoOutsColors.deepNavy)),
+            ],
+          ),
+          line('Check out by ${l.checkOutTime}'),
+          // Only what the host actually said. isUnset hides the permissions
+          // entirely rather than printing three "not allowed" lines nobody
+          // chose. See StayHouseRules.
+          if (!r.isUnset) ...<Widget>[
+            line(r.smokingAllowed ? 'Smoking allowed' : 'No smoking'),
+            line(r.petsAllowed ? 'Pets allowed' : 'No pets'),
+            line(r.partiesAllowed
+                ? 'Parties or events allowed'
+                : 'No parties or events'),
+            if (r.hasQuietHours)
+              line('Quiet hours ${r.quietHoursFrom} to ${r.quietHoursTo}'),
+            if (r.additional.isNotEmpty) line(r.additional),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ── The map ───────────────────────────────────────────────────────────────
+  //
+  // ⚠ AN EXACT PIN HERE, unlike screen 05 which shows a 300m circle and no
+  // marker. That difference is deliberate: screen 05 is public and this screen
+  // only opens on a booking the guest holds, so they are entitled to know
+  // precisely where they are going.
+  //
+  // Dead map, same as screen 05: every gesture off, no controller, nothing to
+  // dispose, lite mode on Android. The button underneath is what moves.
+  Widget _mapCard() {
+    final double? lat = _listing?.lat;
+    final double? lng = _listing?.lng;
+    if (lat == null || lng == null) return const SizedBox.shrink();
+
+    final LatLng centre = LatLng(lat, lng);
+    final StayAddress? a = _listing?.address;
+    final String full = <String>[
+      if (a != null && a.line1.isNotEmpty) a.line1,
+      if (a != null && a.town.isNotEmpty) a.town,
+      if (a != null && a.postcode.isNotEmpty) a.postcode,
+    ].join(', ');
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        height: 180,
+        child: Stack(
+          children: <Widget>[
+            GoogleMap(
+              initialCameraPosition: CameraPosition(target: centre, zoom: 15),
+              liteModeEnabled:
+                  Theme.of(context).platform == TargetPlatform.android,
+              markers: <Marker>{
+                Marker(markerId: const MarkerId('stay'), position: centre),
+              },
+              zoomControlsEnabled: false,
+              zoomGesturesEnabled: false,
+              scrollGesturesEnabled: false,
+              rotateGesturesEnabled: false,
+              tiltGesturesEnabled: false,
+              myLocationButtonEnabled: false,
+              myLocationEnabled: false,
+              mapToolbarEnabled: false,
+              compassEnabled: false,
+            ),
+            Positioned(
+              left: 12,
+              bottom: 12,
+              child: Material(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(999),
+                elevation: 2,
+                child: InkWell(
+                  onTap: () => _openMaps(full),
+                  borderRadius: BorderRadius.circular(999),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        const Icon(Icons.place_outlined,
+                            size: 16, color: GoOutsColors.primaryBlue),
+                        const SizedBox(width: 6),
+                        Text('Open in Maps',
+                            style: GoogleFonts.inter(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w600,
+                                color: GoOutsColors.deepNavy)),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
         ),
-      );
+      ),
+    );
+  }
 }

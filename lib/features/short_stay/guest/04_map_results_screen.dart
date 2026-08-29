@@ -283,7 +283,7 @@ class _MapResultsScreenState extends State<MapResultsScreen> {
                         child: Text(
                           '${partners.halfMile} partners nearby',
                           style: GoogleFonts.inter(
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color: GoOutsColors.primaryBlue,
                           ),

@@ -32,7 +32,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final snap = await _ref.where('isRead', isEqualTo: false).get();
     if (snap.docs.isEmpty) return;
     final batch = FirebaseFirestore.instance.batch();
-    for (final d in snap.docs) batch.update(d.reference, {'isRead': true});
+    for (final d in snap.docs) {
+      batch.update(d.reference, {'isRead': true});
+    }
     await batch.commit();
   }
 

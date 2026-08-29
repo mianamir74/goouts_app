@@ -136,7 +136,7 @@ class _ContestClaimScreenState extends State<ContestClaimScreen> {
         foregroundColor: GoOutsColors.deepNavy,
         title: Text('Tell us why',
             style:
-                GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w700)),
+                GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700)),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 18, 20, 32),
@@ -145,7 +145,7 @@ class _ContestClaimScreenState extends State<ContestClaimScreen> {
             'What happened?',
             style: GoogleFonts.inter(
                 fontSize: 20,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 color: GoOutsColors.deepNavy),
           ),
           const SizedBox(height: 8),
@@ -168,7 +168,7 @@ class _ContestClaimScreenState extends State<ContestClaimScreen> {
               hintText: 'For example: the mark was already there when I '
                   'arrived, or nobody used that room during my stay.',
               hintStyle: GoogleFonts.inter(
-                  fontSize: 13, color: GoOutsColors.textVariant),
+                  fontSize: 13.5, color: GoOutsColors.textVariant),
               filled: true,
               fillColor: GoOutsColors.cardSurface,
               border: OutlineInputBorder(
@@ -187,7 +187,7 @@ class _ContestClaimScreenState extends State<ContestClaimScreen> {
               ),
               child: Text(_error,
                   style: GoogleFonts.inter(
-                      fontSize: 13,
+                      fontSize: 13.5,
                       height: 1.45,
                       color: const Color(0xFFB91C1C))),
             ),
@@ -221,7 +221,7 @@ class _ContestClaimScreenState extends State<ContestClaimScreen> {
             'automatically.',
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
-                fontSize: 11.5, height: 1.45, color: GoOutsColors.textVariant),
+                fontSize: 12, height: 1.45, color: GoOutsColors.textVariant),
           ),
         ],
       ),

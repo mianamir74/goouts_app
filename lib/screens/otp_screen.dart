@@ -102,9 +102,15 @@ class _OtpScreenState extends State<OtpScreen>
   void dispose() {
     _timer?.cancel();
     _shakeCtrl.dispose();
-    for (final c in _controllers) c.dispose();
-    for (final f in _focusNodes) f.dispose();
-    for (final f in _keyEventFocusNodes) f.dispose();
+    for (final c in _controllers) {
+      c.dispose();
+    }
+    for (final f in _focusNodes) {
+      f.dispose();
+    }
+    for (final f in _keyEventFocusNodes) {
+      f.dispose();
+    }
     super.dispose();
   }
 
@@ -232,7 +238,9 @@ class _OtpScreenState extends State<OtpScreen>
                 _isLoading = false;
                 _hasError = true;
               });
-              for (final c in _controllers) c.clear();
+              for (final c in _controllers) {
+                c.clear();
+              }
               _focusNodes[0].requestFocus();
               _shakeCtrl.forward(from: 0);
               GoOutsSheet.error(context,
@@ -267,7 +275,9 @@ class _OtpScreenState extends State<OtpScreen>
           _hasError = true;
         });
         // Clear boxes and shake
-        for (final c in _controllers) c.clear();
+        for (final c in _controllers) {
+          c.clear();
+        }
         _focusNodes[0].requestFocus();
         _shakeCtrl.forward(from: 0);
       }

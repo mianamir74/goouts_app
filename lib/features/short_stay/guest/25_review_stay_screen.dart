@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/stay_colors.dart';
+import '../widgets/stay_bottom_nav.dart';
 
 class ReviewStayScreen extends StatelessWidget {
   const ReviewStayScreen({super.key});
@@ -50,7 +51,7 @@ class ReviewStayScreen extends StatelessWidget {
           ],
         ),
       ),
-      bottomNavigationBar: _buildBottomNavBar(),
+      bottomNavigationBar: const StayBottomNav(current: StayTab.trips),
     );
   }
 
@@ -60,7 +61,7 @@ class ReviewStayScreen extends StatelessWidget {
         Text(
           'Overall experience',
           style: GoogleFonts.inter(
-            fontSize: 18,
+            fontSize: 15,
             fontWeight: FontWeight.bold,
             color: GoOutsColors.deepNavy,
           ),
@@ -94,7 +95,7 @@ class ReviewStayScreen extends StatelessWidget {
           Text(
             'Details',
             style: GoogleFonts.inter(
-              fontSize: 18,
+              fontSize: 15,
               fontWeight: FontWeight.bold,
               color: GoOutsColors.deepNavy,
             ),
@@ -145,7 +146,7 @@ class ReviewStayScreen extends StatelessWidget {
           Text(
             'Describe your stay',
             style: GoogleFonts.inter(
-              fontSize: 18,
+              fontSize: 15,
               fontWeight: FontWeight.bold,
               color: GoOutsColors.deepNavy,
             ),
@@ -190,7 +191,7 @@ class ReviewStayScreen extends StatelessWidget {
                 child: Text(
                   'Your review and your host\'s are published together on your profile and the listing page once both are submitted.',
                   style: GoogleFonts.inter(
-                    fontSize: 13,
+                    fontSize: 13.5,
                     color: GoOutsColors.bodyText.withValues(alpha: 0.8),
                     height: 1.4,
                   ),
@@ -217,7 +218,7 @@ class ReviewStayScreen extends StatelessWidget {
         child: Text(
           'Submit Review',
           style: GoogleFonts.inter(
-            fontSize: 18,
+            fontSize: 15,
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
@@ -226,41 +227,11 @@ class ReviewStayScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildBottomNavBar() {
-    return Container(
-      height: 80,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: GoOutsColors.dividerGray)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildNavItem(Icons.search, 'Search', false),
-          _buildNavItem(Icons.calendar_today, 'Bookings', true),
-          _buildNavItem(Icons.camera_alt, 'Deposit', false),
-          _buildNavItem(Icons.gavel, 'Disputes', false),
-          _buildNavItem(Icons.person, 'Profile', false),
-        ],
-      ),
-    );
-  }
+  // _buildBottomNavBar was four labels with no handlers. Replaced by the shared
+  // StayBottomNav on 28 August 2026. See that file for why it was dead.
 
-  Widget _buildNavItem(IconData icon, String label, bool isActive) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(icon, color: isActive ? GoOutsColors.primaryBlue : GoOutsColors.bodyText),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 10,
-            fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-            color: isActive ? GoOutsColors.primaryBlue : GoOutsColors.bodyText,
-          ),
-        ),
-      ],
-    );
-  }
+
+  // _buildNavItem was four labels with no handlers. Replaced by the shared
+  // StayBottomNav on 28 August 2026. See that file for why it was dead.
+
 }

@@ -286,26 +286,35 @@ class SelfServiceService {
     String statusMessage;
     String statusColor; // 'green', 'orange', 'red', 'grey'
 
-    switch (kycStatus) {
-      case 'verified':
+    // ── ⚠ A SWITCH ON THE RAW STRING IS THE SAME BUG AS `== 'verified'`. ─────
+    //
+    // Fixed 25 August 2026, after the `==` sweep walked straight past it —
+    // I searched for the operator and not for the question being asked.
+    //
+    // This was `switch (kycStatus) { case 'verified': ... }`. The backend
+    // writes 'approved', which matched nothing, so it fell to `default` and
+    // told an APPROVED person, in the support assistant, that their identity
+    // "has not been verified yet" and to go and verify it.
+    //
+    // Of every screen to get this wrong, the support assistant is the one that
+    // costs a ticket. Parsed through utils/kyc_status.dart now.
+    switch (kycStatusFrom(kycStatus)) {
+      case KycStatus.approved:
         statusTitle = 'Identity Verified';
         statusMessage =
             'Your identity has been successfully verified. Your account has full access.';
         statusColor = 'green';
-        break;
-      case 'pending':
+      case KycStatus.pending:
         statusTitle = 'Under Review';
         statusMessage =
             'Your documents are being reviewed by our team. This usually takes 1–2 business days. You will receive a notification once complete.';
         statusColor = 'orange';
-        break;
-      case 'rejected':
+      case KycStatus.rejected:
         statusTitle = 'Verification Failed';
         statusMessage =
             'Your documents were not accepted. Please re-submit with a clear, valid government-issued ID and a matching selfie.';
         statusColor = 'red';
-        break;
-      default:
+      case KycStatus.none:
         statusTitle = 'Not Verified';
         statusMessage =
             'Your identity has not been verified yet. Tap "Verify Now" in your Profile to complete the process and unlock higher limits.';

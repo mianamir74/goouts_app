@@ -145,7 +145,9 @@ class _CreateProfileExpandedScreenState
     final trimmed = val.trim().toLowerCase();
     // Must match standard email format
     if (!RegExp(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$')
-        .hasMatch(trimmed)) return false;
+        .hasMatch(trimmed)) {
+      return false;
+    }
     final parts = trimmed.split('@');
     if (parts.length != 2) return false;
     final domain = parts[1];
@@ -497,7 +499,10 @@ class _CreateProfileExpandedScreenState
                   _label('Title *'),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<String>(
-                    value: _selectedPrefix,
+                    // `value` was deprecated after Flutter 3.33 because it read
+                    // as a controlled value when the field only ever uses it to
+                    // seed itself. Same behaviour, honest name.
+                    initialValue: _selectedPrefix,
                     decoration: _fieldDec('').copyWith(
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 14, vertical: 14),

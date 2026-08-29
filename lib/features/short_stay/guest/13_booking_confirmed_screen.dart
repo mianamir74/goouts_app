@@ -34,6 +34,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/stay_booking.dart';
 import '../models/stay_enums.dart';
 import '../models/stay_listing.dart';
+import '../models/stay_reference.dart';
 import '../services/stay_booking_service.dart';
 import '../services/stay_listing_service.dart';
 import '../stay_routes.dart';
@@ -65,7 +66,7 @@ class _BookingConfirmedScreenState extends State<BookingConfirmedScreen> {
           'Your booking',
           style: GoogleFonts.inter(
             fontSize: 20,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w700,
             color: GoOutsColors.deepNavy,
           ),
         ),
@@ -143,8 +144,8 @@ class _BookingConfirmedScreenState extends State<BookingConfirmedScreen> {
                 'We could not load this booking',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
                     color: GoOutsColors.deepNavy),
               ),
               const SizedBox(height: 8),
@@ -152,7 +153,7 @@ class _BookingConfirmedScreenState extends State<BookingConfirmedScreen> {
                 'It may still have been made. Please check My bookings.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
-                    fontSize: 15, color: GoOutsColors.bodyText),
+                    fontSize: 13.5, color: GoOutsColors.bodyText),
               ),
               const SizedBox(height: 24),
               ElevatedButton(
@@ -244,8 +245,8 @@ class _BookingConfirmedScreenState extends State<BookingConfirmedScreen> {
             copy.title,
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
               color: GoOutsColors.deepNavy,
             ),
           ),
@@ -257,7 +258,7 @@ class _BookingConfirmedScreenState extends State<BookingConfirmedScreen> {
             copy.body,
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
-              fontSize: 16,
+              fontSize: 13.5,
               color: GoOutsColors.bodyText,
               height: 1.5,
             ),
@@ -269,9 +270,23 @@ class _BookingConfirmedScreenState extends State<BookingConfirmedScreen> {
 
   // ── Reference ────────────────────────────────────────────────────────────
   //
-  // The real document id, not a GOS-00000-X pattern invented for the mockup.
-  // This is what support and the host both search on, so a guest reading it
-  // down the phone has to be reading the same string that exists in Firestore.
+  // This used to print `widget.bookingId` raw, under a comment that said:
+  //
+  //     "The real document id, not a GOS-00000-X pattern invented for the
+  //      mockup. This is what support and the host both search on, so a guest
+  //      reading it down the phone has to be reading the same string that
+  //      exists in Firestore."
+  //
+  // The reasoning was right and the result was still unusable. The id looks
+  // like LorC7MLDic9xjrXKq4t8: twenty mixed case characters that overflowed
+  // this card and that nobody can read aloud or write down without error.
+  //
+  // ⚠ THE CODE IS DERIVED FROM THE ID, NOT RANDOM, so the original concern is
+  // fully answered. stayBookingReference() is a pure function, createStayBooking
+  // writes the same value onto the document with the same algorithm, and
+  // support can go either way: id to code with no lookup, code to booking with
+  // one indexed query. Bookings made before the field existed still show the
+  // right code, because this derives rather than reads. See stay_reference.dart.
   Widget _buildReferenceCard() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -287,19 +302,19 @@ class _BookingConfirmedScreenState extends State<BookingConfirmedScreen> {
             'REFERENCE',
             style: GoogleFonts.inter(
               fontSize: 12,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w700,
               color: GoOutsColors.bodyText,
               letterSpacing: 0.5,
             ),
           ),
           Flexible(
             child: Text(
-              widget.bookingId,
+              stayBookingReference(widget.bookingId),
               textAlign: TextAlign.right,
               overflow: TextOverflow.ellipsis,
               style: GoogleFonts.inter(
                 fontSize: 15,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w700,
                 color: GoOutsColors.primaryBlue,
               ),
             ),
@@ -396,7 +411,7 @@ class _BookingConfirmedScreenState extends State<BookingConfirmedScreen> {
           child: Text(
             text,
             style: GoogleFonts.inter(
-              fontSize: 15,
+              fontSize: 13.5,
               fontWeight: FontWeight.w500,
               color: GoOutsColors.deepNavy,
             ),
@@ -461,8 +476,8 @@ class _BookingConfirmedScreenState extends State<BookingConfirmedScreen> {
           Text(
             'What happens next',
             style: GoogleFonts.inter(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
               color: GoOutsColors.deepNavy,
             ),
           ),
@@ -495,7 +510,7 @@ class _BookingConfirmedScreenState extends State<BookingConfirmedScreen> {
             child: Text(
               title,
               style: GoogleFonts.inter(
-                fontSize: 15,
+                fontSize: 13.5,
                 color: GoOutsColors.bodyText,
                 height: 1.35,
               ),
@@ -532,8 +547,8 @@ class _BookingConfirmedScreenState extends State<BookingConfirmedScreen> {
             child: Text(
               declinedOrCancelled ? 'Find somewhere else' : 'View my bookings',
               style: GoogleFonts.inter(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
                 color: Colors.white,
               ),
             ),
@@ -545,7 +560,7 @@ class _BookingConfirmedScreenState extends State<BookingConfirmedScreen> {
             child: Text(
               'Back to Short Stay',
               style: GoogleFonts.inter(
-                fontSize: 15,
+                fontSize: 16,
                 fontWeight: FontWeight.w600,
                 color: GoOutsColors.primaryBlue,
               ),

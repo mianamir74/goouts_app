@@ -66,7 +66,7 @@ class ClaimNotificationScreen extends StatelessWidget {
         foregroundColor: GoOutsColors.deepNavy,
         title: Text('Damage claim',
             style: GoogleFonts.inter(
-                fontSize: 17, fontWeight: FontWeight.w700)),
+                fontSize: 15, fontWeight: FontWeight.w700)),
       ),
       body: id.isEmpty
           ? _centered('No claim was selected.')
@@ -223,7 +223,7 @@ class _BodyState extends State<_Body> {
               : 'These were frozen when the claim was made and cannot be '
                   'changed by anyone, including us.',
           style: GoogleFonts.inter(
-              fontSize: 12.5, height: 1.45, color: GoOutsColors.textVariant),
+              fontSize: 13.5, height: 1.45, color: GoOutsColors.textVariant),
         ),
         const SizedBox(height: 10),
         _evidenceList(c),
@@ -238,7 +238,7 @@ class _BodyState extends State<_Body> {
             ),
             child: Text(_error,
                 style: GoogleFonts.inter(
-                    fontSize: 13,
+                    fontSize: 13.5,
                     height: 1.45,
                     color: const Color(0xFFB91C1C))),
           ),
@@ -298,7 +298,7 @@ class _BodyState extends State<_Body> {
             'automatically.',
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
-                fontSize: 11.5, height: 1.45, color: GoOutsColors.textVariant),
+                fontSize: 12, height: 1.45, color: GoOutsColors.textVariant),
           ),
         ],
       );
@@ -336,7 +336,7 @@ class _BodyState extends State<_Body> {
             const SizedBox(height: 8),
             Text(c.decisionReason!,
                 style: GoogleFonts.inter(
-                    fontSize: 12.5,
+                    fontSize: 13.5,
                     height: 1.5,
                     color: GoOutsColors.bodyText)),
           ],
@@ -344,13 +344,13 @@ class _BodyState extends State<_Body> {
             const SizedBox(height: 10),
             Text('What you told us',
                 style: GoogleFonts.inter(
-                    fontSize: 11.5,
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: GoOutsColors.textVariant)),
             const SizedBox(height: 2),
             Text(c.guestResponseNote!,
                 style: GoogleFonts.inter(
-                    fontSize: 12.5,
+                    fontSize: 13.5,
                     height: 1.5,
                     color: GoOutsColors.bodyText)),
           ],
@@ -390,7 +390,7 @@ class _BodyState extends State<_Body> {
                       'respond, and we will take it into account.'
                   : 'You have about $hours hours to respond.',
               style: GoogleFonts.inter(
-                  fontSize: 12.5,
+                  fontSize: 13.5,
                   height: 1.45,
                   color: overdue
                       ? const Color(0xFF991B1B)
@@ -414,12 +414,12 @@ class _BodyState extends State<_Body> {
           children: <Widget>[
             Text('Amount claimed',
                 style: GoogleFonts.inter(
-                    fontSize: 12.5, color: GoOutsColors.textVariant)),
+                    fontSize: 13.5, color: GoOutsColors.textVariant)),
             const SizedBox(height: 4),
             Text('£${c.amount.toStringAsFixed(2)}',
                 style: GoogleFonts.inter(
-                    fontSize: 30,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
                     color: GoOutsColors.deepNavy)),
             if (c.depositCapPence > 0) ...<Widget>[
               const SizedBox(height: 4),
@@ -427,7 +427,7 @@ class _BodyState extends State<_Body> {
                 'Out of the £${(c.depositCapPence / 100).toStringAsFixed(2)} '
                 'deposit for this booking. A claim can never be more than that.',
                 style: GoogleFonts.inter(
-                    fontSize: 11.5,
+                    fontSize: 12,
                     height: 1.45,
                     color: GoOutsColors.textVariant),
               ),
@@ -503,7 +503,7 @@ class _BodyState extends State<_Body> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.inter(
-                          fontSize: 11, color: GoOutsColors.textVariant)),
+                          fontSize: 12, color: GoOutsColors.textVariant)),
                 ),
             ],
           ),

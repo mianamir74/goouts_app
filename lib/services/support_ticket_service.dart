@@ -23,13 +23,17 @@ class SupportTicketService {
         s.contains('account locked') ||
         s.contains('cannot log in') ||
         s.contains('security') ||
-        c == 'account_security') return 'high';
+        c == 'account_security') {
+          return 'high';
+        }
 
     // Low priority — informational / general
     if (s.contains('how') ||
         s.contains('general') ||
         s.contains('other') ||
-        c == 'other') return 'low';
+        c == 'other') {
+          return 'low';
+        }
 
     return 'medium';
   }

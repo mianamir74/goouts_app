@@ -32,6 +32,7 @@ import '../services/stay_booking_service.dart';
 import '../services/stay_listing_service.dart';
 import '../stay_routes.dart';
 import '../theme/stay_colors.dart';
+import '../models/stay_reference.dart';
 
 class CancellationConfirmedScreen extends StatefulWidget {
   const CancellationConfirmedScreen({super.key, required this.bookingId});
@@ -139,7 +140,7 @@ class _CancellationConfirmedScreenState
             'Your booking is cancelled',
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
-              fontSize: 22,
+              fontSize: 20,
               fontWeight: FontWeight.bold,
               color: GoOutsColors.deepNavy,
             ),
@@ -154,7 +155,7 @@ class _CancellationConfirmedScreenState
           const SizedBox(height: 10),
           // The real document id. Support and the host both search on it.
           Text(
-            'Reference ${b.id}',
+            'Reference ${stayBookingReference(b.id)}',
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
                 fontSize: 12,
@@ -206,7 +207,7 @@ class _CancellationConfirmedScreenState
               children: [
                 Text(_listing?.title ?? 'Your stay',
                     style: GoogleFonts.inter(
-                        fontSize: 15.5,
+                        fontSize: 15,
                         fontWeight: FontWeight.bold,
                         color: GoOutsColors.deepNavy)),
                 Text('${_d(b.checkIn)} to ${_d(b.checkOut)}',
@@ -242,8 +243,8 @@ class _CancellationConfirmedScreenState
                       color: GoOutsColors.deepNavy)),
               Text(c.refundAmount.formatted,
                   style: GoogleFonts.inter(
-                      fontSize: 19,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
                       color: GoOutsColors.tealSecondary)),
             ],
           ),
@@ -253,7 +254,7 @@ class _CancellationConfirmedScreenState
             Text(
               c.explanation,
               style: GoogleFonts.inter(
-                  fontSize: 13, height: 1.4, color: GoOutsColors.bodyText),
+                  fontSize: 13.5, height: 1.4, color: GoOutsColors.bodyText),
             ),
           ],
           // Where the money went. Refunds go back to the pot they came from,
@@ -271,7 +272,7 @@ class _CancellationConfirmedScreenState
                     '${c.refundToWallet.formatted} is back in your GoOuts '
                     'wallet now.',
                     style: GoogleFonts.inter(
-                        fontSize: 12.5, color: GoOutsColors.bodyText),
+                        fontSize: 13.5, color: GoOutsColors.bodyText),
                   ),
                 ),
               ],
@@ -290,7 +291,7 @@ class _CancellationConfirmedScreenState
                     'You were never charged for this booking, so there is '
                     'nothing to return.',
                     style: GoogleFonts.inter(
-                        fontSize: 12.5, color: GoOutsColors.bodyText),
+                        fontSize: 13.5, color: GoOutsColors.bodyText),
                   ),
                 ),
               ],

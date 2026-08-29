@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/stay_colors.dart';
+import '../widgets/stay_bottom_nav.dart';
 
 class NeighbourhoodScreen extends StatelessWidget {
   const NeighbourhoodScreen({super.key});
@@ -91,7 +92,7 @@ class NeighbourhoodScreen extends StatelessWidget {
                     child: Text(
                       'Nearby Partners',
                       style: GoogleFonts.inter(
-                        fontSize: 18,
+                        fontSize: 15,
                         fontWeight: FontWeight.bold,
                         color: GoOutsColors.deepNavy,
                       ),
@@ -138,7 +139,7 @@ class NeighbourhoodScreen extends StatelessWidget {
           ),
         ],
       ),
-      bottomNavigationBar: _buildBottomNavBar(),
+      bottomNavigationBar: const StayBottomNav(current: StayTab.search),
     );
   }
 
@@ -258,8 +259,8 @@ class NeighbourhoodScreen extends StatelessWidget {
                       child: Text(
                         cashback,
                         style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
                           color: GoOutsColors.tickTeal,
                         ),
                       ),
@@ -270,7 +271,7 @@ class NeighbourhoodScreen extends StatelessWidget {
                 Text(
                   '$distance  •  $type',
                   style: GoogleFonts.inter(
-                    fontSize: 13,
+                    fontSize: 13.5,
                     color: GoOutsColors.textVariant,
                   ),
                 ),
@@ -282,43 +283,11 @@ class NeighbourhoodScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildBottomNavBar() {
-    return Container(
-      height: 80,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey.shade200)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildNavItem(Icons.search, 'Search', false),
-          _buildNavItem(Icons.explore, 'Trips', false),
-          _buildNavItem(Icons.stars, 'Rewards', true),
-          _buildNavItem(Icons.person, 'Profile', false),
-        ],
-      ),
-    );
-  }
+  // _buildBottomNavBar was four labels with no handlers. Replaced by the shared
+  // StayBottomNav on 28 August 2026. See that file for why it was dead.
 
-  Widget _buildNavItem(IconData icon, String label, bool isActive) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(
-          icon,
-          color: isActive ? GoOutsColors.primaryBlue : GoOutsColors.textVariant,
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 12,
-            fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-            color: isActive ? GoOutsColors.primaryBlue : GoOutsColors.textVariant,
-          ),
-        ),
-      ],
-    );
-  }
+
+  // _buildNavItem was four labels with no handlers. Replaced by the shared
+  // StayBottomNav on 28 August 2026. See that file for why it was dead.
+
 }

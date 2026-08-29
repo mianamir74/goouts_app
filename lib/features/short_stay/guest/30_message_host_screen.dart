@@ -90,7 +90,7 @@ class _MessageHostScreenState extends State<MessageHostScreen> {
           'Message your host',
           style: GoogleFonts.inter(
             color: GoOutsColors.deepNavy,
-            fontSize: 18,
+            fontSize: 15,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -211,7 +211,7 @@ class _MessageHostScreenState extends State<MessageHostScreen> {
               Text(
                 stamp,
                 style: GoogleFonts.inter(
-                  fontSize: 10.5,
+                  fontSize: 12,
                   color: mine
                       ? Colors.white.withValues(alpha: 0.75)
                       : GoOutsColors.bodyText.withValues(alpha: 0.7),
@@ -234,7 +234,7 @@ class _MessageHostScreenState extends State<MessageHostScreen> {
             child: Text(
               _dayLabel(d),
               style: GoogleFonts.inter(
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: GoOutsColors.bodyText,
               ),
@@ -265,7 +265,7 @@ class _MessageHostScreenState extends State<MessageHostScreen> {
                 'know. Your host sees this in their GoOuts Host app.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
-                    fontSize: 13, height: 1.5, color: GoOutsColors.bodyText),
+                    fontSize: 13.5, height: 1.5, color: GoOutsColors.bodyText),
               ),
             ],
           ),
@@ -289,7 +289,7 @@ class _MessageHostScreenState extends State<MessageHostScreen> {
                 'Messages cannot be edited or deleted, by you, your host or '
                 'GoOuts. They can be used to settle a dispute.',
                 style: GoogleFonts.inter(
-                  fontSize: 11.5,
+                  fontSize: 12,
                   height: 1.4,
                   color: GoOutsColors.bodyText,
                 ),
@@ -327,7 +327,7 @@ class _MessageHostScreenState extends State<MessageHostScreen> {
                       child: Text(
                         _sendError!,
                         style: GoogleFonts.inter(
-                            fontSize: 11.5, color: GoOutsColors.error),
+                            fontSize: 12, color: GoOutsColors.error),
                       ),
                     ),
                   ],
@@ -501,7 +501,7 @@ class _MessageHostScreenState extends State<MessageHostScreen> {
                   maxLines: 4,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.inter(
-                      fontSize: 12.5,
+                      fontSize: 13.5,
                       height: 1.45,
                       color: GoOutsColors.bodyText)),
             ],

@@ -172,11 +172,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           onPressed:
               _submitting ? null : () => Navigator.of(context).pop(),
         ),
+        // ── ⚠ "Checkout", NOT "Review your stay". Corrected 27 August 2026. ──
+        //
+        // Stitch calls this screen Checkout, and it is the pay screen: a price
+        // breakdown, a deposit note, a cancellation policy and a Pay button.
+        //
+        // It was titled "Review your stay", which is ALSO the title of
+        // 25_review_stay_screen.dart, the screen where a guest writes a review
+        // AFTER their trip. Two different screens, at opposite ends of the
+        // journey, wearing the same name. One takes money and the other asks
+        // for an opinion.
+        //
+        // Screen 25 keeps the name, because that is what it actually is.
         title: Text(
-          'Review your stay',
+          'Checkout',
           style: GoogleFonts.inter(
             fontSize: 20,
-            fontWeight: FontWeight.bold,
+            height: 28 / 20,
+            fontWeight: FontWeight.w700,
             color: GoOutsColors.deepNavy,
           ),
         ),
@@ -214,7 +227,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             _error ?? '',
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
-                fontSize: 15, color: GoOutsColors.bodyText),
+                fontSize: 13.5, color: GoOutsColors.bodyText),
           ),
         ),
       );
@@ -257,8 +270,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 Text(
                   _listing?.title ?? 'Your stay',
                   style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
                     color: GoOutsColors.deepNavy,
                   ),
                 ),
@@ -266,13 +279,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   Text(
                     _listing!.address.town,
                     style: GoogleFonts.inter(
-                        fontSize: 14, color: GoOutsColors.bodyText),
+                        fontSize: 13.5, color: GoOutsColors.bodyText),
                   ),
                 const SizedBox(height: 8),
                 Text(
                   '${_longDate(r.checkIn)} to ${_longDate(r.checkOut)}',
                   style: GoogleFonts.inter(
-                      fontSize: 14,
+                      fontSize: 13.5,
                       fontWeight: FontWeight.w600,
                       color: GoOutsColors.deepNavy),
                 ),
@@ -280,7 +293,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   '${r.nights} ${r.nights == 1 ? 'night' : 'nights'} · '
                   '${r.guestSummary}',
                   style: GoogleFonts.inter(
-                      fontSize: 14, color: GoOutsColors.bodyText),
+                      fontSize: 13.5, color: GoOutsColors.bodyText),
                 ),
               ],
             ),
@@ -325,7 +338,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   : '$n ${n == 1 ? 'night is' : 'nights are'} no longer '
                       'available. Please go back and choose different dates.',
               style: GoogleFonts.inter(
-                  fontSize: 14,
+                  fontSize: 13.5,
                   height: 1.4,
                   color: GoOutsColors.onErrorContainer),
             ),
@@ -359,16 +372,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               Text(
                 'Total',
                 style: GoogleFonts.inter(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
                   color: GoOutsColors.deepNavy,
                 ),
               ),
               Text(
                 q.total.formatted,
                 style: GoogleFonts.inter(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
                   color: GoOutsColors.deepNavy,
                 ),
               ),
@@ -389,13 +402,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             child: Text(
               label,
               style: GoogleFonts.inter(
-                  fontSize: 15, color: GoOutsColors.bodyText),
+                  fontSize: 13.5, color: GoOutsColors.bodyText),
             ),
           ),
           Text(
             value,
             style: GoogleFonts.inter(
-                fontSize: 15, color: GoOutsColors.deepNavy),
+                fontSize: 13.5, color: GoOutsColors.deepNavy),
           ),
         ],
       ),
@@ -428,8 +441,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 Text(
                   'You earn ${q.cashback.formatted} cashback',
                   style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
                     color: Colors.white,
                   ),
                 ),
@@ -438,7 +451,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   Text(
                     q.cashbackNote,
                     style: GoogleFonts.inter(
-                      fontSize: 13,
+                      fontSize: 13.5,
                       height: 1.4,
                       color: Colors.white.withValues(alpha: 0.9),
                     ),
@@ -482,8 +495,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 Text(
                   'Damage deposit of ${_quote!.depositHold.formatted}',
                   style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
                     color: GoOutsColors.deepNavy,
                   ),
                 ),
@@ -494,7 +507,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   'and the photographs you take at check-in are what protects '
                   'you if a claim is made.',
                   style: GoogleFonts.inter(
-                    fontSize: 14,
+                    fontSize: 13.5,
                     color: GoOutsColors.bodyText,
                     height: 1.4,
                   ),
@@ -536,7 +549,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           Text(
             lines.join(' '),
             style: GoogleFonts.inter(
-              fontSize: 14,
+              fontSize: 13.5,
               color: GoOutsColors.bodyText,
               height: 1.4,
             ),
@@ -549,7 +562,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             'To change or cancel while we are in testing, please contact us '
             'and we will sort it out for you.',
             style: GoogleFonts.inter(
-              fontSize: 13,
+              fontSize: 13.5,
               fontStyle: FontStyle.italic,
               color: GoOutsColors.bodyText,
               height: 1.4,
@@ -582,8 +595,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 Text(
                   'No payment is taken now',
                   style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
                     color: GoOutsColors.deepNavy,
                   ),
                 ),
@@ -594,7 +607,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   'If the stay is not paid for within 48 hours the hold is '
                   'released and the nights go back on sale.',
                   style: GoogleFonts.inter(
-                    fontSize: 14,
+                    fontSize: 13.5,
                     height: 1.4,
                     color: GoOutsColors.bodyText,
                   ),
@@ -708,14 +721,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   Text(
                     'GoOuts Wallet',
                     style: GoogleFonts.inter(
-                        fontSize: 15,
+                        fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: GoOutsColors.deepNavy),
                   ),
                   Text(
                     '${q.walletBalance.formatted} available',
                     style: GoogleFonts.inter(
-                        fontSize: 13, color: GoOutsColors.bodyText),
+                        fontSize: 13.5, color: GoOutsColors.bodyText),
                   ),
                 ],
               ),
@@ -725,7 +738,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               onChanged: _submitting
                   ? null
                   : (v) => setState(() => _useWallet = v),
-              activeColor: GoOutsColors.tealSecondary,
+              // activeColor was deprecated after Flutter 3.31. The thumb and
+              // the track are separately colourable now; this only ever set
+              // the thumb, so activeThumbColor is the like for like swap.
+              activeThumbColor: GoOutsColors.tealSecondary,
             ),
           ],
         ),
@@ -738,10 +754,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             children: [
               Text('From your wallet',
                   style: GoogleFonts.inter(
-                      fontSize: 14, color: GoOutsColors.bodyText)),
+                      fontSize: 13.5, color: GoOutsColors.bodyText)),
               Text('− ${_fromWallet.formatted}',
                   style: GoogleFonts.inter(
-                      fontSize: 14,
+                      fontSize: 13.5,
                       fontWeight: FontWeight.w600,
                       color: GoOutsColors.tealSecondary)),
             ],
@@ -758,7 +774,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               Text(_fromCard.formatted,
                   style: GoogleFonts.inter(
                       fontSize: 15,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       color: GoOutsColors.deepNavy)),
             ],
           ),
@@ -802,7 +818,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   Text(
                     meta.label,
                     style: GoogleFonts.inter(
-                      fontSize: 15,
+                      fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: GoOutsColors.deepNavy,
                     ),
@@ -810,7 +826,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   Text(
                     meta.sub,
                     style: GoogleFonts.inter(
-                        fontSize: 13, color: GoOutsColors.bodyText),
+                        fontSize: 13.5, color: GoOutsColors.bodyText),
                   ),
                 ],
               ),
@@ -848,11 +864,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              // Stitch section-header: 15 / 700 / +0.02em, which is 0.3px at
+              // this size. Every card heading on this screen goes through here,
+              // so Price breakdown, Cancellation policy and How you are paying
+              // cannot drift apart from each other.
               Text(
                 title,
                 style: GoogleFonts.inter(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  height: 20 / 15,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.3,
                   color: GoOutsColors.deepNavy,
                 ),
               ),
@@ -945,8 +967,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             ? 'Confirm booking'
                             : 'Request to book',
                     style: GoogleFonts.inter(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
                       color: Colors.white,
                     ),
                   ),
@@ -996,7 +1018,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ? e.toString()
                 : 'Something went wrong and your booking was not made. '
                     'Nothing has been charged. Please try again.',
-            style: GoogleFonts.inter(fontSize: 14, height: 1.4),
+            style: GoogleFonts.inter(fontSize: 13.5, height: 1.4),
           ),
           actions: [
             TextButton(

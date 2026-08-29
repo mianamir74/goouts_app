@@ -206,7 +206,7 @@ class _BookingDatesScreenState extends State<BookingDatesScreen> {
           'Booking dates',
           style: GoogleFonts.inter(
             fontSize: 20,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w700,
             color: GoOutsColors.deepNavy,
           ),
         ),
@@ -246,7 +246,7 @@ class _BookingDatesScreenState extends State<BookingDatesScreen> {
                     : 'Availability could not be loaded',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
-                    fontSize: 18,
+                    fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: GoOutsColors.deepNavy),
               ),
@@ -313,8 +313,9 @@ class _BookingDatesScreenState extends State<BookingDatesScreen> {
               Text(
                 '${_monthNames[_month.month - 1]} ${_month.year}',
                 style: GoogleFonts.inter(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  letterSpacing: 0.3,
+                  fontWeight: FontWeight.w700,
                   color: GoOutsColors.deepNavy,
                 ),
               ),
@@ -468,7 +469,7 @@ class _BookingDatesScreenState extends State<BookingDatesScreen> {
           child: Text(
             text,
             style: GoogleFonts.inter(
-                fontSize: 13, color: GoOutsColors.bodyText),
+                fontSize: 13.5, color: GoOutsColors.bodyText),
           ),
         ),
         if (_checkIn != null)
@@ -480,7 +481,7 @@ class _BookingDatesScreenState extends State<BookingDatesScreen> {
             child: Text(
               'Clear',
               style: GoogleFonts.inter(
-                  fontSize: 13,
+                  fontSize: 13.5,
                   fontWeight: FontWeight.w600,
                   color: GoOutsColors.primaryBlue),
             ),
@@ -506,15 +507,16 @@ class _BookingDatesScreenState extends State<BookingDatesScreen> {
               Text(
                 'Guests',
                 style: GoogleFonts.inter(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  letterSpacing: 0.3,
+                  fontWeight: FontWeight.w700,
                   color: GoOutsColors.deepNavy,
                 ),
               ),
               Text(
                 'This place sleeps $_maxGuests',
                 style: GoogleFonts.inter(
-                    fontSize: 13, color: GoOutsColors.bodyText),
+                    fontSize: 13.5, color: GoOutsColors.bodyText),
               ),
             ],
           ),
@@ -554,7 +556,7 @@ class _BookingDatesScreenState extends State<BookingDatesScreen> {
                 '${_maxGuests == 1 ? 'guest' : 'guests'}, not counting '
                 'infants.',
                 style: GoogleFonts.inter(
-                    fontSize: 13, color: GoOutsColors.bodyText),
+                    fontSize: 13.5, color: GoOutsColors.bodyText),
               ),
             ),
         ],
@@ -585,8 +587,9 @@ class _BookingDatesScreenState extends State<BookingDatesScreen> {
                 Text(
                   label,
                   style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    letterSpacing: 0.3,
+                    fontWeight: FontWeight.w700,
                     color: GoOutsColors.deepNavy,
                   ),
                 ),
@@ -594,7 +597,7 @@ class _BookingDatesScreenState extends State<BookingDatesScreen> {
                   Text(
                     sublabel,
                     style: GoogleFonts.inter(
-                        fontSize: 13, color: GoOutsColors.bodyText),
+                        fontSize: 13.5, color: GoOutsColors.bodyText),
                   ),
               ],
             ),
@@ -607,8 +610,9 @@ class _BookingDatesScreenState extends State<BookingDatesScreen> {
                 child: Text(
                   count.toString(),
                   style: GoogleFonts.inter(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    letterSpacing: 0.3,
+                    fontWeight: FontWeight.w700,
                     color: GoOutsColors.deepNavy,
                   ),
                 ),
@@ -700,15 +704,15 @@ class _BookingDatesScreenState extends State<BookingDatesScreen> {
                           '${_shortDate(_checkOut!)}'
                       : 'Select your dates',
                   style: GoogleFonts.inter(
-                      fontSize: 13, color: GoOutsColors.bodyText),
+                      fontSize: 13.5, color: GoOutsColors.bodyText),
                 ),
                 Text(
                   ready
                       ? '${estimate.compact} before fees'
                       : '${_listing?.nightlyRate.compact ?? '—'} nightly',
                   style: GoogleFonts.inter(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
                     color: GoOutsColors.deepNavy,
                   ),
                 ),
@@ -730,8 +734,8 @@ class _BookingDatesScreenState extends State<BookingDatesScreen> {
             child: Text(
               'Continue',
               style: GoogleFonts.inter(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
                 color: Colors.white,
               ),
             ),

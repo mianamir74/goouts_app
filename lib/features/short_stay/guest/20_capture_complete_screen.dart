@@ -48,7 +48,7 @@ class CaptureCompleteScreen extends StatelessWidget {
             Text(
               isCheckOut ? 'Check out photos done' : 'Check in photos done',
               style: GoogleFonts.inter(
-                fontSize: 22,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: GoOutsColors.deepNavy,
               ),
@@ -90,7 +90,7 @@ class CaptureCompleteScreen extends StatelessWidget {
                 child: Text(
                   'Done',
                   style: GoogleFonts.inter(
-                      fontSize: 17, fontWeight: FontWeight.bold),
+                      fontSize: 15, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
@@ -197,7 +197,7 @@ class CaptureCompleteScreen extends StatelessWidget {
                               ? s.room
                               : '${s.room}. ${s.skipReason}',
                           style: GoogleFonts.inter(
-                              fontSize: 13, color: GoOutsColors.bodyText),
+                              fontSize: 13.5, color: GoOutsColors.bodyText),
                         ),
                       ),
                     ],

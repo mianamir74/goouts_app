@@ -31,6 +31,8 @@ import '../services/stay_booking_service.dart';
 import '../services/stay_listing_service.dart';
 import '../stay_routes.dart';
 import '../theme/stay_colors.dart';
+import '../models/stay_reference.dart';
+import '../widgets/stay_bottom_nav.dart';
 
 class BookingDetailsScreen extends StatefulWidget {
   const BookingDetailsScreen({super.key, required this.bookingId});
@@ -79,7 +81,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
           'Booking details',
           style: GoogleFonts.inter(
             fontSize: 20,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w700,
             color: GoOutsColors.primaryBlue,
           ),
         ),
@@ -90,6 +92,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
       ),
       // Watched, not fetched once: a host accepting, or a cancellation
       // completing on the next screen, changes this page underneath the guest.
+      bottomNavigationBar: const StayBottomNav(current: StayTab.trips),
       body: StreamBuilder<StayBooking?>(
         stream: StayBookingService.instance.watch(widget.bookingId),
         builder: (context, snapshot) {
@@ -105,7 +108,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                   'This booking could not be found.',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
-                      fontSize: 15, color: GoOutsColors.bodyText),
+                      fontSize: 13.5, color: GoOutsColors.bodyText),
                 ),
               ),
             );
@@ -197,8 +200,8 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                 Text(
                   _listing?.title ?? 'Your stay',
                   style: GoogleFonts.inter(
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
                     color: GoOutsColors.deepNavy,
                   ),
                 ),
@@ -206,7 +209,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                   Text(
                     _listing!.address.town,
                     style: GoogleFonts.inter(
-                        fontSize: 14, color: GoOutsColors.bodyText),
+                        fontSize: 13.5, color: GoOutsColors.bodyText),
                   ),
                 const SizedBox(height: 8),
                 _statusPill(b.status),
@@ -229,8 +232,8 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
       child: Text(
         chip.label,
         style: GoogleFonts.inter(
-          fontSize: 11.5,
-          fontWeight: FontWeight.w800,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
           color: chip.colour,
           letterSpacing: 0.4,
         ),
@@ -364,6 +367,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                 Text(title,
                     style: GoogleFonts.inter(
                         fontSize: 15,
+                        letterSpacing: 0.3,
                         fontWeight: FontWeight.w700,
                         color: GoOutsColors.deepNavy)),
                 const SizedBox(height: 4),
@@ -474,8 +478,9 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
           padding: const EdgeInsets.only(left: 20, bottom: 8),
           child: Text('Your stay',
               style: GoogleFonts.inter(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  letterSpacing: 0.3,
+                  fontWeight: FontWeight.w700,
                   color: GoOutsColors.deepNavy)),
         ),
         _card(
@@ -530,12 +535,12 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
             leading: Icon(icon, color: GoOutsColors.primaryBlue),
             title: Text(title,
                 style: GoogleFonts.inter(
-                    fontSize: 15,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: GoOutsColors.deepNavy)),
             subtitle: Text(subtitle,
                 style: GoogleFonts.inter(
-                    fontSize: 13, color: GoOutsColors.bodyText)),
+                    fontSize: 13.5, color: GoOutsColors.bodyText)),
             trailing: const Icon(Icons.chevron_right,
                 color: GoOutsColors.bodyText),
             onTap: onTap,
@@ -561,8 +566,9 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
           padding: const EdgeInsets.only(left: 20, bottom: 8),
           child: Text('Price',
               style: GoogleFonts.inter(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  letterSpacing: 0.3,
+                  fontWeight: FontWeight.w700,
                   color: GoOutsColors.deepNavy)),
         ),
         _card(
@@ -582,12 +588,12 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                   Text('Total',
                       style: GoogleFonts.inter(
                           fontSize: 15,
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w700,
                           color: GoOutsColors.deepNavy)),
                   Text(p.total.formatted,
                       style: GoogleFonts.inter(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
                           color: GoOutsColors.deepNavy)),
                 ],
               ),
@@ -612,7 +618,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                           : 'Cashback is added to your wallet after you check '
                               'out.',
                       style: GoogleFonts.inter(
-                          fontSize: 12.5, color: GoOutsColors.bodyText),
+                          fontSize: 13.5, color: GoOutsColors.bodyText),
                     ),
                   ),
                 ],
@@ -624,9 +630,9 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Text(
-            'Reference ${b.id}',
+            'Reference ${stayBookingReference(b.id)}',
             style: GoogleFonts.inter(
-                fontSize: 11.5,
+                fontSize: 12,
                 color: GoOutsColors.bodyText.withValues(alpha: 0.75)),
           ),
         ),
@@ -642,11 +648,11 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
             Expanded(
               child: Text(label,
                   style: GoogleFonts.inter(
-                      fontSize: 14, color: GoOutsColors.bodyText)),
+                      fontSize: 13.5, color: GoOutsColors.bodyText)),
             ),
             Text(value,
                 style: GoogleFonts.inter(
-                    fontSize: 14, color: GoOutsColors.deepNavy)),
+                    fontSize: 13.5, color: GoOutsColors.deepNavy)),
           ],
         ),
       );

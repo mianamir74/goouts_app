@@ -37,9 +37,11 @@ import '../models/stay_booking.dart';
 import '../models/stay_enums.dart';
 import '../models/stay_listing.dart';
 import '../services/stay_booking_service.dart';
+import '../models/stay_reference.dart';
 import '../services/stay_listing_service.dart';
 import '../stay_routes.dart';
 import '../theme/stay_colors.dart';
+import '../widgets/stay_bottom_nav.dart';
 
 class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({super.key});
@@ -73,7 +75,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   /// try/catch, not .catchError.
   ///
   /// This was `.then(...).catchError((_) => <StayListing>[])`, which the
-  /// analyzer rejects: the `then` returns Future<void>, so the error handler
+  /// analyzer rejects: the `then` returns `Future<void>`, so the error handler
   /// must return void or null — a list is not assignable to it. Awaiting in a
   /// plain async method sidesteps the whole question and reads better.
   Future<void> _fetchListings(List<String> ids) async {
@@ -109,7 +111,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
             'My Bookings',
             style: GoogleFonts.inter(
               fontSize: 20,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w700,
               color: GoOutsColors.deepNavy,
             ),
           ),
@@ -118,17 +120,20 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
             indicatorWeight: 3,
             labelColor: GoOutsColors.primaryBlue,
             unselectedLabelColor: GoOutsColors.bodyText,
-            labelStyle:
-                GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16),
+            labelStyle: GoogleFonts.inter(
+                fontWeight: FontWeight.w700,
+                fontSize: 15,
+                letterSpacing: 0.3),
             tabs: const [
               Tab(text: 'Upcoming'),
               Tab(text: 'Past'),
             ],
           ),
         ),
-        // The fake bottom navigation bar is gone. It rendered Search / Trips /
+        // A REAL bottom bar as of 28 August 2026. The one removed here was
         // Rewards / Profile with no tap handling on a screen that is PUSHED,
         // not a tab — so it was four dead labels sitting under a real app.
+        bottomNavigationBar: const StayBottomNav(current: StayTab.trips),
         body: StreamBuilder<List<StayBooking>>(
           stream: StayBookingService.instance.myBookings(),
           builder: (context, snapshot) {
@@ -187,7 +192,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                 'Your bookings could not be loaded',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: GoOutsColors.deepNavy),
               ),
@@ -222,7 +227,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
               Text(
                 emptyTitle,
                 style: GoogleFonts.inter(
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: GoOutsColors.deepNavy),
               ),
@@ -365,11 +370,16 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                         child: Text(
                           // Falls back to the reference while the listing
                           // loads, so the card is never nameless.
-                          listing?.title ?? 'Booking ${b.id}',
+                          // ⚠ THE SHORT CODE, NOT THE RAW ID. Screen 13 shows
+                          // GOS-XXXXX-X, so a fallback printing the twenty
+                          // character Firestore id here would give a guest two
+                          // different strings for the same booking.
+                          listing?.title ??
+                              'Booking ${stayBookingReference(b.id)}',
                           overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.inter(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
                             color: GoOutsColors.deepNavy,
                           ),
                         ),
@@ -415,7 +425,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                           chip.label,
                           style: GoogleFonts.inter(
                             fontSize: 12,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             color: chip.colour,
                             letterSpacing: 0.5,
                           ),
@@ -425,7 +435,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                         'View details',
                         style: GoogleFonts.inter(
                           fontSize: 14,
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w600,
                           color: GoOutsColors.primaryBlue,
                         ),
                       ),

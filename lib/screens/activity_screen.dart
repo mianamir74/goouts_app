@@ -27,7 +27,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
   bool _hasError = false;
   double _totalCashbackBalance = 0.0;
   Set<String> _reviewedTxnIds = {};
-  Set<String> _expandedGroups = {};
+  final Set<String> _expandedGroups = <String>{};
   int _reviewPoints = 0;
   static const int _pointsPerReview = 2;
   static const int _pointsForBonus = 100;
@@ -1139,8 +1139,11 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
     return GestureDetector(
       onTap: () => setState(() {
-        if (isExpanded) _expandedGroups.remove(id);
-        else _expandedGroups.add(id);
+        if (isExpanded) {
+          _expandedGroups.remove(id);
+        } else {
+          _expandedGroups.add(id);
+        }
       }),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),

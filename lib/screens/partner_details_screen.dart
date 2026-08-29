@@ -1360,7 +1360,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
           }
 
           // Verify typed partner code — matches stored code OR master override
-          const String _masterCode = '123456';
+          const String masterCode = '123456';
           Future<void> checkCode() async {
             final entered = codeCtrl.text.trim().toUpperCase();
             if (entered.isEmpty) {
@@ -1370,7 +1370,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
             setSheet(() { codeChecking = true; codeError = ''; });
             await Future.delayed(const Duration(milliseconds: 600));
             if (!ctx.mounted) return;
-            final bool valid = entered == _masterCode ||
+            final bool valid = entered == masterCode ||
                 (storedCode.isNotEmpty && entered == storedCode);
             if (valid) {
               setSheet(() { codeChecking = false; codePassed = true; });
@@ -2860,7 +2860,6 @@ class _PinAuthSheetState extends State<_PinAuthSheet>
   // Set on a failed PIN but never read — the shake animation was never bound to
   // it.
   // ignore: unused_field
-  bool _shake     = false;
   int  _attempts  = 0;
   String? _error;
 

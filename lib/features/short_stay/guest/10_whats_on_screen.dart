@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/stay_colors.dart';
+import '../widgets/stay_bottom_nav.dart';
 
 class WhatsOnScreen extends StatelessWidget {
   const WhatsOnScreen({super.key});
@@ -42,7 +43,7 @@ class WhatsOnScreen extends StatelessWidget {
                     'ON DURING YOUR STAY',
                     style: GoogleFonts.inter(
                       fontSize: 12,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       letterSpacing: 1.2,
                       color: GoOutsColors.deepNavy,
                     ),
@@ -95,7 +96,7 @@ class WhatsOnScreen extends StatelessWidget {
           ],
         ),
       ),
-      bottomNavigationBar: _buildBottomNavBar(),
+      bottomNavigationBar: const StayBottomNav(current: StayTab.trips),
     );
   }
 
@@ -153,7 +154,7 @@ class WhatsOnScreen extends StatelessWidget {
                       Text(
                         date,
                         style: GoogleFonts.inter(
-                          fontSize: 13,
+                          fontSize: 13.5,
                           fontWeight: FontWeight.bold,
                           color: GoOutsColors.deepNavy,
                         ),
@@ -176,7 +177,7 @@ class WhatsOnScreen extends StatelessWidget {
                       child: Text(
                         title,
                         style: GoogleFonts.inter(
-                          fontSize: 18,
+                          fontSize: 15,
                           fontWeight: FontWeight.bold,
                           color: GoOutsColors.deepNavy,
                         ),
@@ -191,8 +192,8 @@ class WhatsOnScreen extends StatelessWidget {
                       child: Text(
                         tag,
                         style: GoogleFonts.inter(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
                           color: tagColor,
                           letterSpacing: 0.5,
                         ),
@@ -216,7 +217,7 @@ class WhatsOnScreen extends StatelessWidget {
                     Text(
                       distance,
                       style: GoogleFonts.inter(
-                        fontSize: 13,
+                        fontSize: 13.5,
                         color: GoOutsColors.bodyText,
                       ),
                     ),
@@ -259,40 +260,11 @@ class WhatsOnScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildBottomNavBar() {
-    return Container(
-      height: 80,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey.shade200)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildNavItem(Icons.search, 'Search', false),
-          _buildNavItem(Icons.explore, 'Trips', true),
-          _buildNavItem(Icons.stars, 'Rewards', false),
-          _buildNavItem(Icons.person, 'Profile', false),
-        ],
-      ),
-    );
-  }
+  // _buildBottomNavBar was four labels with no handlers. Replaced by the shared
+  // StayBottomNav on 28 August 2026. See that file for why it was dead.
 
-  Widget _buildNavItem(IconData icon, String label, bool isActive) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(icon, color: isActive ? GoOutsColors.primaryBlue : GoOutsColors.bodyText),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 12,
-            fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-            color: isActive ? GoOutsColors.primaryBlue : GoOutsColors.bodyText,
-          ),
-        ),
-      ],
-    );
-  }
+
+  // _buildNavItem was four labels with no handlers. Replaced by the shared
+  // StayBottomNav on 28 August 2026. See that file for why it was dead.
+
 }

@@ -60,10 +60,12 @@ class _FoodAddressPickerScreenState extends State<FoodAddressPickerScreen> {
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        if (mounted) setState(() {
-          _error = 'Location services are turned off. Enable them in Settings.';
-          _gpsLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _error = 'Location services are turned off. Enable them in Settings.';
+            _gpsLoading = false;
+          });
+        }
         return;
       }
 
@@ -73,10 +75,12 @@ class _FoodAddressPickerScreenState extends State<FoodAddressPickerScreen> {
       }
       if (perm == LocationPermission.deniedForever ||
           perm == LocationPermission.denied) {
-        if (mounted) setState(() {
-          _error = 'Location permission denied. Please enable it in Settings.';
-          _gpsLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _error = 'Location permission denied. Please enable it in Settings.';
+            _gpsLoading = false;
+          });
+        }
         return;
       }
 
@@ -101,9 +105,11 @@ class _FoodAddressPickerScreenState extends State<FoodAddressPickerScreen> {
       await _addrService.setAddress(addr);
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      if (mounted) setState(() {
-        _error = 'Could not get your location. Please search your address below.';
-      });
+      if (mounted) {
+        setState(() {
+          _error = 'Could not get your location. Please search your address below.';
+        });
+      }
     } finally {
       if (mounted) setState(() => _gpsLoading = false);
     }

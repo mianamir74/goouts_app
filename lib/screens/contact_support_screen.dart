@@ -196,16 +196,20 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
     final Map<String, dynamic> snapshot = {};
     if (_lastSelfServiceData.isNotEmpty) {
       // Wallet balance
-      if (_lastSelfServiceData['walletBalance'] != null)
+      if (_lastSelfServiceData['walletBalance'] != null) {
         snapshot['walletBalance'] = _lastSelfServiceData['walletBalance'];
+      }
       // KYC status
-      if (_lastSelfServiceData['kycStatus'] != null)
+      if (_lastSelfServiceData['kycStatus'] != null) {
         snapshot['kycStatus'] = _lastSelfServiceData['kycStatus'];
-      if (_lastSelfServiceData['kycLabel'] != null)
+      }
+      if (_lastSelfServiceData['kycLabel'] != null) {
         snapshot['kycLabel'] = _lastSelfServiceData['kycLabel'];
+      }
       // Card status
-      if (_lastSelfServiceData['cardStatus'] != null)
+      if (_lastSelfServiceData['cardStatus'] != null) {
         snapshot['cardStatus'] = _lastSelfServiceData['cardStatus'];
+      }
       // Recent transactions (last 3, id + title + amount + date + status)
       final txns = (_lastSelfServiceData['transactions'] ??
                     _lastSelfServiceData['spendingTransactions'] ?? []) as List;

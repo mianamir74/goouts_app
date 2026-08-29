@@ -42,6 +42,65 @@ class StayListing {
   final CancellationPolicy cancellationPolicy;
   final BookingMode bookingMode;
 
+  // ── House rules, check-in and check-out. Added 27 August 2026. ─────────────
+  //
+  // Reported as "there is no rules shows to consumer check in and check out".
+  //
+  // The Stitch guest screens showed all of this — trip detail draws "Check in
+  // 15:00 / Check out 11:00" and a House rules row — and nothing collected it.
+  // Not this model, not createStayListing, not the host wizard.
+  // 15_trip_detail_screen.dart recorded the gap in its own header on 17 August
+  // and correctly left the section out rather than invent a check-in time for
+  // somebody's holiday. The host now supplies it on wizard step 7.
+  //
+  // ⚠ "HH:MM" WALL CLOCK, NEVER A DateTime. A check-in time is a fact about the
+  // property, not an instant. A DateTime forces a date onto it and goes wrong
+  // when the clocks change.
+  //
+  // ⚠ DEFAULTED, NOT NULLABLE. Every listing created before today has no such
+  // field. A null check-in time on a confirmed booking is worse for the guest
+  // than the conventional one, and 15:00 / 11:00 is the UK short-let norm and
+  // exactly what the server writes when the host leaves the step alone.
+  final String checkInTime;
+  final String checkOutTime;
+
+  final StayHouseRules houseRules;
+
+  /// ⚠ PRIVATE. Door codes and key safe locations. Shown ONLY once a booking is
+  /// confirmed, never on the public listing screen. Kept as its own field
+  /// rather than inside houseRules so that distinction is visible here.
+  final String arrivalInstructions;
+
+  /// Who the guest is staying with.
+  ///
+  /// ── ⚠ WHY THIS IS ON THE LISTING AND NOT READ FROM /stay_hosts ────────────
+  ///
+  /// Added 27 August 2026, reported as "host profile is missing completely".
+  ///
+  /// Stitch draws "Hosted by Sarah, host since 2021" near the top of the
+  /// listing. 05_listing_detail_screen recorded on 3 August that the row was
+  /// removed because "the guest cannot read /stay_hosts under the security
+  /// rules", and that is still true and still correct:
+  ///
+  ///     match /stay_hosts/{hostId} {
+  ///       allow read: if ownsDoc(hostId) || isAdmin();
+  ///     }
+  ///
+  /// A host record carries KYC evidence, payout details and booking history.
+  /// Opening it up so a browsing guest can read a first name would be a
+  /// serious mistake, so the answer is to copy the two harmless public fields
+  /// onto the listing at the moment it is created, on the server, where a
+  /// client cannot forge them.
+  ///
+  /// ⚠ THE SEED WAS ALREADY DOING HALF OF THIS AND NOBODY READ IT.
+  /// stay_demo_seed.js has written `hostDisplayName: "GoOuts Demo Host"` onto
+  /// every demo listing since the beginning. It was never on the model, so no
+  /// screen ever showed it. That is the same one fact two names failure as
+  /// idFrontUrl / kycIdFrontUrl and isSeed / isDemo, so the parser below reads
+  /// the new `host` map AND falls back to the old flat field rather than
+  /// leaving a third spelling behind.
+  final StayHostSummary host;
+
   /// Generated from bedrooms and bathrooms by the server. This is exactly what
   /// the guest is asked to photograph, so it must not be guessed client side.
   final List<String> captureRooms;
@@ -71,6 +130,11 @@ class StayListing {
     required this.cleaningFee,
     required this.cancellationPolicy,
     required this.bookingMode,
+    required this.checkInTime,
+    required this.checkOutTime,
+    required this.houseRules,
+    required this.arrivalInstructions,
+    required this.host,
     required this.captureRooms,
     required this.photos,
     required this.locationContext,
@@ -145,6 +209,14 @@ class StayListing {
       cancellationPolicy:
           CancellationPolicy.from(m['cancellationPolicy'] as String?),
       bookingMode: BookingMode.from(m['bookingMode'] as String?),
+      // Defaults matter here: every listing written before 27 August 2026 has
+      // none of these keys. See the field declarations above.
+      checkInTime: _hhmm(m['checkInTime'], '15:00'),
+      checkOutTime: _hhmm(m['checkOutTime'], '11:00'),
+      houseRules: StayHouseRules.fromMap(
+          (m['houseRules'] as Map?)?.cast<String, dynamic>()),
+      arrivalInstructions: (m['arrivalInstructions'] as String?)?.trim() ?? '',
+      host: StayHostSummary.fromListing(m),
       captureRooms: ((m['captureRooms'] as List?) ?? const [])
           .map((e) => e.toString())
           .toList(growable: false),
@@ -159,6 +231,18 @@ class StayListing {
       ratingAvg: (m['ratingAvg'] as num?)?.toDouble() ?? 0,
       ratingCount: (m['ratingCount'] as num?)?.toInt() ?? 0,
     );
+  }
+
+  /// Accepts only a real 24-hour "HH:MM", otherwise returns [dflt].
+  ///
+  /// ⚠ VALIDATES RATHER THAN TRUSTS. The server writes this format, but older
+  /// documents, the demo seed and anything written by hand do not go through
+  /// createStayListing. A malformed string rendered straight onto a booking
+  /// screen reads as a real check-in time, which is the worst failure mode:
+  /// wrong and confident. Falling back to the norm is honest and safe.
+  static String _hhmm(Object? raw, String dflt) {
+    final String s = (raw is String ? raw : '').trim();
+    return RegExp(r'^([01]\d|2[0-3]):[0-5]\d$').hasMatch(s) ? s : dflt;
   }
 
   String? get coverPhotoUrl => photos.isEmpty ? null : photos.first.url;
@@ -179,6 +263,152 @@ class StayListing {
         'cancellationPolicy': cancellationPolicy.wire,
         'bookingMode': bookingMode.wire,
         'updatedAt': FieldValue.serverTimestamp(),
+      };
+}
+
+/// The small, public, harmless part of a host, copied onto the listing by the
+/// server so a guest never needs to read /stay_hosts.
+///
+/// A first name and a joining year. Nothing here identifies a home, a bank
+/// account or a document. See the note on StayListing.host for why it is copied
+/// rather than looked up.
+class StayHostSummary {
+  const StayHostSummary({
+    required this.name,
+    required this.photoUrl,
+    required this.since,
+  });
+
+  /// First name only. Full names are not shown on a public listing.
+  final String name;
+
+  final String photoUrl;
+
+  /// The year they joined, or 0 when it is not known. Never guessed.
+  final int since;
+
+  static const StayHostSummary unknown =
+      StayHostSummary(name: '', photoUrl: '', since: 0);
+
+  /// Reads whichever shape the document happens to carry.
+  ///
+  /// ⚠ TWO SHAPES EXIST AND BOTH ARE LIVE:
+  ///
+  ///   host: {name, photoUrl, since}   written by createStayListing and by the
+  ///                                   demo seed from 27 August 2026
+  ///   hostDisplayName: "..."          written by the demo seed since day one
+  ///
+  /// The flat field is read as a fallback so listings seeded before today keep
+  /// working. Do not delete that branch to tidy up; it silently blanks the host
+  /// on every listing already in the database.
+  factory StayHostSummary.fromListing(Map<String, dynamic> m) {
+    final Map<String, dynamic>? h =
+        (m['host'] as Map?)?.cast<String, dynamic>();
+
+    if (h != null) {
+      final Object? raw = h['since'];
+      return StayHostSummary(
+        name: (h['name'] as String?)?.trim() ?? '',
+        photoUrl: (h['photoUrl'] as String?)?.trim() ?? '',
+        // Only a plausible year counts. A stray 0, a timestamp in milliseconds
+        // or a typo would otherwise render as "host since 1754297".
+        since: raw is num && raw >= 2000 && raw <= 2100 ? raw.toInt() : 0,
+      );
+    }
+
+    final String legacy = (m['hostDisplayName'] as String?)?.trim() ?? '';
+    if (legacy.isNotEmpty) {
+      return StayHostSummary(name: legacy, photoUrl: '', since: 0);
+    }
+    return unknown;
+  }
+
+  bool get hasName => name.isNotEmpty;
+  bool get hasSince => since >= 2000;
+
+  /// The first letter, for the fallback avatar when there is no photograph.
+  String get initial => hasName ? name.substring(0, 1).toUpperCase() : '?';
+}
+
+/// What the host permits, and anything else they wrote.
+///
+/// ── ⚠ EVERY PERMISSION DEFAULTS TO FALSE, MEANING NOT ALLOWED ───────────────
+///
+/// A listing created before these fields existed, or a host who never opened
+/// the step, produces "not allowed" for all three. That is the safe direction:
+/// silence must not grant a guest permission to smoke in, bring a dog to, or
+/// hold a party in somebody's home. The reverse default would quietly permit
+/// all three on every legacy listing in the database.
+class StayHouseRules {
+  const StayHouseRules({
+    required this.smokingAllowed,
+    required this.petsAllowed,
+    required this.partiesAllowed,
+    required this.quietHoursFrom,
+    required this.quietHoursTo,
+    required this.additional,
+  });
+
+  final bool smokingAllowed;
+  final bool petsAllowed;
+  final bool partiesAllowed;
+
+  /// Empty when the host set no quiet hours. NOT "00:00", which is midnight and
+  /// a completely different statement.
+  final String quietHoursFrom;
+  final String quietHoursTo;
+
+  /// Free text. Shoes off, bins on Tuesday, no parking on the drive.
+  final String additional;
+
+  static const StayHouseRules none = StayHouseRules(
+    smokingAllowed: false,
+    petsAllowed: false,
+    partiesAllowed: false,
+    quietHoursFrom: '',
+    quietHoursTo: '',
+    additional: '',
+  );
+
+  factory StayHouseRules.fromMap(Map<String, dynamic>? m) {
+    if (m == null) return none;
+    String time(Object? v) {
+      final String s = (v is String ? v : '').trim();
+      return RegExp(r'^([01]\d|2[0-3]):[0-5]\d$').hasMatch(s) ? s : '';
+    }
+
+    return StayHouseRules(
+      // `== true` and not a cast: a missing key, a null, or a string "false"
+      // must all read as not allowed.
+      smokingAllowed: m['smokingAllowed'] == true,
+      petsAllowed: m['petsAllowed'] == true,
+      partiesAllowed: m['partiesAllowed'] == true,
+      quietHoursFrom: time(m['quietHoursFrom']),
+      quietHoursTo: time(m['quietHoursTo']),
+      additional: (m['additional'] as String?)?.trim() ?? '',
+    );
+  }
+
+  bool get hasQuietHours =>
+      quietHoursFrom.isNotEmpty && quietHoursTo.isNotEmpty;
+
+  /// True when the host has said nothing beyond the three defaults, so a screen
+  /// can hide the section entirely rather than print three "Not allowed" lines
+  /// the host never actually chose.
+  bool get isUnset =>
+      !smokingAllowed &&
+      !petsAllowed &&
+      !partiesAllowed &&
+      !hasQuietHours &&
+      additional.isEmpty;
+
+  Map<String, dynamic> toMap() => <String, dynamic>{
+        'smokingAllowed': smokingAllowed,
+        'petsAllowed': petsAllowed,
+        'partiesAllowed': partiesAllowed,
+        'quietHoursFrom': quietHoursFrom,
+        'quietHoursTo': quietHoursTo,
+        'additional': additional,
       };
 }
 

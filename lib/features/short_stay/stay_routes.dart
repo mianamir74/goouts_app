@@ -125,10 +125,16 @@ class StayRoutes {
     // RULE: anything parsed here must be PASSED to its screen in the switch
     // below, or not parsed at all.
     //
-    // Every guest screen that needs an id now takes one. What remains
-    // unwired is 07-10 (days out, cluster, neighbourhood, what's on), which
-    // have no service behind them at all, and 23-25 (claims and reviews),
-    // deferred under task #106 until payments exist.
+    // Every guest screen that needs an id now takes one.
+    //
+    // Updated 28 August 2026. 07 (days out) and 08 (cluster detail) ARE now
+    // wired, to stay_attractions/{citySlug} built from OpenStreetMap. Both take
+    // a listingId, which is what they lacked.
+    //
+    // Still unwired: 09 (neighbourhood) and 10 (what's on). 10 needs DATED
+    // EVENTS, which OpenStreetMap does not hold — that is a PredictHQ or
+    // Ticketmaster job and is deliberately deferred rather than faked.
+    // 23-25 (claims and reviews) remain deferred under task #106.
     final listingId = id('listingId');
     final bookingId = id('bookingId');
 
@@ -170,8 +176,14 @@ class StayRoutes {
           map               => const MapResultsScreen(),
           listing           => ListingDetailScreen(listingId: listingId),
           amenities         => AmenitiesFullScreen(listingId: listingId),
-          daysOut           => const DaysOutScreen(),
-          cluster           => const ClusterDetailScreen(),
+          // ── WIRED 28 August 2026. Both took NOTHING before, which is part of
+          // why they were never wired: with no property they cannot know which
+          // city to read or which day out is nearest. See stay_attractions.js.
+          daysOut           => DaysOutScreen(listingId: listingId),
+          cluster           => ClusterDetailScreen(
+                listingId: listingId,
+                clusterId: id('clusterId'),
+              ),
           neighbourhood     => const NeighbourhoodScreen(),
           whatsOn           => const WhatsOnScreen(),
           bookingDates      => BookingDatesScreen(listingId: listingId),

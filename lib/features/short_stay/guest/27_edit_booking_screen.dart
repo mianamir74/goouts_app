@@ -286,7 +286,7 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
             const SizedBox(height: 3),
             Text(_d(d),
                 style: GoogleFonts.inter(
-                    fontSize: 14.5,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: GoOutsColors.deepNavy)),
           ],
@@ -335,7 +335,7 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
                       color: GoOutsColors.deepNavy)),
               Text('Sleeps $max',
                   style: GoogleFonts.inter(
-                      fontSize: 13, color: GoOutsColors.bodyText)),
+                      fontSize: 13.5, color: GoOutsColors.bodyText)),
             ],
           ),
           const SizedBox(height: 8),
@@ -376,7 +376,7 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
           children: [
             Text(label,
                 style: GoogleFonts.inter(
-                    fontSize: 14.5, color: GoOutsColors.deepNavy)),
+                    fontSize: 14, color: GoOutsColors.deepNavy)),
             Row(
               children: [
                 IconButton(
@@ -426,7 +426,7 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
                 children: [
                   Text('Your host will need to agree again',
                       style: GoogleFonts.inter(
-                          fontSize: 14.5,
+                          fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: GoOutsColors.deepNavy)),
                   const SizedBox(height: 4),
@@ -435,7 +435,7 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
                     'them returns it to a request, and the host has 24 hours '
                     'to accept. Your new dates are held while they decide.',
                     style: GoogleFonts.inter(
-                        fontSize: 13,
+                        fontSize: 13.5,
                         height: 1.35,
                         color: GoOutsColors.bodyText),
                   ),
@@ -481,7 +481,7 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
             const SizedBox(height: 6),
             Text(_quoteError!,
                 style: GoogleFonts.inter(
-                    fontSize: 12.5, color: GoOutsColors.bodyText)),
+                    fontSize: 13.5, color: GoOutsColors.bodyText)),
           ],
         ),
       );
@@ -539,8 +539,8 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
                     ? '—'
                     : Pence(diff.abs()).formatted,
                 style: GoogleFonts.inter(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
                     color: diff > 0
                         ? GoOutsColors.deepNavy
                         : GoOutsColors.tealSecondary),
@@ -556,7 +556,7 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
               'No money changes hands on a booking change while GoOuts is in '
               'test mode.',
               style: GoogleFonts.inter(
-                  fontSize: 12.5, color: GoOutsColors.bodyText),
+                  fontSize: 13.5, color: GoOutsColors.bodyText),
             ),
           ],
         ],

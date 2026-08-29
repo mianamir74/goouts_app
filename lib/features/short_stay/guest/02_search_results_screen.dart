@@ -28,6 +28,7 @@ import '../services/stay_availability_service.dart';
 import '../services/stay_booking_service.dart';
 import '../stay_routes.dart';
 import '../theme/stay_colors.dart';
+import '../widgets/stay_bottom_nav.dart';
 
 class SearchResultsScreen extends StatefulWidget {
   const SearchResultsScreen({super.key, this.criteria});
@@ -154,6 +155,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
           ],
         ),
       ),
+      bottomNavigationBar: const StayBottomNav(current: StayTab.search),
       body: Column(
         children: [
           _buildUtilityBar(),
@@ -198,7 +200,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
               // found three places says three.
               n == 1 ? '1 place to stay' : '$n places to stay',
               style: GoogleFonts.inter(
-                fontSize: 13,
+                fontSize: 13.5,
                 fontWeight: FontWeight.w600,
                 color: GoOutsColors.bodyText,
               ),
@@ -267,7 +269,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                 'Showing all places in this area. We cannot check which are '
                 'free on your dates yet, so check availability before booking.',
                 style: GoogleFonts.inter(
-                    fontSize: 11, color: GoOutsColors.deepNavy),
+                    fontSize: 12, color: GoOutsColors.deepNavy),
               ),
             ),
           ],
@@ -418,7 +420,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
             Text(
               text,
               style: GoogleFonts.inter(
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: FontWeight.w700,
                 color: Colors.white,
               ),
@@ -578,7 +580,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                       child: Text(
                         headline,
                         style: GoogleFonts.inter(
-                          fontSize: 11,
+                          fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
                         ),

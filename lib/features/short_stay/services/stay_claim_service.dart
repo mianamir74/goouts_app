@@ -160,8 +160,7 @@ class StayClaim {
   /// deadline does not close the door — respondToStayClaim still accepts a late
   /// reply — but telling somebody they have "0 hours" when they can still
   /// answer would stop them trying.
-  Duration? get timeLeft =>
-      respondBy == null ? null : respondBy!.difference(DateTime.now());
+  Duration? get timeLeft => respondBy?.difference(DateTime.now());
 }
 
 class StayClaimService {

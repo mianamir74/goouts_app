@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import '../features/short_stay/services/stay_recently_viewed.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -74,8 +75,28 @@ class AuthService {
   /// Current signed-in user
   User? get currentUser => _auth.currentUser;
 
-  /// Sign out
-  Future<void> signOut() => _auth.signOut();
+  /// Sign out, and drop the device-local traces that belong to the person
+  /// leaving rather than to the device.
+  ///
+  /// ── ⚠ TWO OTHER PLACES SIGN OUT WITHOUT COMING THROUGH HERE ──────────────
+  ///
+  ///     screens/profile_screen.dart:1466   FirebaseAuth.instance.signOut()
+  ///     services/fresh_install_guard.dart  FirebaseAuth.instance.signOut()
+  ///
+  /// Both bypass this method, so anything added here is added for one of three
+  /// exits. That is a pre-existing problem and it is bigger than this line —
+  /// it is why "sign out then sign in as someone else" is worth testing on a
+  /// shared handset. Flagged 27 August 2026, not fixed here because changing
+  /// what the profile screen's sign-out does is its own change with its own
+  /// blast radius.
+  ///
+  /// Clearing is best-effort and never blocks the sign-out itself.
+  Future<void> signOut() async {
+    try {
+      await StayRecentlyViewed.instance.clear();
+    } catch (_) {}
+    await _auth.signOut();
+  }
 
   /// Auth state stream
   Stream<User?> get authStateChanges => _auth.authStateChanges();

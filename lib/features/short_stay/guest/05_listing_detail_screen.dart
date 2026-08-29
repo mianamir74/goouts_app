@@ -45,7 +45,9 @@ import '../models/stay_amenities.dart';
 import '../models/stay_listing.dart';
 import '../models/stay_property_types.dart';
 import '../services/stay_booking_service.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../services/stay_listing_service.dart';
+import '../services/stay_recently_viewed.dart';
 import '../stay_routes.dart';
 import '../theme/stay_colors.dart';
 
@@ -74,6 +76,24 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
     _listing = _service.byId(widget.listingId);
     _reviews = _service.reviews(widget.listingId);
     _loadRate();
+
+    // ── ⚠ THE ONLY PLACE A VIEW IS RECORDED. Added 27 August 2026. ──────────
+    //
+    // "Recently viewed" came back to the home screen when it became real. The
+    // obvious place to record was the home screen's own onTap — and that would
+    // have been wrong, because it is not the only door.
+    //
+    // Listings open from the home screen AND from search results. Recording at
+    // the tap site means a property found by searching never appears in the
+    // history, so the section shows only what was already on the front page —
+    // which is the least useful possible version of it.
+    //
+    // This screen is where a listing is actually looked at, whatever route
+    // reached it. Deep links and state restoration land here too.
+    //
+    // Never awaited and never throws: a browsing convenience must not be able
+    // to delay or break opening a property.
+    StayRecentlyViewed.instance.record(widget.listingId);
   }
 
   Future<void> _loadRate() async {
@@ -121,6 +141,10 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _buildHeader(listing),
+                          // Stitch puts the host directly under the title,
+                          // before the property facts. Hides itself when the
+                          // listing carries no host name.
+                          _buildHostRow(listing),
                           const SizedBox(height: 16),
                           _buildFactsRow(listing),
                           if (_rate.isKnown) ...[
@@ -144,6 +168,8 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                           ],
                           const Divider(height: 32),
                           _buildReviewsSection(listing),
+                          _buildHouseRules(listing),
+                          _buildWhereYoullBe(listing),
                           const SizedBox(height: 100), // Space for bottom bar
                         ],
                       ),
@@ -267,7 +293,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
         Text(
           listing.title,
           style: GoogleFonts.inter(
-            fontSize: 24,
+            fontSize: 20,
             fontWeight: FontWeight.w700,
             color: GoOutsColors.deepNavy,
           ),
@@ -283,14 +309,14 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
               Text(
                 listing.ratingAvg.toStringAsFixed(1),
                 style: GoogleFonts.inter(
-                    fontSize: 16, fontWeight: FontWeight.w600),
+                    fontSize: 14, fontWeight: FontWeight.w600),
               ),
               const SizedBox(width: 8),
             ] else ...[
               Text(
                 'New',
                 style: GoogleFonts.inter(
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: GoOutsColors.tealSecondary),
               ),
@@ -300,7 +326,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
               child: Text(
                 town,
                 style: GoogleFonts.inter(
-                    fontSize: 16, color: GoOutsColors.bodyText),
+                    fontSize: 13.5, color: GoOutsColors.bodyText),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -310,14 +336,78 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
     );
   }
 
+  // ── Who you are staying with ──────────────────────────────────────────────
+  //
+  // ⚠ THIS ROW IS BACK. Added 27 August 2026: "host profile is missing
+  // completely".
+  //
+  // It was removed on 3 August for a good reason, recorded below in the
+  // occupancy note: the listing carried no host name and the guest cannot read
+  // /stay_hosts, because that record holds KYC evidence and payout details and
+  // the rule correctly says owner or admin only.
+  //
+  // The fix was not to relax that rule. createStayListing now copies a first
+  // name and a joining year onto the listing itself, on the server, where a
+  // client cannot forge them. See StayListing.host.
+  //
+  // ⚠ HIDES ITSELF WHEN THERE IS NO NAME. Every listing created before today
+  // has no host block, and "Hosted by" above a blank space is worse than no
+  // row at all.
+  //
+  // ⚠ NO "SUPERHOST" AND NO "5 YEARS EXPERIENCE". Stitch drew both. Neither is
+  // computed anywhere, and a badge nobody can earn is worse than no badge.
+  Widget _buildHostRow(StayListing listing) {
+    final StayHostSummary h = listing.host;
+    if (!h.hasName) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Row(
+        children: <Widget>[
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: GoOutsColors.paleBlueTint,
+            backgroundImage:
+                h.photoUrl.isEmpty ? null : NetworkImage(h.photoUrl),
+            child: h.photoUrl.isEmpty
+                ? Text(h.initial,
+                    style: GoogleFonts.inter(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: GoOutsColors.primaryBlue))
+                : null,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text('Hosted by ${h.name}',
+                    style: GoogleFonts.inter(
+                        fontSize: 14,
+                        height: 20 / 14,
+                        fontWeight: FontWeight.w600,
+                        color: GoOutsColors.deepNavy)),
+                // Only when the year is real. Nothing here guesses a tenure.
+                if (h.hasSince)
+                  Text('Host since ${h.since}',
+                      style: GoogleFonts.inter(
+                          fontSize: 12,
+                          height: 16 / 12,
+                          color: GoOutsColors.bodyText)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ── Occupancy ────────────────────────────────────────────────────────────
   //
-  // Replaces the "Hosted by Sarah — Superhost, 5 years experience" row.
-  //
-  // The listing does not carry a host name, photo or tenure, and the guest
-  // cannot read /stay_hosts under the security rules, so every part of that
-  // row was unavailable rather than merely unwired. Guests get the facts that
-  // do exist and are what a booking actually turns on.
+  // Replaced the "Hosted by Sarah, Superhost, 5 years experience" row when the
+  // host name was unavailable. The occupancy facts stay because they are what
+  // a booking actually turns on; the host row above now sits alongside them.
   Widget _buildFactsRow(StayListing listing) {
     // Via the catalogue, not by capitalising the slug: that would print
     // "Flat" and "Annexe" where a guest should read "Flat or apartment" and
@@ -412,7 +502,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
         Text(
           'About this place',
           style: GoogleFonts.inter(
-            fontSize: 18,
+            fontSize: 15,
             fontWeight: FontWeight.w700,
             color: GoOutsColors.deepNavy,
           ),
@@ -447,11 +537,20 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // ⚠ "Amenities", not "What this place offers". Corrected 27 Aug 2026.
+        //
+        // Stitch labels this section "Amenities" and the full list screen it
+        // opens is "All amenities". Renaming it in the build gave the guest
+        // three different words for one thing across two screens, and the
+        // button underneath still says "Show all 34 amenities", which read as
+        // though it opened something else.
         Text(
-          'What this place offers',
+          'Amenities',
           style: GoogleFonts.inter(
-            fontSize: 18,
+            fontSize: 15,
+            height: 20 / 15,
             fontWeight: FontWeight.w700,
+            letterSpacing: 0.3,
             color: GoOutsColors.deepNavy,
           ),
         ),
@@ -469,14 +568,19 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
           itemBuilder: (context, index) {
             return Row(
               children: [
+                // Stitch draws these at roughly 20px against body text. Ours
+                // were 24px icons against 15px labels, which made the grid
+                // read as six buttons rather than a list of facts.
                 Icon(shown[index].icon,
-                    color: GoOutsColors.tealSecondary, size: 24),
+                    color: GoOutsColors.tealSecondary, size: 20),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     shown[index].label,
                     style: GoogleFonts.inter(
-                        fontSize: 15, color: GoOutsColors.bodyText),
+                        fontSize: 13.5,
+                        height: 20 / 13.5,
+                        color: GoOutsColors.deepNavy),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -521,7 +625,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
         Text(
           'Getting around',
           style: GoogleFonts.inter(
-            fontSize: 18,
+            fontSize: 15,
             fontWeight: FontWeight.w700,
             color: GoOutsColors.deepNavy,
           ),
@@ -570,10 +674,10 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                 if (station.lines.isNotEmpty)
                   Text(station.lines.join(', '),
                       style: GoogleFonts.inter(
-                          fontSize: 13, color: GoOutsColors.bodyText)),
+                          fontSize: 13.5, color: GoOutsColors.bodyText)),
                 Text('${_miles(station.walkMi)} walking',
                     style: GoogleFonts.inter(
-                        fontSize: 13, fontWeight: FontWeight.w500)),
+                        fontSize: 13.5, fontWeight: FontWeight.w500)),
               ],
             ),
           ),
@@ -614,7 +718,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
             '$half GoOuts ${half == 1 ? 'partner' : 'partners'} '
             'within half a mile',
             style: GoogleFonts.inter(
-              fontSize: 18,
+              fontSize: 15,
               fontWeight: FontWeight.w700,
               color: Colors.white,
             ),
@@ -661,7 +765,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                       '${_plural(listing.ratingCount, 'review')}'
                   : 'Reviews',
               style:
-                  GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700),
+                  GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700),
             ),
           ],
         ),
@@ -741,6 +845,247 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
   static String _monthYear(DateTime d) =>
       '${_months[d.month - 1]} ${d.year}';
 
+  // ── House rules, check-in and check-out ───────────────────────────────────
+  //
+  // ⚠ ADDED 27 August 2026: "there is no rules shows to consumer check in and
+  // check out".
+  //
+  // Nothing anywhere in the product carried these. The Stitch GUEST screens
+  // displayed them — trip detail draws "Check in 15:00 / Check out 11:00" and a
+  // House rules row — but no Stitch HOST screen ever asked for them. Stitch's
+  // host step 7 is called "pricing_rules" and its rules are the CANCELLATION
+  // policy. So the design showed guest data the design never collected, and
+  // 15_trip_detail_screen.dart recorded exactly that on 17 August and left the
+  // section out rather than invent a check-in time for somebody's holiday.
+  //
+  // Fixed at the source: host wizard step 7 now captures it, createStayListing
+  // validates and stores it, StayListing parses it with the UK norm as the
+  // default for every listing written before today.
+  //
+  // ⚠ SHOWN BEFORE BOOKING, ON PURPOSE. "No pets" is something a guest needs
+  // while they are deciding, not an unpleasant surprise on the confirmation.
+  //
+  // ⚠ arrivalInstructions IS DELIBERATELY NOT HERE. Door codes and key safe
+  // locations belong to a confirmed booking, not to a public listing page that
+  // anybody can open.
+  Widget _buildHouseRules(StayListing listing) {
+    final StayHouseRules r = listing.houseRules;
+
+    TextStyle head() => GoogleFonts.inter(
+        fontSize: 15,
+        height: 20 / 15,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.3,
+        color: GoOutsColors.deepNavy);
+
+    Widget row(IconData icon, String label, String value, {Color? tone}) =>
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Icon(icon, size: 18, color: tone ?? GoOutsColors.primaryBlue),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(label,
+                    style: GoogleFonts.inter(
+                        fontSize: 13.5,
+                        height: 20 / 13.5,
+                        color: GoOutsColors.bodyText)),
+              ),
+              Text(value,
+                  style: GoogleFonts.inter(
+                      fontSize: 14,
+                      height: 20 / 14,
+                      fontWeight: FontWeight.w600,
+                      color: tone ?? GoOutsColors.deepNavy)),
+            ],
+          ),
+        );
+
+    // A permission the host has NOT granted is the ordinary case and is drawn
+    // plainly. Only what they HAVE allowed is worth colouring, because that is
+    // the surprising, useful information.
+    Widget permission(IconData icon, String label, bool allowed) => row(
+          icon,
+          label,
+          allowed ? 'Allowed' : 'Not allowed',
+          tone: allowed ? GoOutsColors.success : GoOutsColors.bodyText,
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        const Divider(height: 32),
+        Text('House rules', style: head()),
+        const SizedBox(height: 12),
+
+        // Always shown. Every listing has these two, defaulted to the UK norm
+        // when the host left the step alone, so there is no empty state.
+        row(Icons.login_rounded, 'Check-in from', listing.checkInTime),
+        row(Icons.logout_rounded, 'Check-out by', listing.checkOutTime),
+
+        // Hidden entirely when the host said nothing beyond the defaults.
+        // Printing three "Not allowed" lines a host never actually chose would
+        // put words in their mouth.
+        if (!r.isUnset) ...<Widget>[
+          const SizedBox(height: 2),
+          permission(Icons.smoking_rooms_outlined, 'Smoking',
+              r.smokingAllowed),
+          permission(Icons.pets_outlined, 'Pets', r.petsAllowed),
+          permission(Icons.celebration_outlined, 'Parties or events',
+              r.partiesAllowed),
+          if (r.hasQuietHours)
+            row(Icons.bedtime_outlined, 'Quiet hours',
+                '${r.quietHoursFrom} – ${r.quietHoursTo}'),
+          if (r.additional.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 4),
+            Text(r.additional,
+                style: GoogleFonts.inter(
+                    fontSize: 13.5,
+                    height: 20 / 13.5,
+                    color: GoOutsColors.bodyText)),
+          ],
+        ],
+      ],
+    );
+  }
+
+  // ── "Where you'll be" ─────────────────────────────────────────────────────
+  //
+  // ⚠ THIS SECTION WAS NEVER BUILT. Added 27 August 2026, reported as "there is
+  // no map showing in the listing".
+  //
+  // Stitch draws it between Reviews and the booking bar, captioned with the
+  // town. Every other section on this screen was built — gallery, about,
+  // amenities, getting around, partner highlight, reviews — and this one was
+  // simply skipped. The coordinates were already on the model (`lat`, `lng`,
+  // both nullable), already parsed from the `geo` map, and nothing read them.
+  //
+  // The only GoogleMap in the entire Short Stay feature was on screen 04.
+  //
+  // ── ⚠ A CIRCLE, NOT A PIN. THIS IS DELIBERATE. ──────────────────────────────
+  //
+  // The exact address of somebody's home is not shown to a person who has not
+  // booked it. This draws a 300m circle around the property and NO marker, so
+  // the guest learns the area — which is what they are actually deciding on —
+  // without the screen publishing where a host lives to anyone who opens a
+  // listing. Every established stay platform does exactly this, and reversing
+  // it would be a host-safety problem, not a design tweak.
+  //
+  // ── ⚠ THE MAP IS DEAD. NO GESTURES, NO CONTROLLER, NO DISPOSE. ─────────────
+  //
+  // 04_map_results carries a rule at the top of the file: "ONE GoogleMap alive
+  // at a time across the whole Short Stay feature, and the controller is
+  // disposed". A live, gesture-enabled map inside a scrolling list would break
+  // that rule AND fight the ListView for vertical drags.
+  //
+  // So: every gesture flag off, no onMapCreated, no controller held, therefore
+  // nothing to dispose. Lite mode on Android renders it as a static bitmap,
+  // which is far cheaper again. Tapping opens the neighbourhood screen, which
+  // is the interactive one.
+  Widget _buildWhereYoullBe(StayListing listing) {
+    final double? lat = listing.lat;
+    final double? lng = listing.lng;
+
+    // Hidden entirely when the property has no coordinates. An empty grey box
+    // captioned "Where you'll be" is worse than no section: it reads as a
+    // failure to load rather than as an absence of data.
+    if (lat == null || lng == null) return const SizedBox.shrink();
+
+    final LatLng centre = LatLng(lat, lng);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        const Divider(height: 32),
+        Text(
+          "Where you'll be",
+          style: GoogleFonts.inter(
+            fontSize: 15,
+            height: 20 / 15,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.3,
+            color: GoOutsColors.deepNavy,
+          ),
+        ),
+        const SizedBox(height: 12),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: SizedBox(
+            height: 180,
+            width: double.infinity,
+            child: Stack(
+              children: <Widget>[
+                GoogleMap(
+                  initialCameraPosition:
+                      CameraPosition(target: centre, zoom: 14),
+                  // Android only. Renders a non-interactive bitmap instead of a
+                  // full map surface — a fraction of the memory and no texture
+                  // for the ListView to composite on every frame.
+                  liteModeEnabled: Theme.of(context).platform ==
+                      TargetPlatform.android,
+                  circles: <Circle>{
+                    Circle(
+                      circleId: const CircleId('approx'),
+                      center: centre,
+                      radius: 300,
+                      fillColor:
+                          GoOutsColors.primaryBlue.withValues(alpha: 0.18),
+                      strokeColor: GoOutsColors.primaryBlue,
+                      strokeWidth: 2,
+                    ),
+                  },
+                  // ⚠ Everything off. See the note above about the ListView.
+                  zoomControlsEnabled: false,
+                  zoomGesturesEnabled: false,
+                  scrollGesturesEnabled: false,
+                  rotateGesturesEnabled: false,
+                  tiltGesturesEnabled: false,
+                  myLocationButtonEnabled: false,
+                  myLocationEnabled: false,
+                  mapToolbarEnabled: false,
+                  compassEnabled: false,
+                ),
+                // ⚠ NO TAP HANDLER, ON PURPOSE.
+                //
+                // The obvious move was to open StayRoutes.neighbourhood on tap.
+                // That route resolves to `const NeighbourhoodScreen()` — it
+                // takes NO listingId, and stay_routes.dart:129 records that
+                // screens 07 to 10 are still unwired. Tapping would have sent
+                // the guest to an empty screen about nowhere in particular.
+                //
+                // Stitch's own map here is a flat image with no interaction, so
+                // a dead map is the design, not a shortcut. Wire this to the
+                // neighbourhood screen when that screen takes a property.
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          listing.address.publicLabel,
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            height: 20 / 14,
+            fontWeight: FontWeight.w600,
+            color: GoOutsColors.deepNavy,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          'Exact address is shared once your booking is confirmed.',
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            height: 16 / 12,
+            fontWeight: FontWeight.w500,
+            color: GoOutsColors.bodyText,
+          ),
+        ),
+      ],
+    );
+  }
+
   // ── Bottom bar ───────────────────────────────────────────────────────────
   //
   // Was "£112 nightly / 12 to 14 July" with an empty onPressed. The price is
@@ -770,7 +1115,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                   Text(
                     '${rate.compact} nightly',
                     style: GoogleFonts.inter(
-                        fontSize: 18, fontWeight: FontWeight.w700),
+                        fontSize: 16, fontWeight: FontWeight.w700),
                   ),
                   if (!listing.cleaningFee.isZero)
                     Text(
@@ -834,7 +1179,7 @@ class _MessageState extends StatelessWidget {
                 title,
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
-                    fontSize: 18,
+                    fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: GoOutsColors.deepNavy),
               ),

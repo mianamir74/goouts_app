@@ -161,7 +161,7 @@ class EvidencePackScreen extends StatelessWidget {
               '${photos.length} '
               '${photos.length == 1 ? 'photo' : 'photos'}',
               style: GoogleFonts.inter(
-                  fontSize: 13, color: GoOutsColors.bodyText),
+                  fontSize: 13.5, color: GoOutsColors.bodyText),
             ),
           ],
         ),
@@ -265,7 +265,7 @@ class EvidencePackScreen extends StatelessWidget {
                   Text(
                     e.skipReason!,
                     style: GoogleFonts.inter(
-                        fontSize: 13, color: GoOutsColors.bodyText),
+                        fontSize: 13.5, color: GoOutsColors.bodyText),
                   ),
               ],
             ),
@@ -358,7 +358,7 @@ class EvidencePackScreen extends StatelessWidget {
             '$photoPart$skipPart.',
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
-                fontSize: 13, color: GoOutsColors.bodyText),
+                fontSize: 13.5, color: GoOutsColors.bodyText),
           ),
           const SizedBox(height: 4),
           Text(

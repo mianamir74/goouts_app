@@ -58,7 +58,7 @@ class DepositProtectionScreen extends StatelessWidget {
                   Text(
                     'Protect your deposit',
                     style: GoogleFonts.inter(
-                      fontSize: 32,
+                      fontSize: 20,
                       fontWeight: FontWeight.bold,
                       color: GoOutsColors.deepNavy,
                     ),
@@ -132,7 +132,7 @@ class DepositProtectionScreen extends StatelessWidget {
               Text(
                 title,
                 style: GoogleFonts.inter(
-                  fontSize: 18,
+                  fontSize: 15,
                   fontWeight: FontWeight.bold,
                   color: GoOutsColors.deepNavy,
                 ),
@@ -198,7 +198,7 @@ class DepositProtectionScreen extends StatelessWidget {
       child: Text(
         'Start',
         style: GoogleFonts.inter(
-          fontSize: 18,
+          fontSize: 15,
           fontWeight: FontWeight.bold,
           color: Colors.white,
         ),

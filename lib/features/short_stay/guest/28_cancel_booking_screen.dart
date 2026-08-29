@@ -179,7 +179,7 @@ class _CancelBookingScreenState extends State<CancelBookingScreen> {
                 _error ?? '',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
-                    fontSize: 11.5,
+                    fontSize: 12,
                     color: GoOutsColors.bodyText.withValues(alpha: 0.8)),
               ),
             ],
@@ -288,8 +288,8 @@ class _CancelBookingScreenState extends State<CancelBookingScreen> {
                       color: GoOutsColors.deepNavy)),
               Text(q.refundAmount.formatted,
                   style: GoogleFonts.inter(
-                      fontSize: 19,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
                       color: GoOutsColors.tealSecondary)),
             ],
           ),
@@ -302,7 +302,7 @@ class _CancelBookingScreenState extends State<CancelBookingScreen> {
             Text(
               q.explanation,
               style: GoogleFonts.inter(
-                  fontSize: 13, height: 1.4, color: GoOutsColors.bodyText),
+                  fontSize: 13.5, height: 1.4, color: GoOutsColors.bodyText),
             ),
           ],
         ],
@@ -327,27 +327,65 @@ class _CancelBookingScreenState extends State<CancelBookingScreen> {
 
   // ── Reason ───────────────────────────────────────────────────────────────
 
+  /// ── Migrated to RadioGroup, 27 August 2026. ─────────────────────────────
+  ///
+  /// `groupValue` and `onChanged` on RadioListTile were deprecated after
+  /// Flutter 3.32. Each tile used to be told, separately, what the selected
+  /// value was and what to do about a tap, so the shared state lived in N
+  /// places and a tile added later could quietly be given the wrong one.
+  ///
+  /// RadioGroup holds it once for the whole set. The tiles now carry only
+  /// their own `value`, which is the only thing that genuinely differs
+  /// between them.
+  ///
+  /// ⚠ THE DISABLED STATE MOVED TOO. `onChanged: null` per tile is what used
+  /// to disable them while submitting; that now has to be the group's
+  /// onChanged, or every tile stays live during submission and a guest can
+  /// change their reason after pressing the button.
   Widget _reasonList() => Container(
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Column(
-          children: [
-            for (final r in _reasons)
-              RadioListTile<String>(
-                value: r,
-                groupValue: _selectedReason,
-                onChanged: _submitting
-                    ? null
-                    : (v) => setState(() => _selectedReason = v ?? r),
-                activeColor: GoOutsColors.primaryBlue,
-                title: Text(r,
-                    style: GoogleFonts.inter(
-                        fontSize: 14.5, color: GoOutsColors.deepNavy)),
-                dense: true,
+        child: RadioGroup<String>(
+          groupValue: _selectedReason,
+          // ⚠ RadioGroup.onChanged IS NOT NULLABLE, unlike the per tile one it
+          // replaced. `onChanged: null` was how the old code disabled the list
+          // while submitting, and that no longer type checks.
+          //
+          // So the guard moved inside the callback, and AbsorbPointer below
+          // does the visual half. Both are needed: the callback guard alone
+          // leaves the ripple firing on every tap during submission, and
+          // AbsorbPointer alone would be defeated by a keyboard or an
+          // accessibility action.
+          //
+          // ⚠ _selectedReason is NON-NULLABLE and defaults to _reasons.first,
+          // so a null from the group is ignored rather than assigned. The old
+          // handler did the same with `v ?? r`. Dropping that guard would let
+          // a deselection blank a reason the submit path requires.
+          onChanged: (String? v) {
+            if (_submitting || v == null) return;
+            setState(() => _selectedReason = v);
+          },
+          child: AbsorbPointer(
+            absorbing: _submitting,
+            child: Opacity(
+              opacity: _submitting ? 0.5 : 1,
+              child: Column(
+                children: [
+                  for (final r in _reasons)
+                    RadioListTile<String>(
+                      value: r,
+                      activeColor: GoOutsColors.primaryBlue,
+                      title: Text(r,
+                          style: GoogleFonts.inter(
+                              fontSize: 14, color: GoOutsColors.deepNavy)),
+                      dense: true,
+                    ),
+                ],
               ),
-          ],
+            ),
+          ),
         ),
       );
 
@@ -368,7 +406,7 @@ class _CancelBookingScreenState extends State<CancelBookingScreen> {
                 'Cancelling cannot be undone. The nights go back on sale '
                 'immediately and the same dates may not be available again.',
                 style: GoogleFonts.inter(
-                    fontSize: 13,
+                    fontSize: 13.5,
                     height: 1.35,
                     color: GoOutsColors.onErrorContainer),
               ),

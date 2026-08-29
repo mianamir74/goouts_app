@@ -68,6 +68,10 @@ KycStatus kycStatusFrom(Object? raw) {
     // it costs nothing to be generous on the way IN.
     case 'complete':
     case 'completed':
+    // ⚠ driver_app / goouts_drapp only — driver_profile_screen has always
+    // accepted this. It is in here so routing that screen through this parser
+    // does not quietly unverify anybody carrying the word.
+    case 'success':
       return KycStatus.approved;
 
     case 'pending':
@@ -79,6 +83,8 @@ KycStatus kycStatusFrom(Object? raw) {
     case 'rejected':
     case 'declined':
     case 'failed':
+    // ⚠ driver apps only, same reason as 'success' above.
+    case 'needs_support':
       return KycStatus.rejected;
 
     default:

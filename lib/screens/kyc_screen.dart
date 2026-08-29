@@ -26,6 +26,7 @@ import '../services/document_quality_inspector.dart';
 import '../widgets/goouts_sheet.dart';
 import '../utils/dob_input_formatter.dart';
 import '../services/mrz_reader.dart';
+import '../utils/kyc_status.dart';
 
 class KycScreen extends StatefulWidget {
   const KycScreen({super.key});
@@ -163,14 +164,32 @@ class _KycScreenState extends State<KycScreen> {
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) return;
       final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
-      final status = doc.data()?['kycStatus'] as String? ?? '';
+      final status = doc.data()?['kycStatus'];
       if (!mounted) return;
-      if (status == 'verified') {
-        setState(() { _submitted = true; _kycDecisionTier = 'GREEN'; });
-      } else if (status == 'pending') {
-        setState(() { _submitted = true; _kycDecisionTier = 'AMBER'; });
-      } else if (status == 'rejected') {
-        setState(() { _submitted = true; _kycDecisionTier = 'RED'; });
+
+      // ── ⚠ THE SAME WORD BUG, IN THE KYC SCREEN ITSELF. Fixed 25 Aug 2026. ──
+      //
+      // This read `status == 'verified'`. The backend writes 'approved'.
+      //
+      // So somebody who had been AUTO-APPROVED and came back to this screen was
+      // shown THE EMPTY FORM — no status, no confirmation, nothing to say the
+      // job was done — and would reasonably photograph their passport and their
+      // face all over again. Every one of those resubmissions is a paid Stripe
+      // verification once we are live, on an applicant who was already passed.
+      //
+      // I fixed this in profile_screen and in five other places and did not
+      // check the screen the whole flow is named after. Parsed now.
+      final KycStatus existing = kycStatusFrom(status);
+      switch (existing) {
+        case KycStatus.approved:
+          setState(() { _submitted = true; _kycDecisionTier = 'GREEN'; });
+        case KycStatus.pending:
+          setState(() { _submitted = true; _kycDecisionTier = 'AMBER'; });
+        case KycStatus.rejected:
+          setState(() { _submitted = true; _kycDecisionTier = 'RED'; });
+        case KycStatus.none:
+          // Never started, or a word nothing recognises. Show the form.
+          break;
       }
     } catch (_) {}
   }

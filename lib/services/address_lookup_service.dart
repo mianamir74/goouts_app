@@ -179,9 +179,13 @@ class AddressLookupService {
           final m    = _asMap(c);
           final id   = _str(m['id']);
           final text = _str(m['text']);
-          if (id.startsWith('postcode'))  pc      = text;
-          else if (id.startsWith('place')) town   = text;
-          else if (id.startsWith('country')) country = text;
+          if (id.startsWith('postcode')) {
+            pc      = text;
+          } else if (id.startsWith('place')) {
+            town   = text;
+          } else if (id.startsWith('country')) {
+            country = text;
+          }
         }
 
         final inferredCity = inferCityFromPostcode(pc) ?? town;

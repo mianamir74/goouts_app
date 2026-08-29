@@ -303,7 +303,7 @@ class _GoOutsPlusUnlockedScreenState extends State<GoOutsPlusUnlockedScreen>
 
   // ── Confirmation bottom sheet ──────────────────────────────
   void _showConfirmationSheet(BuildContext context) {
-    bool _activating = false;
+    bool activating = false;
 
     showModalBottomSheet(
       context: context,
@@ -427,7 +427,7 @@ class _GoOutsPlusUnlockedScreenState extends State<GoOutsPlusUnlockedScreen>
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: _activating
+                      onPressed: activating
                           ? null
                           : () => Navigator.pop(ctx),
                       style: OutlinedButton.styleFrom(
@@ -447,10 +447,10 @@ class _GoOutsPlusUnlockedScreenState extends State<GoOutsPlusUnlockedScreen>
                   Expanded(
                     flex: 2,
                     child: ElevatedButton(
-                      onPressed: _activating
+                      onPressed: activating
                           ? null
                           : () async {
-                              setSheet(() => _activating = true);
+                              setSheet(() => activating = true);
 
                               // The charge, the activation and the family
                               // group are ONE server side transaction now, so
@@ -490,7 +490,7 @@ class _GoOutsPlusUnlockedScreenState extends State<GoOutsPlusUnlockedScreen>
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14)),
                       ),
-                      child: _activating
+                      child: activating
                           ? const SizedBox(
                               width: 20, height: 20,
                               child: CircularProgressIndicator(

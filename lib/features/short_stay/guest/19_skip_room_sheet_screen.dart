@@ -103,7 +103,7 @@ class _SkipRoomSheetState extends State<SkipRoomSheet> {
               Text(
                 title,
                 style: GoogleFonts.inter(
-                  fontSize: 18,
+                  fontSize: 15,
                   fontWeight: FontWeight.bold,
                   color: GoOutsColors.deepNavy,
                 ),
@@ -160,7 +160,7 @@ class _SkipRoomSheetState extends State<SkipRoomSheet> {
                 'record is fair to both of you. You will not be stopped from '
                 'finishing.',
                 style: GoogleFonts.inter(
-                  fontSize: 13,
+                  fontSize: 13.5,
                   height: 1.5,
                   color: GoOutsColors.bodyText,
                 ),

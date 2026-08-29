@@ -57,7 +57,7 @@ class _WalletScreenState extends State<WalletScreen> {
 
     for (final t in txList) {
       final month = t['month'] as String? ?? '';
-      final isThisMonth = month.contains('${_monthName(now.month)}') && month.contains('${now.year}');
+      final isThisMonth = month.contains(_monthName(now.month)) && month.contains('${now.year}');
       if (!isThisMonth) continue;
       final type = t['type'] as String? ?? t['category'] as String? ?? '';
       final amount = (t['amountValue'] as num?)?.toDouble() ?? 0.0;
