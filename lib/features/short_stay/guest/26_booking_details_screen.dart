@@ -22,7 +22,15 @@
 // The payment card reports what the booking actually records, including
 // "no payment taken", rather than a PAID badge that was true of nobody.
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:google_fonts/google_fonts.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+// ⚠ FIRST USE IN THE WHOLE APP. share_plus has been in pubspec.yaml since the
+// listing screen was planned, with a comment saying it was for "the share
+// button on a listing", and nothing has ever imported it. Checked before
+// adding this: the v13 API is SharePlus.instance.share(ShareParams(...)), not
+// the Share.share() of v10 and earlier.
+import 'package:share_plus/share_plus.dart';
 
 import '../models/stay_booking.dart';
 import '../models/stay_enums.dart';
@@ -85,6 +93,28 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
             color: GoOutsColors.primaryBlue,
           ),
         ),
+        // ⚠ SHARES A SUMMARY, NOT A LINK. Stitch draws a share icon here and
+        // we had none. What it must NOT share is a deep link into the booking:
+        // stay_bookings/{id} is readable only by the guest and the host, so a
+        // link would open on nothing for whoever received it, and a booking id
+        // is not a thing to scatter through other people's message apps.
+        //
+        // What a person actually wants to send is the plain facts — where,
+        // when, and the reference — to whoever is travelling with them.
+        actions: <Widget>[
+          StreamBuilder<StayBooking?>(
+            stream: StayBookingService.instance.watch(widget.bookingId),
+            builder: (context, snap) {
+              final StayBooking? b = snap.data;
+              return IconButton(
+                icon: const Icon(Icons.ios_share,
+                    color: GoOutsColors.primaryBlue),
+                tooltip: 'Share these details',
+                onPressed: b == null ? null : () => _share(b),
+              );
+            },
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(color: GoOutsColors.dividerGray, height: 1),
@@ -130,6 +160,11 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                 const SizedBox(height: 24),
                 _stayManagement(b),
                 const SizedBox(height: 16),
+                // Stitch puts the map and the address between Stay Management
+                // and the payment summary. It is the last thing a guest looks
+                // at before they set off, so it sits with the practical block
+                // rather than under the money.
+                _addressCard(),
                 _paymentSummary(b),
                 const SizedBox(height: 32),
               ],
@@ -638,6 +673,160 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
         ),
       ],
     );
+  }
+
+  // ── Where it is ──────────────────────────────────────────────────────────
+  //
+  //  Stitch draws a map, the address, and a COPY ADDRESS action. We had none
+  //  of the three on this screen, though screen 15 has carried a map since the
+  //  trip screen was built.
+  //
+  //  ⚠ RENDERS NOTHING WITHOUT COORDINATES rather than showing an empty grey
+  //  rectangle. A listing whose location has not been enriched yet has no lat
+  //  or lng, and a blank map on a booking somebody is about to travel to reads
+  //  as a broken app rather than as missing data.
+
+  Widget _addressCard() {
+    final StayListing? l = _listing;
+    final double? lat = l?.lat;
+    final double? lng = l?.lng;
+    if (l == null || lat == null || lng == null) return const SizedBox.shrink();
+
+    final StayAddress a = l.address;
+    final String full = <String>[
+      if (a.line1.isNotEmpty) a.line1,
+      if (a.town.isNotEmpty) a.town,
+      if (a.postcode.isNotEmpty) a.postcode,
+    ].join(', ');
+    if (full.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: _card(
+        padding: EdgeInsets.zero,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(12)),
+              child: SizedBox(
+                height: 160,
+                width: double.infinity,
+                child: GoogleMap(
+                  initialCameraPosition: CameraPosition(
+                      target: LatLng(lat, lng), zoom: 15),
+                  // ⚠ LITE MODE ON ANDROID, as on screen 15. A full map is one
+                  // of the heaviest things this app can draw and this one is a
+                  // picture, not something to pan. iOS has no lite mode, hence
+                  // the platform check rather than a flat true.
+                  liteModeEnabled:
+                      Theme.of(context).platform == TargetPlatform.android,
+                  markers: <Marker>{
+                    Marker(
+                        markerId: const MarkerId('stay'),
+                        position: LatLng(lat, lng)),
+                  },
+                  zoomControlsEnabled: false,
+                  zoomGesturesEnabled: false,
+                  scrollGesturesEnabled: false,
+                  rotateGesturesEnabled: false,
+                  tiltGesturesEnabled: false,
+                  myLocationEnabled: false,
+                  myLocationButtonEnabled: false,
+                  mapToolbarEnabled: false,
+                  compassEnabled: false,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          a.town.isEmpty ? 'Your stay' : a.town,
+                          style: GoogleFonts.inter(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: GoOutsColors.deepNavy),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(full,
+                            style: GoogleFonts.inter(
+                                fontSize: 13.5,
+                                height: 1.4,
+                                color: GoOutsColors.bodyText)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  TextButton(
+                    onPressed: () => _copyAddress(full),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: const Size(0, 36),
+                    ),
+                    child: Text('COPY',
+                        style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                            color: GoOutsColors.primaryBlue)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _copyAddress(String address) async {
+    await Clipboard.setData(ClipboardData(text: address));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Address copied')),
+    );
+  }
+
+  /// ⚠ PLAIN TEXT, NO LINK. See the note on the app bar action.
+  ///
+  /// The address is included only when we have one — a share that says
+  /// "Address: " followed by nothing is worse than one that leaves it out.
+  Future<void> _share(StayBooking b) async {
+    final StayListing? l = _listing;
+    final String title = l?.title ?? 'GoOuts stay';
+    final StayAddress? a = l?.address;
+    final String full = a == null
+        ? ''
+        : <String>[
+            if (a.line1.isNotEmpty) a.line1,
+            if (a.town.isNotEmpty) a.town,
+            if (a.postcode.isNotEmpty) a.postcode,
+          ].join(', ');
+
+    final String text = <String>[
+      title,
+      '${_d(b.checkIn)} to ${_d(b.checkOut)}, '
+          '${b.nights} ${b.nights == 1 ? 'night' : 'nights'}',
+      if (full.isNotEmpty) full,
+      'Reference ${stayBookingReference(b.id)}',
+    ].join('\n');
+
+    try {
+      await SharePlus.instance.share(ShareParams(text: text, subject: title));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nothing could open the share sheet.')),
+      );
+    }
   }
 
   Widget _row(String label, String value) => Padding(

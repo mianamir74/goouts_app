@@ -43,12 +43,34 @@ import '../theme/stay_colors.dart';
 import '../widgets/stay_bottom_nav.dart';
 
 class DaysOutScreen extends StatefulWidget {
-  const DaysOutScreen({super.key, required this.listingId});
+  const DaysOutScreen({
+    super.key,
+    required this.listingId,
+    this.fromListing = false,
+  });
 
   /// ⚠ REQUIRED. This screen used to take nothing, which is part of why it was
   /// never wired: with no property it cannot know which city to show or which
   /// clusters are nearest.
   final String listingId;
+
+  /// True when a guest arrived here from the PROPERTY screen while browsing,
+  /// rather than from the trip screen after booking.
+  ///
+  /// ── ⚠ IT DECIDES WHICH BOTTOM TAB IS LIT, AND THAT MATTERS ────────────────
+  ///
+  ///  Until 29 August 2026 this screen was reachable only from the trip screen,
+  ///  so Trips was always the right tab. Days out now appear on the property
+  ///  screen too, and a guest who is BROWSING is not in Trips — they are in
+  ///  Search.
+  ///
+  ///  Lighting the wrong tab is not cosmetic. The tab you are already on does
+  ///  nothing when tapped, by design, so a browsing guest who taps Search to
+  ///  get back gets a working button that throws away the property they were
+  ///  reading — pushNamedAndRemoveUntil drops the whole stack. Telling them
+  ///  they are in Trips makes Search look like the way out. It is the way out
+  ///  of everything.
+  final bool fromListing;
 
   @override
   State<DaysOutScreen> createState() => _DaysOutScreenState();
@@ -69,12 +91,17 @@ class _DaysOutScreenState extends State<DaysOutScreen> {
     try {
       final StayListing? l =
           await StayListingService.instance.byId(widget.listingId);
-      // The town on the property decides the city document. A property with no
-      // town simply has no days out, which is the honest outcome rather than
-      // guessing a city from a postcode prefix.
+      // ⚠ THE PROPERTY'S COORDINATES DECIDE THE DOCUMENT, NOT ITS TOWN NAME.
+      // The town is still passed as a fallback while the grid sweep runs; see
+      // forProperty. A property with neither has no days out, which is the
+      // honest outcome rather than guessing from a postcode prefix.
       final StayAttractions? a = l == null
           ? null
-          : await StayAttractionsService.instance.forTown(l.address.town);
+          : await StayAttractionsService.instance.forProperty(
+              lat: l.lat,
+              lng: l.lng,
+              town: l.address.town,
+            );
       if (!mounted) return;
       setState(() {
         _listing = l;
@@ -111,7 +138,6 @@ class _DaysOutScreenState extends State<DaysOutScreen> {
         backgroundColor: GoOutsColors.cardSurface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        toolbarHeight: 52,
         shape: const Border(
           bottom: BorderSide(color: GoOutsColors.outlineVariant, width: 0.5),
         ),
@@ -122,10 +148,34 @@ class _DaysOutScreenState extends State<DaysOutScreen> {
           icon: const Icon(Icons.arrow_back, color: GoOutsColors.primaryBlue),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text('Days out from your stay',
-            style: _screenTitle.copyWith(color: GoOutsColors.primaryBlue)),
+        // ⚠ THE PROPERTY NAME UNDER THE TITLE, when we know it.
+        //
+        // A guest who came here from a property is two screens deep in that
+        // property's context and nothing on the page said so. Naming it makes
+        // the back arrow's destination obvious instead of something they have
+        // to try — which is the whole question "how do I get back to the one I
+        // liked" is asking.
+        titleSpacing: 0,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Text('Days out',
+                style: _screenTitle.copyWith(color: GoOutsColors.primaryBlue)),
+            if (_listing != null)
+              Text(
+                'from ${_listing!.title}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: _body.copyWith(color: GoOutsColors.bodyText),
+              ),
+          ],
+        ),
+        toolbarHeight: _listing == null ? 52 : 62,
       ),
-      bottomNavigationBar: const StayBottomNav(current: StayTab.trips),
+      bottomNavigationBar: StayBottomNav(
+        current: widget.fromListing ? StayTab.search : StayTab.trips,
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : clusters.isEmpty
@@ -134,7 +184,16 @@ class _DaysOutScreenState extends State<DaysOutScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
                   children: <Widget>[
                     Text(
-                      'Grouped by what you can do in one trip, nearest first.',
+                      // ⚠ THE LEAD LINE CHANGES WHEN THE NEAREST IS A DRIVE.
+                      //
+                      // "Nearest first" is fine in a city and slightly absurd
+                      // in the Highlands, where the nearest is 30 miles off. A
+                      // guest who reads it and then sees 34 miles on the first
+                      // card concludes the screen is broken. Saying it plainly
+                      // costs nothing and is simply true: in the countryside a
+                      // day out is a drive, and people staying there know that
+                      // better than we do.
+                      _leadLine(clusters),
                       style: _body.copyWith(color: GoOutsColors.bodyText),
                     ),
                     const SizedBox(height: 16),
@@ -149,33 +208,76 @@ class _DaysOutScreenState extends State<DaysOutScreen> {
     );
   }
 
-  /// Shown when we have not built this city yet.
+  /// The line above the list, which depends on how far the nearest one is.
+  String _leadLine(List<StayCluster> clusters) {
+    final double? lat = _listing?.lat;
+    final double? lng = _listing?.lng;
+    if (clusters.isEmpty || lat == null || lng == null) {
+      return 'Grouped by what you can do in one trip, nearest first.';
+    }
+    final double mi = StayAttractionsService.milesBetween(
+        lat, lng, clusters.first.lat, clusters.first.lng);
+    if (mi < 12) {
+      return 'Grouped by what you can do in one trip, nearest first.';
+    }
+    return 'You are somewhere quiet, so these are a drive rather than a walk. '
+        'The nearest is about ${mi.round()} miles away.';
+  }
+
+  /// Shown when there is nothing to list.
   ///
-  /// ⚠ SAYS WHAT IS ACTUALLY TRUE. Not "no days out near you", which would be
-  /// false for every city in Britain. The data is missing, not the attractions.
-  Widget _empty() => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              const Icon(Icons.map_outlined,
-                  size: 48, color: GoOutsColors.primaryBlue),
-              const SizedBox(height: 12),
-              Text('We have not mapped this area yet',
-                  textAlign: TextAlign.center,
-                  style: _cardTitle.copyWith(color: GoOutsColors.deepNavy)),
-              const SizedBox(height: 6),
-              Text(
-                'Days out are added city by city. Your host and the partners '
-                'near your stay are still on the trip screen.',
-                textAlign: TextAlign.center,
-                style: _body.copyWith(color: GoOutsColors.bodyText),
-              ),
-            ],
-          ),
+  /// ── ⚠ TWO DIFFERENT FACTS, AND THEY USED TO SHARE ONE MESSAGE ─────────────
+  ///
+  ///  "We have not built this area yet" and "we have looked and there is
+  ///  genuinely very little near you" are not the same thing, and until the
+  ///  grid shipped there was no way to tell them apart, so both said the
+  ///  first one.
+  ///
+  ///  Now a built cell exists even when it holds nothing, which is exactly
+  ///  what makes the difference knowable: _attractions is null only when the
+  ///  sweep has not reached here.
+  ///
+  ///  ⚠ THE SECOND MESSAGE MUST NOT SAY "no days out near you" EITHER. The
+  ///  app searched about 40 miles and found nothing it would stake its name
+  ///  on. That is a statement about our list, not about the countryside, and
+  ///  a guest staying in the Highlands knows perfectly well there is plenty
+  ///  out there. Claiming otherwise makes us look wrong rather than modest.
+  Widget _empty() {
+    final bool notBuilt = _attractions == null;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(notBuilt ? Icons.map_outlined : Icons.landscape_outlined,
+                size: 48, color: GoOutsColors.primaryBlue),
+            const SizedBox(height: 12),
+            Text(
+              notBuilt
+                  ? 'We have not mapped this area yet'
+                  : 'Nothing on our list within about 40 miles',
+              textAlign: TextAlign.center,
+              style: _cardTitle.copyWith(color: GoOutsColors.deepNavy),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              notBuilt
+                  ? 'We are working through the country a region at a time. '
+                      'Your host and the partners near your stay are still on '
+                      'the trip screen.'
+                  : 'That says more about our list than about where you are '
+                      'staying. Your host will know the area far better than '
+                      'we do, and the partners near your stay are still on '
+                      'the trip screen.',
+              textAlign: TextAlign.center,
+              style: _body.copyWith(color: GoOutsColors.bodyText),
+            ),
+          ],
         ),
-      );
+      ),
+    );
+  }
 
   Widget _clusterCard(StayCluster c) {
     final double? lat = _listing?.lat;
@@ -194,6 +296,12 @@ class _DaysOutScreenState extends State<DaysOutScreen> {
           arguments: <String, dynamic>{
             'listingId': widget.listingId,
             'clusterId': c.id,
+            // ⚠ CARRIED THROUGH, not defaulted. Without this the flag survives
+            // exactly one hop: a guest going property → days out → a day out
+            // would see Search lit on the middle screen and Trips on the last
+            // one, in the same journey. Any screen that passes a journey along
+            // has to pass the whole journey.
+            'fromListing': widget.fromListing,
           },
         ),
         child: Column(
@@ -209,6 +317,20 @@ class _DaysOutScreenState extends State<DaysOutScreen> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: _cardTitle.copyWith(color: GoOutsColors.deepNavy)),
+                  // ⚠ TWO LINES ON THE CARD, THE WHOLE THING ON SCREEN 08.
+                  // A description is what turns a name into a reason to go,
+                  // and the card is where somebody is scanning for one. Two
+                  // lines is enough to sell it and short enough to keep the
+                  // cards the same height as each other.
+                  if (c.hasAbout) ...<Widget>[
+                    const SizedBox(height: 4),
+                    Text(
+                      c.about,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: _body.copyWith(color: GoOutsColors.bodyText),
+                    ),
+                  ],
                   const SizedBox(height: 4),
                   Row(
                     children: <Widget>[

@@ -137,10 +137,32 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
     }
     skipped.removeWhere(done.contains);
 
-    final int addressed = done.length + skipped.length;
+    // ── ⚠ COUNTS ONLY ROOMS THE LISTING ASKS FOR. Fixed 29 August 2026, in
+    //    the SAME EDIT as syncStayCaptureProgress in stay_booking.js.
+    //
+    //  This was `done.length + skipped.length >= _rooms.length`, comparing a
+    //  count of every room name found in the evidence against the length of a
+    //  different list. Any name not on the listing's list inflated it.
+    //
+    //  That is not hypothetical. captureRoomsFor names a single bedroom
+    //  "Bedroom" and two bedrooms "Bedroom 1" and "Bedroom 2", so a host who
+    //  adds a bedroom RENAMES the one that already existed. Evidence taken
+    //  before the edit no longer matches anything required, and still counted:
+    //  a guest could photograph four rooms out of five and be told they had
+    //  finished.
+    //
+    //  ⚠ THE COMMENT ABOVE THIS METHOD IS THE REASON IT HAD TO BE BOTH SIDES.
+    //  It says the client and syncStayCaptureProgress must agree, "because the
+    //  two disagreeing is how a guest sees one thing and a claim is judged on
+    //  another". Fixing only the server would have created exactly that.
+    final Set<String> required = _rooms.toSet();
+    final int addressed = done.where(required.contains).length +
+        skipped.where(required.contains).length;
     final bool complete = _rooms.isNotEmpty && addressed >= _rooms.length;
     return CapturePhase(
-      status: addressed == 0
+      // Any activity at all counts as started, including a photograph of
+      // something off the list such as pre-existing damage.
+      status: (done.isEmpty && skipped.isEmpty)
           ? 'not_started'
           : complete
               ? 'complete'

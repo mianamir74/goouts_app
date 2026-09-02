@@ -17,6 +17,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/stay_booking.dart';
 import '../models/stay_enums.dart';
+// kStayDamageRoom and stayRoomLabel. The damage entry is stored as a slug and
+// shown as words, like amenities and property types.
+import '../models/stay_evidence.dart';
 import '../theme/stay_colors.dart';
 
 /// One row's state. Derived from the booking, never stored on this screen.
@@ -130,64 +133,205 @@ class CaptureChecklistScreen extends StatelessWidget {
           _progress(),
           const SizedBox(height: 20),
           for (final room in rooms) _roomCard(context, room),
+          // ── ⚠ ARRIVAL ONLY, AND OPTIONAL ────────────────────────────────
+          //
+          //  Stitch draws this row and labels it "Mandatory check". Ours is
+          //  neither mandatory nor shown at check out, and both departures are
+          //  deliberate:
+          //
+          //  · OPTIONAL, because a guest who walks into a spotless flat would
+          //    otherwise be unable to finish — standing there with a camera
+          //    hunting for a scratch to photograph.
+          //
+          //  · ARRIVAL ONLY, because at check in recording damage PROTECTS the
+          //    guest: it is dated proof the mark was already there. At check
+          //    out the same photograph is a confession. Offering it on the way
+          //    out invites somebody to volunteer evidence against themselves,
+          //    on the set that decides a claim.
+          //
+          //  It does not count towards Finish. Both counters ignore any room
+          //  that is not in the listing's captureRooms — see _phaseFrom and
+          //  syncStayCaptureProgress.
+          if (kind != CaptureKind.guestCheckOut) _damageCard(context),
         ],
       );
 
-  Widget _progress() {
-    final fraction = rooms.isEmpty ? 0.0 : _addressed / rooms.length;
+  /// The pre-existing damage row. See the note at the call site.
+  Widget _damageCard(BuildContext context) {
+    final RoomState state = _stateOf(kStayDamageRoom);
+    final bool recorded = state == RoomState.done;
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: GoOutsColors.cardSurface,
+        borderRadius: BorderRadius.circular(12),
+        // Outlined rather than plain, so it reads as a different kind of thing
+        // from the rooms above it without shouting. Stitch uses a red warning
+        // tile; red here would suggest something is wrong with the property
+        // before the guest has even looked.
+        border: Border.all(color: GoOutsColors.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: recorded
+                  ? GoOutsColors.dividerGray
+                  : GoOutsColors.paleBlueTint,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              recorded ? Icons.check_circle : Icons.report_problem_outlined,
+              size: 22,
+              color: recorded
+                  ? GoOutsColors.success
+                  : GoOutsColors.primaryBlue,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  stayRoomLabel(kStayDamageRoom),
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: GoOutsColors.deepNavy,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  recorded
+                      ? 'Recorded. Add another if you find more.'
+                      : 'Optional. A mark you photograph now cannot be '
+                          'claimed against you later.',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    height: 1.35,
+                    color: recorded
+                        ? GoOutsColors.success
+                        : GoOutsColors.bodyText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          // ⚠ NO SKIP BUTTON. Skipping is for something a guest was asked to do
+          // and could not. Nobody needs to record that they declined to
+          // photograph damage they did not find.
+          IconButton(
+            onPressed: onCapture == null
+                ? null
+                : () => onCapture!(kStayDamageRoom),
+            icon: const Icon(Icons.add_a_photo_outlined, size: 22),
+            color: GoOutsColors.primaryBlue,
+            tooltip: 'Photograph existing damage',
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// ── ⚠ A RING, NOT A BAR. Changed 29 August 2026 to match Stitch. ─────────
+  ///
+  /// This was a LinearProgressIndicator with the count written above it. Stitch
+  /// draws a large ring with "3 of 7 / Captured" inside, and it is the one
+  /// thing on this screen somebody looks at.
+  ///
+  /// The difference is not decoration. A thin bar reads as "loading"; a ring
+  /// with a number in it reads as a task with a remainder, which is exactly
+  /// what this screen is asking somebody to finish. This is the screen that
+  /// answers "why can I not just take one photograph", and the count is the
+  /// answer.
+  Widget _progress() {
+    final double fraction = rooms.isEmpty ? 0.0 : _addressed / rooms.length;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
       decoration: BoxDecoration(
         color: GoOutsColors.cardSurface,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Text(
-                '$_addressed of ${rooms.length} captured',
-                style: GoogleFonts.inter(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: GoOutsColors.deepNavy,
+          SizedBox(
+            width: 140,
+            height: 140,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox.expand(
+                  child: CircularProgressIndicator(
+                    value: fraction,
+                    strokeWidth: 10,
+                    // Rounded, like Stitch. A square cap on a ring that is
+                    // three sevenths full looks like a rendering fault.
+                    strokeCap: StrokeCap.round,
+                    backgroundColor: GoOutsColors.surfaceBlue,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      _complete
+                          ? GoOutsColors.success
+                          : GoOutsColors.primaryBlue,
+                    ),
+                  ),
                 ),
-              ),
-              const Spacer(),
-              if (_complete)
-                Row(children: [
-                  const Icon(Icons.check_circle,
-                      size: 18, color: GoOutsColors.success),
-                  const SizedBox(width: 4),
-                  Text('All done',
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '$_addressed of ${rooms.length}',
+                      style: GoogleFonts.inter(
+                        fontSize: 20,
+                        height: 28 / 20,
+                        fontWeight: FontWeight.w700,
+                        color: GoOutsColors.deepNavy,
+                      ),
+                    ),
+                    Text(
+                      'Captured',
                       style: GoogleFonts.inter(
                         fontSize: 13.5,
-                        fontWeight: FontWeight.w600,
-                        color: GoOutsColors.success,
-                      )),
-                ]),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: fraction,
-              minHeight: 8,
-              backgroundColor: GoOutsColors.surfaceBlue,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                _complete ? GoOutsColors.success : GoOutsColors.primaryBlue,
-              ),
+                        color: GoOutsColors.bodyText,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
+          if (_complete)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.check_circle,
+                    size: 18, color: GoOutsColors.success),
+                const SizedBox(width: 6),
+                Text('All done',
+                    style: GoogleFonts.inter(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      color: GoOutsColors.success,
+                    )),
+              ],
+            ),
+          if (_complete) const SizedBox(height: 8),
           Text(
             _complete
                 ? 'Thank you. Your host can see these now.'
-                : 'About ten seconds a room. It protects your deposit.',
+                : 'About ten seconds a room. Good light helps. It protects '
+                    'your deposit.',
+            textAlign: TextAlign.center,
             style: GoogleFonts.inter(
               fontSize: 13.5,
+              height: 20 / 13.5,
               color: GoOutsColors.bodyText,
             ),
           ),
@@ -238,7 +382,9 @@ class CaptureChecklistScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  room,
+                  // Through the label map, so the damage entry reads as words
+                  // rather than as its slug.
+                  stayRoomLabel(room),
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,

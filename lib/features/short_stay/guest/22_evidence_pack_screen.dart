@@ -212,7 +212,7 @@ class EvidencePackScreen extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    e.room.isEmpty ? 'Room' : e.room,
+                    e.room.isEmpty ? 'Room' : stayRoomLabel(e.room),
                     style: GoogleFonts.inter(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
@@ -254,7 +254,8 @@ class EvidencePackScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${e.room.isEmpty ? 'Room' : e.room} — not photographed',
+                  '${e.room.isEmpty ? 'Room' : stayRoomLabel(e.room)} '
+                      '— not photographed',
                   style: GoogleFonts.inter(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,

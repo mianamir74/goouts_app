@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../services/delivery_address_service.dart';
+import '../widgets/food_bottom_nav.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  GoOuts Food Delivery — Restaurant Listing & Discovery Screen
@@ -19,7 +20,7 @@ class FoodDeliveryScreen extends StatefulWidget {
 class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
     with SingleTickerProviderStateMixin {
   // ── Brand colours ──────────────────────────────────────────────────────────
-  static const Color _primary  = Color(0xFFEA580C); // orange
+  static const Color _primary  = Color(0xFF0392CA); // GoOuts blue. Was 0xFFEA580C.
   static const Color _navy     = Color(0xFF0D1B3E);
   static const Color _purple   = Color(0xFF7C3AED);
   static const Color _bg       = Color(0xFFF2F4F7);
@@ -105,6 +106,8 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      bottomNavigationBar:
+          const FoodBottomNav(current: FoodTab.restaurants),
       backgroundColor: _bg,
       body: CustomScrollView(
         slivers: [
@@ -121,7 +124,7 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
           ),
           // ── DIETARY ROW SITS BELOW THE BAND, NOT INSIDE IT ──────────────
           //
-          // Its chips are green and purple when selected. On the orange band
+          // Its chips are green and purple when selected. On the coloured band
           // that is three warm colours fighting; on the neutral background
           // they read as what they are — filters, not decoration.
           if (_filtersExpanded)
@@ -139,8 +142,8 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
   // ── App bar ─────────────────────────────────────────────────────────────────
   Widget _buildAppBar() {
     return SliverAppBar(
-      // Orange, so the app bar and the search band below it read as one
-      // header rather than a white strip on a coloured panel.
+      // The brand colour, so the app bar and the search band below it read
+      // as one header rather than a white strip on a coloured panel.
       backgroundColor: _primary,
       elevation: 0,
       pinned: true,
@@ -350,9 +353,11 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
                 padding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 decoration: BoxDecoration(
-                  // ⚠ INVERTED FOR THE ORANGE BAND. Selected used to be
-                  // _primary — orange on orange, which made the chosen
-                  // cuisine invisible the moment the header became coloured.
+                  // ⚠ INVERTED FOR THE COLOURED BAND. Selected used to be
+                  // _primary, which put the brand colour on the brand colour
+                  // and made the chosen cuisine invisible. Still true now the
+                  // band is blue rather than orange: the reason was never the
+                  // hue, it was the chip matching its own background.
                   color: selected
                       ? Colors.white
                       : Colors.white.withValues(alpha: 0.18),
@@ -463,7 +468,7 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
             ),
             child: Row(children: [
               const Icon(Icons.location_on_rounded,
-                  color: Color(0xFFEA580C), size: 20),
+                  color: Color(0xFF0392CA), size: 20),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -475,7 +480,7 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
                 ),
               ),
               const Icon(Icons.chevron_right_rounded,
-                  color: Color(0xFFEA580C), size: 18),
+                  color: Color(0xFF0392CA), size: 18),
             ]),
           ),
         );
@@ -686,7 +691,12 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
     );
   }
 
-  /// The orange band the search sits in.
+  /// The coloured band the search sits in.
+  ///
+  /// ⚠ WAS ORANGE, 0xFFEA580C to 0xFFF97316, changed 31 August 2026. It read
+  /// as a different product sitting inside GoOuts rather than part of it, and
+  /// at that saturation it fought everything below it. Now the house gradient,
+  /// AppColors.primary to gradientEnd.
   ///
   /// The screen used to open on a white app bar over a grey background with
   /// the search field floating on it, which read as a settings page. Food is
@@ -696,7 +706,7 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFFEA580C), Color(0xFFF97316)],
+            colors: [Color(0xFF0392CA), Color(0xFF004C6B)],
           ),
         ),
         padding: const EdgeInsets.only(bottom: 16),

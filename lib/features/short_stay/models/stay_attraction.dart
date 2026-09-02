@@ -33,6 +33,7 @@ class StayPhotoCredit {
     required this.licenceUrl,
     required this.author,
     required this.sourceUrl,
+    this.source = 'wikimedia',
   });
 
   final String url;
@@ -40,6 +41,16 @@ class StayPhotoCredit {
   final String licenceUrl;
   final String author;
   final String sourceUrl;
+
+  /// Where the image came from. 'goouts' for the curated set, 'wikimedia' for
+  /// anything left over from the old pipeline.
+  ///
+  /// ⚠ ADDED 29 August 2026 BECAUSE creditLine USED TO END IN "Wikimedia
+  /// Commons" UNCONDITIONALLY. Once we started serving our own photographs
+  /// that line would have credited Wikimedia for an image they had nothing to
+  /// do with — a false attribution, on the one string whose entire job is to
+  /// say truthfully where a picture came from.
+  final String source;
 
   static StayPhotoCredit? fromMap(Map<String, dynamic>? m) {
     if (m == null) return null;
@@ -54,11 +65,52 @@ class StayPhotoCredit {
       licenceUrl: (m['licenceUrl'] as String?)?.trim() ?? '',
       author: (m['author'] as String?)?.trim() ?? 'Unknown',
       sourceUrl: (m['sourceUrl'] as String?)?.trim() ?? '',
+      // Anything written before 29 August 2026 came from Commons and has no
+      // source field, so that is the honest default for a legacy document.
+      source: (m['source'] as String?)?.trim() ?? 'wikimedia',
     );
   }
 
+  bool get isOurs => source == 'goouts';
+
+  /// Where the picture came from, written the way that archive asks for.
+  ///
+  /// ⚠ A LOOKUP, NOT A HARDCODED STRING, AND THE SECOND TIME THIS HAS BITTEN.
+  /// The line read '$author · $licence · Wikimedia Commons' unconditionally,
+  /// which was true while Commons was the only source. When we started serving
+  /// our own photographs it began crediting Wikimedia for images they had
+  /// nothing to do with, so a `source` field was added and this line taught
+  /// about exactly one new value.
+  ///
+  /// It would do it again the moment a Geograph or an Unsplash picture
+  /// arrived. A credit line naming the wrong archive is worse than none,
+  /// because it looks like diligence.
+  static const Map<String, String> _sourceLabels = <String, String>{
+    'wikimedia': 'Wikimedia Commons',
+    'geograph': 'Geograph Britain and Ireland',
+    'unsplash': 'Unsplash',
+    'pexels': 'Pexels',
+    'press': 'supplied by the attraction',
+    'host': 'photographed by a GoOuts host',
+    'guest': 'photographed by a GoOuts guest',
+  };
+
   /// One line, ready to render under an image.
-  String get creditLine => '$author · $licence · Wikimedia Commons';
+  ///
+  /// Ours reads simply the author, with no licence and no archive, because
+  /// there is no third party to credit and "Owned" is bookkeeping rather than
+  /// something to print under a photograph.
+  ///
+  /// ⚠ AN UNKNOWN SOURCE FALLS BACK TO AUTHOR AND LICENCE ONLY. Naming no
+  /// archive is honest. Naming the wrong one is not, and guessing is how the
+  /// original fault happened.
+  String get creditLine {
+    if (isOurs) return author;
+    final String archive = _sourceLabels[source] ?? '';
+    return archive.isEmpty
+        ? '$author · $licence'
+        : '$author · $licence · $archive';
+  }
 }
 
 /// One place inside a day out.
@@ -97,6 +149,7 @@ class StayCluster {
     required this.partnerCount,
     required this.partnerCategories,
     required this.photo,
+    this.about = '',
   });
 
   final String id;
@@ -118,6 +171,19 @@ class StayCluster {
   final Map<String, int> partnerCategories;
 
   final StayPhotoCredit? photo;
+
+  /// What this day out is, in two or three sentences.
+  ///
+  /// ⚠ WRITTEN BY A PERSON IN THE ADMIN PANEL, and empty until somebody does.
+  /// There is no automatic source: OSM has no usable description field and the
+  /// one thing that did have descriptions was Wikipedia, which was taken out
+  /// of this pipeline on 29 August 2026.
+  ///
+  /// Empty renders as nothing rather than as a gap, for the same reason the
+  /// photograph does — a plainer card is fine, a card with a hole in it is not.
+  final String about;
+
+  bool get hasAbout => about.trim().isNotEmpty;
 
   factory StayCluster.fromMap(Map<String, dynamic> m) {
     final List<StayPlace> places = ((m['places'] as List?) ?? const [])
@@ -146,6 +212,7 @@ class StayCluster {
       partnerCategories: cats,
       photo: StayPhotoCredit.fromMap(
           (m['photo'] as Map?)?.cast<String, dynamic>()),
+      about: (m['about'] as String?)?.trim() ?? '',
     );
   }
 
@@ -187,7 +254,15 @@ class StayAttractions {
   final String attributionUrl;
 
   factory StayAttractions.fromMap(Map<String, dynamic> m) => StayAttractions(
-        city: (m['city'] as String?)?.trim() ?? '',
+        // ⚠ `cell` IS THE FIELD THE GRID WRITES, `city` THE OLD PER TOWN BUILD.
+        //
+        // Reading only `city` would leave this empty for every grid document
+        // and empty is not obviously wrong on a screen, so it would have gone
+        // unnoticed. Both are read while the two live side by side; see
+        // stay_grid.js for why the town keyed build is going away.
+        city: (m['city'] as String?)?.trim() ??
+            (m['cell'] as String?)?.trim() ??
+            '',
         cityName: (m['cityName'] as String?)?.trim() ?? '',
         clusters: ((m['clusters'] as List?) ?? const [])
             .whereType<Map>()

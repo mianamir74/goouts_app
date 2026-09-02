@@ -22,7 +22,7 @@ class FoodDeliveryChatScreen extends StatefulWidget {
 }
 
 class _FoodDeliveryChatScreenState extends State<FoodDeliveryChatScreen> {
-  static const Color _primary = Color(0xFFEA580C);
+  static const Color _primary = Color(0xFF0392CA);
   static const Color _navy    = Color(0xFF0D1B3E);
   static const Color _bg      = Color(0xFFF2F4F7);
 
@@ -159,7 +159,7 @@ class _FoodDeliveryChatScreenState extends State<FoodDeliveryChatScreen> {
           CircleAvatar(
             radius: 18,
             backgroundColor: _primary.withValues(alpha: 0.15),
-            child: const Icon(Icons.delivery_dining_rounded, color: Color(0xFFEA580C), size: 20),
+            child: const Icon(Icons.delivery_dining_rounded, color: Color(0xFF0392CA), size: 20),
           ),
           const SizedBox(width: 10),
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

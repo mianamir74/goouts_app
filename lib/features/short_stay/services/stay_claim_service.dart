@@ -223,9 +223,17 @@ class StayClaimService {
             q.docs.map(StayClaim.fromDoc).toList(growable: false));
   }
 
-  /// How many are waiting on this guest. Drives a badge.
-  Stream<int> watchAwaitingReply() =>
-      watchAwaitingReplyClaims().map((List<StayClaim> c) => c.length);
+  // ⚠ watchAwaitingReply() WAS HERE AND IS GONE. 29 August 2026.
+  //
+  // A Stream<int> wrapper documented as "drives a badge", and no badge was
+  // ever built — nothing in the app called it. It opened a second live
+  // Firestore listener on the same query as watchAwaitingReplyClaims for
+  // anything that had used it, which is the sort of thing that gets added
+  // "because it is already there" and quietly doubles the read cost of a
+  // screen.
+  //
+  // If a badge is wanted later, take .length off the existing stream at the
+  // call site rather than opening a second subscription here.
 
   /// Accept or dispute. [note] is REQUIRED for a dispute — the server refuses
   /// it otherwise, and that refusal is deliberate.

@@ -6,18 +6,35 @@
 // Money is in PENCE throughout. The slider works in pounds for display and
 // converts at the edge, because a price filter that drifts by a penny produces
 // a listing that appears and disappears from results for no visible reason.
+//
+// ── REBUILT TO STITCH 29 August 2026 ────────────────────────────────────────
+//
+// Two faults were found while matching the layout, and neither was cosmetic.
+// Both are recorded at the code that fixes them:
+//
+//   1. THE SHEET NEVER RECEIVED THE CRITERIA IT WAS SENT. See _apply.
+//   2. APPLYING WIPED THE SEARCH, AND A CLEARED FILTER COULD NOT BE CLEARED.
+//      Also _apply.
+//
+// The layout itself: Stitch groups this screen into five WHITE CARDS on the
+// pale page. Ours was one flat column, which is why it read as a settings list
+// rather than as a filter sheet. Cards, and only cards, are the difference.
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import '../models/stay_amenities.dart';
 import '../models/stay_property_types.dart';
 import '../services/stay_availability_service.dart';
 import '../theme/stay_colors.dart';
+import '../theme/stay_type.dart';
 
 /// Returns a [StaySearchCriteria] through `Navigator.pop`, or null if closed
 /// without applying. The caller keeps the previous criteria in that case.
 class SearchFiltersSheet extends StatefulWidget {
   const SearchFiltersSheet({super.key, this.initial});
 
+  /// ⚠ MUST BE PASSED. See the note on _apply — for three weeks this arrived
+  /// null on every open because stay_routes.dart built `const
+  /// SearchFiltersSheet()` while screen 02 was correctly sending criteria.
   final StaySearchCriteria? initial;
 
   @override
@@ -74,7 +91,7 @@ class _SearchFiltersSheetState extends State<SearchFiltersSheet> {
   @override
   void initState() {
     super.initState();
-    final i = widget.initial;
+    final StaySearchCriteria? i = widget.initial;
     _price = RangeValues(
       ((i?.minPricePence ?? (_minPounds * 100).round()) / 100)
           .clamp(_minPounds, _maxPounds),
@@ -84,7 +101,7 @@ class _SearchFiltersSheetState extends State<SearchFiltersSheet> {
     _propertyType = i?.propertyType;
     _bedrooms = i?.minBedrooms ?? 0;
     _minPartners = (i?.minPartnersHalfMile ?? 0).toDouble();
-    _amenities.addAll(i?.amenities ?? const []);
+    _amenities.addAll(i?.amenities ?? const <String>[]);
   }
 
   bool get _priceIsDefault =>
@@ -105,15 +122,60 @@ class _SearchFiltersSheetState extends State<SearchFiltersSheet> {
         _amenities.clear();
       });
 
+  /// ── ⚠ TWO BUGS FIXED HERE ON 29 AUGUST 2026 ───────────────────────────────
+  ///
+  /// This method used to read:
+  ///
+  ///     final base = widget.initial ?? const StaySearchCriteria();
+  ///     Navigator.of(context).pop(base.copyWith( ... ));
+  ///
+  /// which is correct-looking and was wrong twice over.
+  ///
+  /// ① `widget.initial` WAS ALWAYS NULL. Screen 02 pushes this route with
+  ///    `arguments: {'criteria': _criteria}` — correctly — and
+  ///    stay_routes.dart answered it with `const SearchFiltersSheet()`. The
+  ///    argument was sent, ignored, and nobody complained because a filter
+  ///    sheet that opens blank looks like a filter sheet that opens blank.
+  ///
+  ///    So `base` was an EMPTY criteria, and applying any filter DISCARDED THE
+  ///    TOWN, THE DATES AND THE GUEST COUNT. Filter for a £150 ceiling in
+  ///    Richmond and you were shown the whole country under £150. That reads as
+  ///    a broken search, not as a lost filter, which is why it was never traced
+  ///    back to this screen.
+  ///
+  /// ② copyWith CANNOT CLEAR A FIELD. It is written `minPricePence ??
+  ///    this.minPricePence`, so passing null means KEEP, not REMOVE. Every
+  ///    "leave it null when untouched" line below was therefore a no-op on the
+  ///    second pass: set a max price, apply, drag the slider back to the top,
+  ///    apply again — and the old ceiling survived. Reset appeared to work on
+  ///    screen, because the sliders moved, and then applied nothing.
+  ///
+  /// The fix for both is to stop using copyWith here and CONSTRUCT the criteria
+  /// explicitly. This screen owns every filter field, so it should state every
+  /// filter field, including the ones it is clearing. The four search fields it
+  /// does NOT own — town, dates, guests, sort — are carried across by hand.
+  ///
+  /// ⚠ IF A FILTER FIELD IS EVER ADDED TO StaySearchCriteria, ADD IT HERE. A
+  /// field left out of this constructor is silently reset every time a guest
+  /// touches the filters.
   void _apply() {
-    final base = widget.initial ?? const StaySearchCriteria();
+    final StaySearchCriteria base =
+        widget.initial ?? const StaySearchCriteria();
+
     Navigator.of(context).pop(
-      base.copyWith(
-        // Leave price null when untouched, so the query is not narrowed by a
-        // filter the guest never set.
-        minPricePence: _price.start <= _minPounds
-            ? null
-            : (_price.start * 100).round(),
+      StaySearchCriteria(
+        // ── Carried across untouched. Not filters; this screen must not lose
+        //    them and must not edit them.
+        town: base.town,
+        checkIn: base.checkIn,
+        checkOut: base.checkOut,
+        guests: base.guests,
+        sort: base.sort,
+
+        // ── Owned by this screen. Stated in full, every time, so that null
+        //    genuinely means "no filter" rather than "unchanged".
+        minPricePence:
+            _price.start <= _minPounds ? null : (_price.start * 100).round(),
         maxPricePence:
             _price.end >= _maxPounds ? null : (_price.end * 100).round(),
         propertyType: _propertyType,
@@ -130,28 +192,29 @@ class _SearchFiltersSheetState extends State<SearchFiltersSheet> {
       backgroundColor: GoOutsColors.pageBackground,
       appBar: AppBar(
         backgroundColor: GoOutsColors.cardSurface,
-        elevation: 0.5,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        toolbarHeight: 52,
+        shape: const Border(
+          bottom: BorderSide(color: GoOutsColors.outlineVariant, width: 0.5),
+        ),
+        // Stitch draws a back arrow, not a close cross. It is pushed onto the
+        // results, so back is what it does.
         leading: IconButton(
-          icon: const Icon(Icons.close, color: GoOutsColors.primaryBlue),
+          icon: const Icon(Icons.arrow_back, color: GoOutsColors.primaryBlue),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
           'Filters',
-          style: GoogleFonts.inter(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: GoOutsColors.deepNavy,
-          ),
+          style: StayType.screenTitle.on(GoOutsColors.primaryBlue),
         ),
-        actions: [
+        actions: <Widget>[
           TextButton(
             onPressed: _activeCount == 0 ? null : _reset,
             child: Text(
               'Reset',
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: _activeCount == 0
+              style: StayType.cardTitle.on(
+                _activeCount == 0
                     ? GoOutsColors.outlineVariant
                     : GoOutsColors.primaryBlue,
               ),
@@ -159,202 +222,404 @@ class _SearchFiltersSheetState extends State<SearchFiltersSheet> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(
+            StaySpacing.page, StaySpacing.page, StaySpacing.page, 24),
+        children: <Widget>[
+          _priceCard(),
+          const SizedBox(height: StaySpacing.inline),
+          _propertyTypeCard(),
+          const SizedBox(height: StaySpacing.inline),
+          _bedroomsCard(),
+          const SizedBox(height: StaySpacing.inline),
+          _partnersCard(),
+          const SizedBox(height: StaySpacing.inline),
+          _amenitiesCard(),
+        ],
+      ),
+      bottomNavigationBar: _applyBar(),
+    );
+  }
+
+  // ── The card the whole screen is built from ────────────────────────────────
+
+  Widget _card({required List<Widget> children}) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(StaySpacing.page),
+        decoration: BoxDecoration(
+          color: GoOutsColors.cardSurface,
+          borderRadius: BorderRadius.circular(12),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _header('Price range'),
-            Text(
-              _priceIsDefault
-                  ? 'Any price'
-                  : '£${_price.start.round()} to '
-                      '£${_price.end.round()}${_price.end >= _maxPounds ? ' or more' : ''} a night',
-              style: GoogleFonts.inter(
-                  fontSize: 13.5, color: GoOutsColors.bodyText),
-            ),
-            RangeSlider(
-              values: _price,
-              min: _minPounds,
-              max: _maxPounds,
-              divisions: 48,
-              activeColor: GoOutsColors.primaryBlue,
-              inactiveColor: GoOutsColors.surfaceBlue,
-              labels: RangeLabels(
-                '£${_price.start.round()}',
-                '£${_price.end.round()}',
-              ),
-              onChanged: (v) => setState(() => _price = v),
-            ),
+          children: children,
+        ),
+      );
 
-            _header('Property type'),
-            Wrap(
-              spacing: 8,
-              children: [
+  Widget _sectionHeader(String title) => Text(
+        title,
+        style: StayType.sectionHeader.on(GoOutsColors.deepNavy),
+      );
+
+  // ── Price ──────────────────────────────────────────────────────────────────
+
+  Widget _priceCard() => _card(
+        children: <Widget>[
+          _sectionHeader('Price range'),
+          const SizedBox(height: StaySpacing.inline),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Expanded(
+                child: _priceEnd(
+                  'Minimum price',
+                  '£${_price.start.round()}',
+                  TextAlign.left,
+                ),
+              ),
+              Expanded(
+                child: _priceEnd(
+                  'Maximum price',
+                  // The ceiling is "or more", not a cap. Without the plus, a
+                  // £900 a night property looks like it was excluded on price
+                  // when in fact no upper limit was ever set.
+                  _price.end >= _maxPounds
+                      ? '£${_maxPounds.round()}+'
+                      : '£${_price.end.round()}',
+                  TextAlign.right,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: StaySpacing.card),
+          RangeSlider(
+            values: _price,
+            min: _minPounds,
+            max: _maxPounds,
+            divisions: 48,
+            activeColor: GoOutsColors.primaryBlue,
+            inactiveColor: GoOutsColors.outlineVariant,
+            labels: RangeLabels(
+              '£${_price.start.round()}',
+              '£${_price.end.round()}',
+            ),
+            onChanged: (RangeValues v) => setState(() => _price = v),
+          ),
+        ],
+      );
+
+  Widget _priceEnd(String label, String value, TextAlign align) => Column(
+        crossAxisAlignment: align == TextAlign.left
+            ? CrossAxisAlignment.start
+            : CrossAxisAlignment.end,
+        children: <Widget>[
+          Text(label,
+              textAlign: align,
+              style: StayType.body.on(GoOutsColors.bodyText)),
+          const SizedBox(height: 2),
+          Text(value,
+              textAlign: align,
+              style: StayType.cardTitle.on(GoOutsColors.deepNavy)),
+        ],
+      );
+
+  // ── Property type ──────────────────────────────────────────────────────────
+
+  /// ⚠ SCROLLS SIDEWAYS, does not wrap. Stitch shows the fourth chip clipped at
+  /// the right edge, which is how it tells you there are more. A Wrap would
+  /// reflow to two rows and change the height of the card as chips are added.
+  Widget _propertyTypeCard() => _card(
+        children: <Widget>[
+          _sectionHeader('Property type'),
+          const SizedBox(height: StaySpacing.inline),
+          SizedBox(
+            height: 40,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: EdgeInsets.zero,
+              children: <Widget>[
                 // Selects the slug, shows the label. Selecting the label is
                 // the bug this section used to have.
-                for (final t in _propertyTypes.entries)
-                  ChoiceChip(
-                    label: Text(t.value),
-                    selected: _propertyType == t.key,
-                    onSelected: (sel) =>
-                        setState(() => _propertyType = sel ? t.key : null),
-                    selectedColor: GoOutsColors.paleBlueTint,
-                    labelStyle: GoogleFonts.inter(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w600,
-                      color: _propertyType == t.key
-                          ? GoOutsColors.primaryBlue
-                          : GoOutsColors.bodyText,
-                    ),
+                for (final MapEntry<String, String> t in _propertyTypes.entries)
+                  Padding(
+                    padding: const EdgeInsets.only(right: StaySpacing.card),
+                    child: _typeChip(t.key, t.value),
                   ),
               ],
             ),
+          ),
+        ],
+      );
 
-            _header('Bedrooms'),
-            Row(
-              children: [
-                _stepButton(
-                    Icons.remove,
-                    _bedrooms == 0
-                        ? null
-                        : () => setState(() => _bedrooms--)),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Text(
-                    _bedrooms == 0 ? 'Any' : '$_bedrooms or more',
-                    style: GoogleFonts.inter(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: GoOutsColors.deepNavy,
-                    ),
-                  ),
-                ),
-                _stepButton(
-                    Icons.add,
-                    _bedrooms >= 8
-                        ? null
-                        : () => setState(() => _bedrooms++)),
-              ],
-            ),
-
-            // The differentiator. Nobody else can offer this filter, because
-            // nobody else has a merchant network.
-            _header('GoOuts partners nearby'),
-            Text(
-              _minPartners == 0
-                  ? 'Any number of partners'
-                  : 'At least ${_minPartners.round()} within half a mile',
-              style: GoogleFonts.inter(
-                  fontSize: 13.5, color: GoOutsColors.bodyText),
-            ),
-            Slider(
-              value: _minPartners,
-              min: 0,
-              max: _maxPartners.toDouble(),
-              divisions: _maxPartners,
-              activeColor: GoOutsColors.primaryBlue,
-              inactiveColor: GoOutsColors.surfaceBlue,
-              label: _minPartners.round().toString(),
-              onChanged: (v) => setState(() => _minPartners = v),
-            ),
-
-            for (final entry in _amenityGroups.entries)
-              _amenityGroup(entry.key, entry.value),
-          ],
-        ),
-      ),
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-        decoration: const BoxDecoration(
-          color: GoOutsColors.cardSurface,
-          border: Border(top: BorderSide(color: GoOutsColors.dividerGray)),
-        ),
-        child: ElevatedButton(
-          onPressed: _apply,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: GoOutsColors.primaryBlue,
-            foregroundColor: GoOutsColors.cardSurface,
-            minimumSize: const Size(double.infinity, 52),
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+  Widget _typeChip(String slug, String label) {
+    final bool on = _propertyType == slug;
+    return Material(
+      color: on ? GoOutsColors.paleBlueTint : GoOutsColors.cardSurface,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => setState(() => _propertyType = on ? null : slug),
+        child: Container(
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: StaySpacing.page),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: on ? Colors.transparent : GoOutsColors.outlineVariant,
             ),
           ),
           child: Text(
-            _activeCount == 0 ? 'Show all places' : 'Apply $_activeCount filters',
-            style: GoogleFonts.inter(
-                fontSize: 16, fontWeight: FontWeight.w700),
+            label,
+            style: StayType.body.semibold.on(
+              on ? GoOutsColors.primaryBlue : GoOutsColors.bodyText,
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _header(String title) => Padding(
-        padding: const EdgeInsets.only(top: 20, bottom: 4),
-        child: Text(
-          title,
-          style: GoogleFonts.inter(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: GoOutsColors.primaryBlue,
+  // ── Bedrooms ───────────────────────────────────────────────────────────────
+
+  Widget _bedroomsCard() => _card(
+        children: <Widget>[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: <Widget>[
+              _sectionHeader('Bedrooms'),
+              Container(
+                decoration: BoxDecoration(
+                  color: GoOutsColors.pageBackground,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    _stepButton(Icons.remove,
+                        _bedrooms == 0 ? null : () => setState(() => _bedrooms--)),
+                    SizedBox(
+                      width: 48,
+                      child: Text(
+                        // "Any", or the number with a plus. The plus carries
+                        // "or more", which is what the query actually does —
+                        // a bare 2 reads as "exactly two bedrooms".
+                        _bedrooms == 0 ? 'Any' : '$_bedrooms+',
+                        textAlign: TextAlign.center,
+                        style: StayType.cardTitle.on(GoOutsColors.deepNavy),
+                      ),
+                    ),
+                    _stepButton(Icons.add,
+                        _bedrooms >= 8 ? null : () => setState(() => _bedrooms++)),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ),
+        ],
       );
 
   Widget _stepButton(IconData icon, VoidCallback? onTap) => IconButton(
         onPressed: onTap,
-        icon: Icon(icon),
+        icon: Icon(icon, size: 20),
+        visualDensity: VisualDensity.compact,
         color: GoOutsColors.primaryBlue,
         disabledColor: GoOutsColors.outlineVariant,
-        style: IconButton.styleFrom(
-          backgroundColor: GoOutsColors.cardSurface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
       );
 
-  Widget _amenityGroup(String title, List<StayAmenity> items) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 16, bottom: 4),
-            child: Text(
-              title,
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: GoOutsColors.deepNavy,
+  // ── Partners. The differentiator. ──────────────────────────────────────────
+  //
+  // Nobody else can offer this filter, because nobody else has a merchant
+  // network. Stitch gives it its own icon and its own card for that reason,
+  // rather than leaving it as a fourth slider in a list of sliders.
+
+  Widget _partnersCard() => _card(
+        children: <Widget>[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: GoOutsColors.paleBlueTint,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.storefront_outlined,
+                    size: 20, color: GoOutsColors.primaryBlue),
               ),
-            ),
-          ),
-          // The checkbox stores item.slug, which is what Firestore holds, and
-          // shows item.label, which is what a guest reads. Storing the label
-          // is the bug this file used to have.
-          for (final item in items)
-            CheckboxListTile(
-              value: _amenities.contains(item.slug),
-              onChanged: (on) => setState(() {
-                if (on ?? false) {
-                  _amenities.add(item.slug);
-                } else {
-                  _amenities.remove(item.slug);
-                }
-              }),
-              title: Text(
-                item.label,
-                style: GoogleFonts.inter(
-                  fontSize: 13.5,
-                  color: GoOutsColors.bodyText,
+              const SizedBox(width: StaySpacing.inline),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text('GoOuts partners nearby',
+                        style: StayType.cardTitle.on(GoOutsColors.deepNavy)),
+                    const SizedBox(height: 2),
+                    Text('Minimum partners within half a mile',
+                        style: StayType.body.on(GoOutsColors.bodyText)),
+                  ],
                 ),
               ),
-              contentPadding: EdgeInsets.zero,
-              controlAffinity: ListTileControlAffinity.leading,
-              activeColor: GoOutsColors.primaryBlue,
-              dense: true,
-            ),
+            ],
+          ),
+          const SizedBox(height: StaySpacing.inline),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: <Widget>[
+              Text(_minPartners == 0 ? 'Any number' : 'At least',
+                  style: StayType.cardTitle.on(GoOutsColors.primaryBlue)),
+              Text(
+                _minPartners == 0
+                    ? 'No minimum'
+                    : '${_minPartners.round()} '
+                        '${_minPartners.round() == 1 ? 'partner' : 'partners'}',
+                style: StayType.cardTitle.on(GoOutsColors.primaryBlue),
+              ),
+            ],
+          ),
+          Slider(
+            value: _minPartners,
+            min: 0,
+            max: _maxPartners.toDouble(),
+            divisions: _maxPartners,
+            activeColor: GoOutsColors.primaryBlue,
+            inactiveColor: GoOutsColors.outlineVariant,
+            label: _minPartners.round().toString(),
+            onChanged: (double v) => setState(() => _minPartners = v),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: <Widget>[
+              Text('None', style: StayType.caption.on(GoOutsColors.bodyText)),
+              Text('10', style: StayType.caption.on(GoOutsColors.bodyText)),
+              Text('$_maxPartners+',
+                  style: StayType.caption.on(GoOutsColors.bodyText)),
+            ],
+          ),
         ],
+      );
+
+  // ── Amenities ──────────────────────────────────────────────────────────────
+
+  Widget _amenitiesCard() => _card(
+        children: <Widget>[
+          for (final MapEntry<String, List<StayAmenity>> entry
+              in _amenityGroups.entries) ...<Widget>[
+            if (entry.key != _amenityGroups.keys.first)
+              const SizedBox(height: StaySpacing.section),
+            Text(entry.key,
+                style: StayType.cardTitle.on(GoOutsColors.deepNavy)),
+            const Padding(
+              padding: EdgeInsets.only(top: 6, bottom: 4),
+              child: Divider(height: 1, color: GoOutsColors.outlineVariant),
+            ),
+            // The checkbox stores item.slug, which is what Firestore holds, and
+            // shows item.label, which is what a guest reads. Storing the label
+            // is the bug this file used to have.
+            for (final StayAmenity item in entry.value) _amenityRow(item),
+          ],
+        ],
+      );
+
+  Widget _amenityRow(StayAmenity item) {
+    final bool on = _amenities.contains(item.slug);
+    return InkWell(
+      onTap: () => setState(() {
+        if (on) {
+          _amenities.remove(item.slug);
+        } else {
+          _amenities.add(item.slug);
+        }
+      }),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: <Widget>[
+            Expanded(
+              child: Text(item.label,
+                  style: StayType.body.on(GoOutsColors.deepNavy)),
+            ),
+            // ⚠ TRAILING, not leading. Stitch puts every tick on the right so
+            // the labels form one readable column down the card. A leading
+            // checkbox indents every label by 40px and the group headers stop
+            // lining up with the words under them.
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: Checkbox(
+                value: on,
+                onChanged: (bool? v) => setState(() {
+                  if (v ?? false) {
+                    _amenities.add(item.slug);
+                  } else {
+                    _amenities.remove(item.slug);
+                  }
+                }),
+                activeColor: GoOutsColors.tealSecondary,
+                checkColor: GoOutsColors.cardSurface,
+                side: const BorderSide(
+                    color: GoOutsColors.outlineVariant, width: 1.5),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Apply bar ──────────────────────────────────────────────────────────────
+
+  Widget _applyBar() => Container(
+        padding: const EdgeInsets.fromLTRB(
+            StaySpacing.page, StaySpacing.inline, StaySpacing.page, 28),
+        decoration: const BoxDecoration(
+          color: GoOutsColors.cardSurface,
+          border: Border(top: BorderSide(color: GoOutsColors.outlineVariant)),
+        ),
+        child: Row(
+          children: <Widget>[
+            // Stitch repeats Reset down here, because on a long sheet the one
+            // in the app bar has been scrolled past and out of mind.
+            TextButton(
+              onPressed: _activeCount == 0 ? null : _reset,
+              child: Text(
+                'Reset',
+                style: StayType.cardTitle
+                    .on(_activeCount == 0
+                        ? GoOutsColors.outlineVariant
+                        : GoOutsColors.deepNavy)
+                    .copyWith(decoration: TextDecoration.underline),
+              ),
+            ),
+            const SizedBox(width: StaySpacing.card),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: _apply,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: GoOutsColors.primaryBlue,
+                  foregroundColor: GoOutsColors.cardSurface,
+                  minimumSize:
+                      const Size(double.infinity, StaySpacing.buttonHeight),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  _activeCount == 0
+                      ? 'Show all places'
+                      : 'Apply $_activeCount '
+                          '${_activeCount == 1 ? 'filter' : 'filters'}',
+                  style: StayType.buttonText,
+                ),
+              ),
+            ),
+          ],
+        ),
       );
 }

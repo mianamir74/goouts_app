@@ -86,6 +86,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'ticket_status': return Icons.support_agent_outlined;
       case 'cashback':      return Icons.account_balance_wallet_outlined;
       case 'transaction':   return Icons.receipt_long_outlined;
+      // ── Short Stay. Added 29 August 2026. ──────────────────────────────
+      //
+      // ⚠ THE FIRST TWO ARE NOT NEW TYPES. stay_claim has been sent since 25
+      // August and stay_message_thread since the messaging build, and neither
+      // was ever added here — so a notification telling somebody a damage
+      // claim had been opened against them arrived wearing the same grey bell
+      // as a marketing message. Found while adding the review types.
+      case 'stay_claim':            return Icons.gavel_outlined;
+      case 'stay_message_thread':   return Icons.forum_outlined;
+      case 'stay_review_waiting':   return Icons.rate_review_outlined;
+      case 'stay_review_published': return Icons.star_rounded;
       default:              return Icons.notifications_none_outlined;
     }
   }
@@ -98,6 +109,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'ticket_status': return const Color(0xFFEDE7F6);
       case 'cashback':      return const Color(0xFFE1F5FE);
       case 'transaction':   return const Color(0xFFF5F5F5);
+      case 'stay_claim':            return const Color(0xFFFFEBEE);
+      case 'stay_message_thread':   return const Color(0xFFE1F5FE);
+      case 'stay_review_waiting':
+      case 'stay_review_published': return const Color(0xFFFFF8E1);
       default:              return const Color(0xFFF5F5F5);
     }
   }
@@ -110,6 +125,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'ticket_status': return const Color(0xFF6A1B9A);
       case 'cashback':      return _primary;
       case 'transaction':   return Colors.grey.shade600;
+      // Red, because a claim is money being asked for and it carries a 72
+      // hour clock. It should not look like a message.
+      case 'stay_claim':            return const Color(0xFFC62828);
+      case 'stay_message_thread':   return _primary;
+      case 'stay_review_waiting':
+      case 'stay_review_published': return const Color(0xFFF59E0B);
       default:              return Colors.grey.shade600;
     }
   }

@@ -10,7 +10,6 @@ import 'guest/06_amenities_full_screen.dart';
 import 'guest/07_days_out_screen.dart';
 import 'guest/08_cluster_detail_screen.dart';
 import 'guest/09_neighbourhood_screen.dart';
-import 'guest/10_whats_on_screen.dart';
 import 'guest/11_booking_dates_screen.dart';
 import 'guest/12_checkout_screen.dart';
 import 'guest/13_booking_confirmed_screen.dart';
@@ -35,6 +34,8 @@ import 'guest/27_edit_booking_screen.dart';
 import 'guest/28_cancel_booking_screen.dart';
 import 'guest/29_cancellation_confirmed_screen.dart';
 import 'models/stay_booking_request.dart';
+// For the typed cast of args['listings'] on the map route.
+import 'models/stay_listing.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Short Stay routing.
@@ -65,7 +66,6 @@ class StayRoutes {
   static const daysOut              = '/stay/days-out';
   static const cluster              = '/stay/days-out/cluster';
   static const neighbourhood        = '/stay/neighbourhood';
-  static const whatsOn              = '/stay/whats-on';
   static const bookingDates         = '/stay/book/dates';
   static const checkout             = '/stay/book/checkout';
   static const bookingConfirmed     = '/stay/book/confirmed';
@@ -93,7 +93,7 @@ class StayRoutes {
   /// route name produces a clear error rather than a blank screen.
   static const _all = <String>{
     home, results, filters, map, listing, amenities, daysOut, cluster,
-    neighbourhood, whatsOn, bookingDates, checkout, bookingConfirmed,
+    neighbourhood, bookingDates, checkout, bookingConfirmed,
     myBookings, trip, bookingDetails, editBooking, cancelBooking,
     cancellationDone, captureIntro, captureChecklist, cameraCapture, skipRoom,
     captureComplete, checkoutCapture, evidencePack, claim, contestClaim, review,
@@ -172,20 +172,64 @@ class StayRoutes {
           results           => SearchResultsScreen(
                 criteria: args['criteria'] as StaySearchCriteria?,
               ),
-          filters           => const SearchFiltersSheet(),
-          map               => const MapResultsScreen(),
+          // ⚠ TAKES THE CRITERIA. Fixed 29 August 2026, and it is the exact
+          // fault this file warns about thirty lines above: screen 02 has
+          // always pushed `arguments: {'criteria': _criteria}` here, and this
+          // line answered with `const SearchFiltersSheet()` and dropped it.
+          //
+          // The sheet therefore opened blank every time, and — worse — applied
+          // its result onto an EMPTY criteria, discarding the town, the dates
+          // and the guest count. Filtering by price in Richmond returned the
+          // whole country. See _apply in 03_search_filters_screen.dart.
+          filters           => SearchFiltersSheet(
+                initial: args['criteria'] as StaySearchCriteria?,
+              ),
+          // ⚠ TAKES THE RESULTS. Fixed 29 August 2026. MapResultsScreen has
+          // always accepted `listings`, and this line built it `const` — so
+          // the list was empty on every open and the screen showed its own
+          // "Nothing to show on the map" empty state, permanently. A live
+          // route with no data behind it, exactly as 07 and 08 were.
+          //
+          // The results are PASSED rather than re-queried on purpose, so the
+          // map and the list cannot disagree about what was found.
+          map               => MapResultsScreen(
+                listings: (args['listings'] as List<StayListing>?) ??
+                    const <StayListing>[],
+                criteria: args['criteria'] as StaySearchCriteria?,
+              ),
           listing           => ListingDetailScreen(listingId: listingId),
           amenities         => AmenitiesFullScreen(listingId: listingId),
           // ── WIRED 28 August 2026. Both took NOTHING before, which is part of
           // why they were never wired: with no property they cannot know which
           // city to read or which day out is nearest. See stay_attractions.js.
-          daysOut           => DaysOutScreen(listingId: listingId),
+          // ⚠ fromListing DECIDES WHICH BOTTOM TAB IS LIT. Added 29 August
+          // 2026, when days out started appearing on the property screen as
+          // well as the trip screen.
+          //
+          // A browsing guest is in Search, not Trips. Lighting Trips is not
+          // cosmetic: the active tab does nothing when tapped, so it makes
+          // Search look like the way back — and Search is
+          // pushNamedAndRemoveUntil, which throws away the property they were
+          // reading. See the note on DaysOutScreen.fromListing.
+          daysOut           => DaysOutScreen(
+                listingId: listingId,
+                fromListing: args['fromListing'] == true,
+              ),
           cluster           => ClusterDetailScreen(
                 listingId: listingId,
                 clusterId: id('clusterId'),
+                fromListing: args['fromListing'] == true,
               ),
-          neighbourhood     => const NeighbourhoodScreen(),
-          whatsOn           => const WhatsOnScreen(),
+          // ⚠ WIRED 29 August 2026, and it takes the property. This was
+          // `const NeighbourhoodScreen()` in front of a screen whose "map" was
+          // an Unsplash photograph of a city from above with Positioned() pins
+          // at fixed pixel offsets on top of it, and every handler empty.
+          //
+          // The data had been there the whole time: locationContext
+          // .nearestPartners, up to ten partners within three miles with a
+          // name, a category, a distance and a cashback rate, written by
+          // enrichListingLocation and only ever surfaced as a COUNT.
+          neighbourhood     => NeighbourhoodScreen(listingId: listingId),
           bookingDates      => BookingDatesScreen(listingId: listingId),
           // Checkout cannot be opened cold — without a selection there is
           // nothing to price. Reached directly (a deep link, or a mistake in a
@@ -243,7 +287,14 @@ class StayRoutes {
           // pushNamed(claim, arguments: id) works from a push notification tap.
           claim             => ClaimNotificationScreen(claimId: claimId),
           contestClaim      => ContestClaimScreen(claimId: claimId),
-          review            => const ReviewStayScreen(),
+          // ⚠ TAKES THE BOOKING. Wired 29 August 2026. This was
+          // `const ReviewStayScreen()` in front of a screen that accepted
+          // nothing, and NOTHING PUSHED IT — a live route with no way in, over
+          // a form that could not have known which stay it was about. See
+          // functions/stay_reviews.js for what was behind it, which was
+          // nothing at all: every real listing sat at ratingAvg 0 while four
+          // screens read reviews that only the demo seed could produce.
+          review            => ReviewStayScreen(bookingId: bookingId),
           _                 => const _StayRouteMissing(),
         };
 

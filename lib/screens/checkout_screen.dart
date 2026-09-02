@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/cart_service.dart';
 import '../services/delivery_address_service.dart';
@@ -16,7 +17,7 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   // ── Brand colours ──────────────────────────────────────────────────────────
-  static const Color _primary  = Color(0xFFEA580C); // orange
+  static const Color _primary  = Color(0xFF0392CA); // GoOuts blue. Was 0xFFEA580C.
   static const Color _navy     = Color(0xFF0D1B3E);
   static const Color _green    = Color(0xFF10B981);
   static const Color _blue     = Color(0xFF0392CA);
@@ -128,7 +129,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 width: 72, height: 72,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF7C3AED), Color(0xFFEA580C)],
+                    colors: [Color(0xFF7C3AED), Color(0xFF0392CA)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -149,7 +150,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF7C3AED), Color(0xFFEA580C)],
+                    colors: [Color(0xFF7C3AED), Color(0xFF0392CA)],
                     begin: Alignment.centerLeft,
                     end: Alignment.centerRight,
                   ),
@@ -234,60 +235,58 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final uid = _auth.currentUser?.uid;
       if (uid == null) throw Exception('Not signed in');
 
-      final orderRef = _db.collection('food_orders').doc();
+      // ── ⚠ THE SERVER PRICES THIS ORDER. THIS SCREEN DOES NOT. ─────────────
+      //
+      //  Until 31 August 2026 this method built the whole order document and
+      //  wrote it straight to Firestore, prices included:
+      //
+      //      'subtotal'   : _cart.subtotal,
+      //      'serviceFee' : serviceFee,
+      //      'deliveryFee': _effectiveDeliveryFee,
+      //      'total'      : _cart.subtotal + _effectiveDeliveryFee,
+      //      await orderRef.set(orderData);
+      //
+      //  ⚠ EVERY ONE OF THOSE NUMBERS WAS ATTACKER CONTROLLED. Not through a
+      //  bug, through the design: the rules allowed any signed in account to
+      //  create any order document, so `total: 0.01` bought a hundred pounds
+      //  of food. A comment here even said the service fee was needed by the
+      //  Cloud Function for VAT, which meant the server was filing tax figures
+      //  it had read back off a document the customer wrote.
+      //
+      //  ⚠ ONLY ITEM IDS AND QUANTITIES GO UP NOW. Prices, VAT, the delivery
+      //  fee and the discount are all decided by createFoodOrder against the
+      //  menu the restaurant published. `food_orders` create is `if false` in
+      //  the rules, so there is no second path back.
+      //
+      //  ⚠ expectedTotal IS NOT A PRICE, IT IS A QUESTION. The server compares
+      //  it with what it worked out and REFUSES on a mismatch rather than
+      //  adjusting. A menu price changing while somebody was choosing should
+      //  produce "the price has changed", not a silent overcharge.
+      final res = await FirebaseFunctions.instanceFor(region: 'europe-west1')
+          .httpsCallable('createFoodOrder')
+          .call<Map<String, dynamic>>({
+        'restaurantId': _cart.restaurantId,
+        'items': _cart.items
+            .map((i) => {'itemId': i.itemId, 'quantity': i.quantity})
+            .toList(),
+        'deliveryAddress': _deliveryAddress,
+        'paymentMethod': _selectedPayment,
+        'specialNote': _noteCtrl.text.trim(),
+        'socialBoostCodeId': _boostApplied ? _boostCodeId : null,
+        // ⚠ EXACTLY WHAT THIS SCREEN DISPLAYS, and nothing cleverer. The
+        // server compares it with its own figure and refuses on a mismatch,
+        // so any drift between what is shown and what is charged becomes a
+        // visible error instead of a silent overcharge.
+        'expectedTotal': _cart.subtotal + _effectiveDeliveryFee,
+      });
 
-      // VAT-inclusive extraction from cart items (food VAT)
-      final foodVatTotal = _cart.foodVatTotal;
+      final orderId = '${res.data['orderId'] ?? ''}';
+      if (orderId.isEmpty) throw Exception('Order was not created');
 
-      // GoOuts own VAT: service fee (10% of subtotal) + delivery fee at 20% each
-      // This mirrors the Cloud Function logic — stored on order so CF can verify
-      const serviceFeeRate = 0.10;
-      final serviceFee     = double.parse((_cart.subtotal * serviceFeeRate).toStringAsFixed(2));
-      final gooutsVatTotal = double.parse(
-          ((serviceFee * 0.20) + (_effectiveDeliveryFee * 0.20)).toStringAsFixed(2));
-
-      // Customer display name for driver app + vat_records
-      final customerName = FirebaseAuth.instance.currentUser?.displayName ?? '';
-
-      final orderData = {
-        'orderId'           : orderRef.id,
-        'userId'            : uid,
-        'customerName'      : customerName,
-        'restaurantId'      : _cart.restaurantId,
-        'restaurantName'    : _cart.restaurantName,
-        'items'             : _cart.items.map((i) => i.toMap()).toList(),
-        'subtotal'          : _cart.subtotal,
-        'serviceFee'        : serviceFee,       // needed by Cloud Function for VAT
-        'deliveryFee'       : _effectiveDeliveryFee,
-        'total'             : _cart.subtotal + _effectiveDeliveryFee,
-        'foodVatTotal'      : foodVatTotal,
-        'gooutsVatTotal'    : gooutsVatTotal,
-        'grandTotalVat'     : double.parse((foodVatTotal + gooutsVatTotal).toStringAsFixed(2)),
-        'deliveryAddress'   : _deliveryAddress,
-        'paymentMethod'     : _selectedPayment,
-        'specialNote'       : _noteCtrl.text.trim(),
-        'status'            : 'pending',
-        'socialBoostApplied': _boostApplied,
-        'socialBoostCodeId' : _boostApplied ? _boostCodeId : null,
-        'createdAt'         : FieldValue.serverTimestamp(),
-        'estimatedMins'     : _cart.deliveryMins,
-      };
-
-      await orderRef.set(orderData);
-
-      // Mark social boost code as used
-      if (_boostApplied && _boostCodeId != null) {
-        await _db
-            .collection('users')
-            .doc(uid)
-            .collection('socialBoostCodes')
-            .doc(_boostCodeId)
-            .update({
-          'used'      : true,
-          'usedAt'    : FieldValue.serverTimestamp(),
-          'usedOnOrder': orderRef.id,
-        });
-      }
+      // ⚠ THE BOOST CODE IS NO LONGER MARKED USED FROM HERE. It is claimed in
+      // the same transaction that writes the order, so the two cannot come
+      // apart. Doing it separately, as this screen used to, meant a failure on
+      // the second write left a free delivery with the code still unspent.
 
       // Clear cart
       _cart.clear();
@@ -299,7 +298,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           MaterialPageRoute(
             builder: (_) => const FoodOrderTrackingScreen(),
             settings: RouteSettings(arguments: {
-              'orderId':        orderRef.id,
+              'orderId':        orderId,
               'restaurantId':   _cart.restaurantId ?? '',
               'restaurantName': _cart.restaurantName ?? '',
             }),
@@ -600,7 +599,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFF7C3AED), Color(0xFFEA580C)],
+                            colors: [Color(0xFF7C3AED), Color(0xFF0392CA)],
                           ),
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -666,7 +665,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF7C3AED), Color(0xFFEA580C)],
+          colors: [Color(0xFF7C3AED), Color(0xFF0392CA)],
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
         ),
@@ -859,7 +858,7 @@ class _AddressPickerSheet extends StatefulWidget {
 
 class _AddressPickerSheetState extends State<_AddressPickerSheet> {
   static const Color _navy    = Color(0xFF0D1B3E);
-  static const Color _primary = Color(0xFFEA580C);
+  static const Color _primary = Color(0xFF0392CA);
   static const Color _blue    = Color(0xFF0392CA);
 
   final _ctrl = TextEditingController();

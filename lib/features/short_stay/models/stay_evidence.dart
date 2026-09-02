@@ -17,6 +17,39 @@ import 'stay_enums.dart';
 // worthless in a dispute.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// The pre-existing damage entry, stored in `room` like any other.
+///
+/// ── ⚠ A SLUG, NOT THE WORDS ─────────────────────────────────────────────────
+///
+///  Written 29 August 2026. Every display site maps it through
+///  [stayRoomLabel], so the wording can be changed without orphaning every
+///  photograph already taken under the old sentence.
+///
+///  This codebase has been bitten repeatedly by storing a LABEL where a slug
+///  belonged — amenities and property types both did it, and in both cases a
+///  filter silently matched nothing. A room name that is user-visible prose is
+///  the same trap: rename it and the server can no longer recognise it.
+///
+/// ── ⚠ IT IS NOT ONE OF THE REQUIRED ROOMS AND MUST NEVER BECOME ONE ─────────
+///
+///  captureRooms comes from the server and lists the rooms a guest has to
+///  photograph. This is not on that list, deliberately:
+///
+///    · it is OPTIONAL. Forcing a photograph of damage from a guest who found
+///      a spotless flat leaves them unable to finish, holding a camera,
+///      looking for a scratch.
+///    · both counters — syncStayCaptureProgress and _phaseFrom — now count
+///      only rooms that appear in captureRooms, so a damage photograph cannot
+///      push a phase to "complete" with a real room unphotographed.
+const String kStayDamageRoom = '__existing_damage';
+
+/// What to show a person for a stored room value.
+///
+/// Ordinary rooms are stored as their own display names ("Living room") and
+/// pass straight through. Only the reserved slugs are translated.
+String stayRoomLabel(String room) =>
+    room == kStayDamageRoom ? 'Anything already damaged' : room;
+
 class StayEvidence {
   final String id;
   final CaptureKind kind;

@@ -71,6 +71,22 @@ class StayBooking {
   /// until then, and false forever on a stay that was never paid for.
   final bool cashbackAwarded;
 
+  // ── ADDED 29 August 2026, with functions/stay_reviews.js ──────────────────
+  //
+  // Server writes, client reads, like the payment block above.
+
+  /// True the moment this guest submits, NOT when the pair is published.
+  ///
+  /// ⚠ THE DISTINCTION IS THE WHOLE POINT. Reviews are double blind, so a
+  /// guest who has written waits for the host — sometimes for the full
+  /// fourteen days. Keying the invitation off publication would show them
+  /// "Review your stay" for a fortnight after they already had, and hand them
+  /// an already-exists error when they accepted it.
+  final bool reviewSubmittedByGuest;
+
+  /// When both sides became visible. Null while the stay is still blind.
+  final DateTime? reviewsPublishedAt;
+
   const StayBooking({
     required this.id,
     required this.listingId,
@@ -93,6 +109,8 @@ class StayBooking {
     required this.paymentMode,
     required this.cashbackAwarded,
     required this.claimId,
+    this.reviewSubmittedByGuest = false,
+    this.reviewsPublishedAt,
   });
 
   factory StayBooking.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) =>
@@ -134,6 +152,8 @@ class StayBooking {
       paymentMethod: m['paymentMethod'] as String?,
       paymentMode: (m['paymentMode'] ?? 'none') as String,
       cashbackAwarded: m['cashbackAwarded'] == true,
+      reviewSubmittedByGuest: m['reviewSubmittedByGuest'] == true,
+      reviewsPublishedAt: (m['reviewsPublishedAt'] as Timestamp?)?.toDate(),
     );
   }
 
@@ -153,6 +173,41 @@ class StayBooking {
   /// The 72 hour window in which a host may claim, from checkout.
   DateTime get claimWindowCloses => checkOut.add(const Duration(hours: 72));
   bool get claimWindowOpen => DateTime.now().isBefore(claimWindowCloses);
+
+  /// ── REVIEWS ──────────────────────────────────────────────────────────────
+  ///
+  /// ⚠ FOURTEEN DAYS, AND THE SAME NUMBER LIVES IN stay_reviews.js AS
+  /// REVIEW_WINDOW_DAYS. If one changes the other changes with it, or the app
+  /// offers a guest a review form that the server then refuses — the same trap
+  /// recorded against claimWindowHours in stay_config.js.
+  ///
+  /// ⚠ AND IT IS NOT THE CLAIM WINDOW. Those two are unrelated: a claim moves
+  /// money and closes in 72 hours, a review does not and does not.
+  static const int reviewWindowDays = 14;
+
+  DateTime get reviewWindowCloses =>
+      checkOut.add(const Duration(days: reviewWindowDays));
+  bool get reviewWindowOpen => DateTime.now().isBefore(reviewWindowCloses);
+
+  /// Whether to offer this guest the review form.
+  ///
+  /// ⚠ GATED ON THE DATES, NOT ON status == completed. BookingStatus declares
+  /// `completed` and NOTHING IN THE PLATFORM EVER WRITES IT — verified 29
+  /// August 2026, the only writers of those words anywhere in functions/ are
+  /// the capture phase tracker and a support ticket. A booking is created
+  /// pending, becomes confirmed, and stays confirmed for years. Gating on it
+  /// would have produced a review form nobody could ever reach, and it would
+  /// have looked like a quiet feature rather than a fault.
+  bool get canGuestReview =>
+      isPast &&
+      !status.isCancelled &&
+      status != BookingStatus.declined &&
+      reviewWindowOpen &&
+      !reviewSubmittedByGuest;
+
+  /// Written, waiting on the host. The screen says so rather than going quiet.
+  bool get awaitingOtherReview =>
+      reviewSubmittedByGuest && reviewsPublishedAt == null;
 
   bool get needsCheckInCapture =>
       (isStaying || daysUntilCheckIn == 0) && !capture.guestCheckIn.isComplete;

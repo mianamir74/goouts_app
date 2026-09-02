@@ -26,6 +26,9 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/stay_listing.dart';
 import '../services/stay_availability_service.dart';
 import '../services/stay_booking_service.dart';
+// For watchSaved / setSaved on the card heart. Both existed and nothing called
+// them until 28 August 2026.
+import '../services/stay_listing_service.dart';
 import '../stay_routes.dart';
 import '../theme/stay_colors.dart';
 import '../widgets/stay_bottom_nav.dart';
@@ -139,7 +142,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
             Text(
               _criteria.town ?? 'Anywhere in the UK',
               style: GoogleFonts.inter(
-                fontSize: 16,
+                fontSize: 15,
                 fontWeight: FontWeight.w700,
                 color: GoOutsColors.deepNavy,
               ),
@@ -331,8 +334,22 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                   _pickSort),
             ],
           ),
+          // ⚠ HANDS THE RESULTS OVER. Fixed 29 August 2026. This pushed the
+          // map route with no arguments at all, and the map screen — which has
+          // always accepted a listings list — received an empty one and drew
+          // its "Nothing to show on the map" state every single time.
+          //
+          // The list is PASSED rather than re-queried on the other side so the
+          // two views cannot disagree, and so opening the map costs no second
+          // Firestore read. The criteria goes with it for the header.
           _buildUtilityButton(Icons.map, 'Map', () {
-            Navigator.of(context).pushNamed(StayRoutes.map);
+            Navigator.of(context).pushNamed(
+              StayRoutes.map,
+              arguments: <String, dynamic>{
+                'listings': _page.listings,
+                'criteria': _criteria,
+              },
+            );
           }),
         ],
       ),
@@ -429,10 +446,39 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         ),
       );
 
+  // ── The property card, rebuilt to Stitch 2-search_results, 28 August 2026 ──
+  //
+  // ── ⚠ THE PARTNER COUNT WAS A GREY FOOTNOTE ON THE BROWSE SCREEN ───────────
+  //
+  // Stitch runs it as a SOLID BLUE BANNER across the full width of every card,
+  // directly under the transport line, and it is the strongest thing on the
+  // card by a distance. Ours had it twice and quietly: a translucent chip on
+  // the photograph, and a small rounded pill at the bottom under the price.
+  //
+  // This is the screen where a guest compares us against Airbnb. A photograph
+  // and a price are what every other app shows. "14 GoOuts partners within half
+  // a mile" is the only line on the card that no other app can write, and it
+  // was the least prominent thing on it.
+  //
+  // ⚠ AND IT IS RENDERED ONCE. It appeared as both a photo chip and a footer
+  // pill, which is the same fact twice on one card.
+  //
+  // ── ⚠ THE TRANSPORT LINE NOW USES THE STATION, NOT THE CITY CENTRE ─────────
+  //
+  // Stitch says "0.4 miles from Wembley Park, Jubilee and Metropolitan lines".
+  // We were saying "2.1 miles from Central London", which is a worse answer to
+  // the question a guest is actually asking, and StayStation has carried name,
+  // lines and walkMi the whole time. locationContext.stations was populated and
+  // this screen never read it.
+  //
+  // Falls back to the distance-to-centre line when a property has no station,
+  // rather than dropping the row.
   Widget _buildPropertyCard(StayListing l) {
-    final cover = l.photos.isNotEmpty ? l.photos.first.url : '';
-    final headline = l.locationContext?.partnerCounts.headline;
-    final centre = l.locationContext;
+    final String cover = l.photos.isNotEmpty ? l.photos.first.url : '';
+    final String? headline = l.locationContext?.partnerCounts.headline;
+    final StayLocationContext? ctx = l.locationContext;
+    final StayStation? station =
+        (ctx != null && ctx.stations.isNotEmpty) ? ctx.stations.first : null;
 
     return InkWell(
       onTap: () => Navigator.of(context).pushNamed(
@@ -452,71 +498,58 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
             ),
           ],
         ),
+        clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(14)),
-              child: Stack(children: <Widget>[
-              cover.isEmpty
-                  ? Container(
-                      height: 200,
-                      color: GoOutsColors.dividerGray,
-                      child: const Icon(Icons.home_outlined,
-                          size: 40, color: GoOutsColors.outlineVariant),
-                    )
-                  : Image.network(
-                      cover,
-                      height: 200,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      // Decoded at roughly display width. A full resolution
-                      // decode per card is how a list eats memory, and this
-                      // app has been killed by iOS for that before.
-                      cacheWidth: 800,
-                      errorBuilder: (_, __, ___) => Container(
+          children: <Widget>[
+            Stack(
+              children: <Widget>[
+                cover.isEmpty
+                    ? Container(
                         height: 200,
+                        width: double.infinity,
                         color: GoOutsColors.dividerGray,
-                        child: const Icon(Icons.broken_image_outlined,
-                            color: GoOutsColors.outlineVariant),
+                        child: const Icon(Icons.home_outlined,
+                            size: 40, color: GoOutsColors.outlineVariant),
+                      )
+                    : Image.network(
+                        cover,
+                        height: 200,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        // Decoded at roughly display width. A full resolution
+                        // decode per card is how a list eats memory, and this
+                        // app has been killed by iOS for that before.
+                        cacheWidth: 800,
+                        errorBuilder: (_, __, ___) => Container(
+                          height: 200,
+                          color: GoOutsColors.dividerGray,
+                          child: const Icon(Icons.broken_image_outlined,
+                              color: GoOutsColors.outlineVariant),
+                        ),
                       ),
+                // Cashback stays on the photograph. It is a real figure and it
+                // is not the same claim as the partner count below.
+                if (_rate.isKnown)
+                  Positioned(
+                    right: 10,
+                    top: 10,
+                    child: _photoChip(
+                      '${_rate.label} back',
+                      colour: GoOutsColors.tealSecondary,
                     ),
-              // ── OVERLAY CHIPS ────────────────────────────────────────
-              //
-              // Both hidden when the data behind them is absent. headline is
-              // null when there is nothing nearby to claim, and _rate is
-              // unknown until the server tells us — see the note at the top
-              // of this file about the mock card that always said 18.
-              if (headline != null)
-                Positioned(
-                  left: 10,
-                  top: 10,
-                  child: _photoChip(
-                    headline,
-                    colour: GoOutsColors.deepNavy.withValues(alpha: 0.82),
-                    icon: Icons.local_offer_outlined,
                   ),
-                ),
-              if (_rate.isKnown)
-                Positioned(
-                  right: 10,
-                  top: 10,
-                  child: _photoChip(
-                    '${_rate.label} back',
-                    colour: GoOutsColors.tealSecondary,
-                  ),
-                ),
-              ]),
+                Positioned(left: 10, top: 10, child: _saveButton(l)),
+              ],
             ),
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+                children: <Widget>[
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                    children: <Widget>[
                       Expanded(
                         child: Text(
                           l.title,
@@ -524,6 +557,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                           overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.inter(
                             fontSize: 14,
+                            height: 20 / 14,
                             fontWeight: FontWeight.w600,
                             color: GoOutsColors.deepNavy,
                           ),
@@ -531,62 +565,135 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                       ),
                       // A rating of zero is "no reviews yet", not "nought out
                       // of five". Showing 0.0 would libel a new listing.
-                      if (l.ratingCount > 0) ...[
+                      if (l.ratingCount > 0) ...<Widget>[
                         const SizedBox(width: 8),
-                        const Icon(Icons.star,
-                            size: 14, color: GoOutsColors.warning),
-                        const SizedBox(width: 4),
-                        Text(
-                          l.ratingAvg.toStringAsFixed(1),
-                          style: GoogleFonts.inter(
-                              fontSize: 12, fontWeight: FontWeight.w500),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: GoOutsColors.paleBlueTint,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: <Widget>[
+                              const Icon(Icons.star_border_rounded,
+                                  size: 14, color: GoOutsColors.primaryBlue),
+                              const SizedBox(width: 3),
+                              Text(
+                                l.ratingAvg.toStringAsFixed(1),
+                                style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    height: 16 / 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: GoOutsColors.primaryBlue),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  if (centre != null && centre.centreName.isNotEmpty)
+                  const SizedBox(height: 6),
+                  if (station != null)
                     Text(
-                      // "miles from", never "minutes from". The stored value
-                      // is a straight line distance.
-                      '${centre.distanceToCentreMi.toStringAsFixed(1)} miles '
-                      'from ${centre.centreName}',
+                      // Exactly the shape Stitch draws, from data we already
+                      // hold. "miles", never "minutes": walkMi is a distance.
+                      '${station.walkMi.toStringAsFixed(1)} miles from '
+                      '${station.name}, ${station.linesLabel}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: GoOutsColors.bodyText,
-                      ),
+                          fontSize: 13.5,
+                          height: 20 / 13.5,
+                          color: GoOutsColors.bodyText),
+                    )
+                  else if (ctx != null && ctx.centreName.isNotEmpty)
+                    Text(
+                      '${ctx.distanceToCentreMi.toStringAsFixed(1)} miles '
+                      'from ${ctx.centreName}',
+                      style: GoogleFonts.inter(
+                          fontSize: 13.5,
+                          height: 20 / 13.5,
+                          color: GoOutsColors.bodyText),
                     ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _rate.isKnown
-                        ? '${l.nightlyRate.compact} per night · '
-                            '${_rate.label} back'
-                        : '${l.nightlyRate.compact} per night',
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: GoOutsColors.deepNavy,
-                    ),
-                  ),
-                  if (headline != null) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: GoOutsColors.primaryBlue,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
+                ],
+              ),
+            ),
+
+            // ⚠ THE BANNER. Full width, solid, and the loudest thing on the
+            // card. Hidden entirely when headline is null, which is what it
+            // returns when there is genuinely nothing nearby to claim.
+            if (headline != null) ...<Widget>[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                color: GoOutsColors.primaryBlue,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                child: Row(
+                  children: <Widget>[
+                    const Icon(Icons.verified_rounded,
+                        size: 17, color: Colors.white),
+                    const SizedBox(width: 9),
+                    Expanded(
                       child: Text(
                         headline,
                         style: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 13.5,
+                          height: 20 / 13.5,
+                          fontWeight: FontWeight.w700,
                           color: Colors.white,
                         ),
                       ),
                     ),
                   ],
+                ),
+              ),
+            ] else
+              const SizedBox(height: 12),
+
+            // Price and the call to action, as Stitch lays them out.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+              child: Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text('Total per night',
+                            style: GoogleFonts.inter(
+                                fontSize: 12,
+                                height: 16 / 12,
+                                color: GoOutsColors.bodyText)),
+                        Text(l.nightlyRate.compact,
+                            style: GoogleFonts.inter(
+                                fontSize: 20,
+                                height: 28 / 20,
+                                fontWeight: FontWeight.w700,
+                                color: GoOutsColors.deepNavy)),
+                      ],
+                    ),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.of(context).pushNamed(
+                      StayRoutes.listing,
+                      arguments: {'listingId': l.id},
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: GoOutsColors.primaryBlue,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: Text('View property',
+                        style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white)),
+                  ),
                 ],
               ),
             ),
@@ -595,4 +702,38 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
       ),
     );
   }
+
+  /// ── ⚠ THE HEART. setSaved AND watchSaved EXISTED AND NOTHING CALLED THEM. ──
+  ///
+  /// StayListingService has carried both since the service was written, with a
+  /// comment describing saving as "the only listing related write a guest may
+  /// make". No screen ever used either, so the feature was complete and
+  /// unreachable. Stitch draws the heart on this card, so here it is.
+  ///
+  /// Streamed per card rather than loaded once, because a guest who saves a
+  /// property on the detail screen and comes back should see it filled in
+  /// without a refresh.
+  Widget _saveButton(StayListing l) => StreamBuilder<bool>(
+        stream: StayListingService.instance.watchSaved(l.id),
+        builder: (BuildContext c, AsyncSnapshot<bool> snap) {
+          final bool saved = snap.data ?? false;
+          return Material(
+            color: Colors.white,
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: () => StayListingService.instance.setSaved(l.id, !saved),
+              child: Padding(
+                padding: const EdgeInsets.all(7),
+                child: Icon(
+                  saved ? Icons.favorite : Icons.favorite_border,
+                  size: 19,
+                  color:
+                      saved ? GoOutsColors.error : GoOutsColors.deepNavy,
+                ),
+              ),
+            ),
+          );
+        },
+      );
 }

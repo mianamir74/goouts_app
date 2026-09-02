@@ -32,6 +32,7 @@ import '../models/stay_enums.dart';
 import '../models/stay_listing.dart';
 import '../services/stay_booking_service.dart';
 import '../services/stay_listing_service.dart';
+import '../services/stay_message_service.dart';
 import '../theme/stay_colors.dart';
 
 class EditBookingScreen extends StatefulWidget {
@@ -53,6 +54,10 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
   int _children = 0;
   int _infants = 0;
 
+  /// The optional note that travels to the host as a message once the
+  /// amendment succeeds. See _noteCard.
+  final TextEditingController _note = TextEditingController();
+
   StayQuote? _quote;
   bool _loading = true;
   bool _quoting = false;
@@ -64,6 +69,15 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  // ⚠ THE SCREEN HAD NO dispose AT ALL until 29 August 2026, because it had no
+  // controllers. It has one now, and a TextEditingController that is never
+  // disposed leaks its listeners for the life of the app.
+  @override
+  void dispose() {
+    _note.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -213,6 +227,8 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
                       const SizedBox(height: 16),
                     ],
                     _priceCard(),
+                    const SizedBox(height: 16),
+                    _noteCard(),
                     const SizedBox(height: 100),
                   ],
                 ),
@@ -235,6 +251,89 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
           borderRadius: BorderRadius.circular(12),
         ),
         child: child,
+      );
+
+  // ── A note for the host ──────────────────────────────────────────────────
+  //
+  //  Stitch draws this on the edit screen and we did not have it.
+  //
+  //  ── ⚠ IT IS SENT AS A MESSAGE, NOT STORED ON THE BOOKING ────────────────
+  //
+  //  amendStayBooking does not accept a note. I checked parseAmendment before
+  //  building this: it reads checkIn, checkOut and guests and nothing else, so
+  //  a note passed to it would be silently dropped — a text box a guest types
+  //  into that goes nowhere, which is the exact fault this whole pass keeps
+  //  finding.
+  //
+  //  Adding a note field to the booking document would have meant a second
+  //  home for guest to host text, and a new place in the HOST app to read it.
+  //  There is already a message thread on every booking, the host already has
+  //  a screen for it, and notifyOnStayMessage already pushes it to them. So
+  //  the note goes there.
+  //
+  //  ⚠ SENT ONLY IF THE AMENDMENT SUCCEEDS. See _confirm. A note about dates
+  //  that were never changed is worse than no note.
+
+  Widget _noteCard() => _card(
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.chat_bubble_outline_rounded,
+                    size: 18, color: GoOutsColors.primaryBlue),
+                const SizedBox(width: 8),
+                Text('Add a note for the host',
+                    style: GoogleFonts.inter(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: GoOutsColors.deepNavy)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Optional. It arrives in your message thread with them.',
+              style: GoogleFonts.inter(
+                  fontSize: 12, color: GoOutsColors.bodyText),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _note,
+              maxLines: 3,
+              maxLength: 500,
+              textCapitalization: TextCapitalization.sentences,
+              style: GoogleFonts.inter(
+                  fontSize: 13.5, color: GoOutsColors.deepNavy),
+              decoration: InputDecoration(
+                hintText:
+                    'Let the host know about your arrival time or anything '
+                    'they should plan for',
+                hintStyle: GoogleFonts.inter(
+                    fontSize: 13.5, color: GoOutsColors.outlineVariant),
+                counterStyle: GoogleFonts.inter(
+                    fontSize: 12, color: GoOutsColors.bodyText),
+                filled: true,
+                fillColor: GoOutsColors.pageBackground,
+                contentPadding: const EdgeInsets.all(12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide:
+                      const BorderSide(color: GoOutsColors.outlineVariant),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide:
+                      const BorderSide(color: GoOutsColors.outlineVariant),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide:
+                      const BorderSide(color: GoOutsColors.primaryBlue),
+                ),
+              ),
+            ),
+          ],
+        ),
       );
 
   // ── Dates ────────────────────────────────────────────────────────────────
@@ -620,6 +719,16 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
 
   Future<void> _confirm() async {
     if (_submitting) return;
+
+    // ⚠ BOTH CAPTURED BEFORE THE POP. This read the messenger off `context`
+    // on the line AFTER Navigator.pop(), so it was looking one up through a
+    // context that had just left the tree. It survives today only because the
+    // nearest ScaffoldMessenger happens to be the app level one; a screen level
+    // messenger anywhere above this route would swallow the confirmation
+    // silently. Same fault, same fix, as the host review sheet.
+    final NavigatorState nav = Navigator.of(context);
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+
     setState(() => _submitting = true);
     try {
       final res = await StayBookingService.instance.amend(
@@ -630,10 +739,33 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
         children: _children,
         infants: _infants,
       );
+
+      // ── ⚠ THE NOTE GOES ONLY AFTER THE AMENDMENT SUCCEEDS ────────────────
+      //
+      // Sent here rather than alongside the amend call, because a note saying
+      // "we will arrive late on the 14th" delivered against dates that were
+      // then rejected is worse than no note: the host acts on a change that
+      // did not happen.
+      //
+      // ⚠ AND A FAILED NOTE MUST NOT LOOK LIKE A FAILED AMENDMENT. The
+      // booking IS changed by this point. Swallowing the error and telling the
+      // guest their booking changed is the honest outcome — the alternative is
+      // an error dialog saying "Your booking is unchanged" about a booking
+      // that was.
+      final String note = _note.text.trim();
+      if (note.isNotEmpty) {
+        try {
+          await StayMessageService.instance
+              .send(bookingId: widget.bookingId, text: note);
+        } catch (_) {
+          // Deliberately silent. See above.
+        }
+      }
+
       if (!mounted) return;
 
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
+      nav.pop();
+      messenger.showSnackBar(
         SnackBar(
           content: Text(res.returnedToPending
               ? 'Changed. Your host has 24 hours to accept the new dates.'

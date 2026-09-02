@@ -77,6 +77,24 @@ class StaySearchCriteria {
     this.sort = StaySort.journeyTime,
   });
 
+  /// ⚠ THIS CANNOT CLEAR A FIELD. Read this before using it.
+  ///
+  /// Every line below is `x ?? this.x`, so passing null means KEEP THE OLD
+  /// VALUE, not "remove this filter". There is no way through this method to
+  /// set minPricePence back to null once it has been set.
+  ///
+  /// That cost us a real bug, found 29 August 2026. The filters sheet applied
+  /// itself with `base.copyWith(minPricePence: atFloor ? null : value)`, under
+  /// a comment saying "leave price null when untouched, so the query is not
+  /// narrowed by a filter the guest never set". It read exactly right and did
+  /// the opposite: a guest could set a maximum price, drag the slider back to
+  /// the top, apply, and the old ceiling survived. Reset moved the sliders on
+  /// screen and then applied nothing.
+  ///
+  /// ⚠ SO: USE THIS ONLY TO CHANGE A FIELD TO A NON NULL VALUE. To clear
+  /// anything, or to rewrite a whole group of fields at once, CONSTRUCT a
+  /// StaySearchCriteria instead and state every field you own. That is what
+  /// _apply in 03_search_filters_screen.dart now does, and why.
   StaySearchCriteria copyWith({
     String? town,
     DateTime? checkIn,

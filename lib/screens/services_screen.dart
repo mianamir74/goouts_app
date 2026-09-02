@@ -113,7 +113,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFEA580C), Color(0xFFF59E0B)],
+                colors: [Color(0xFF0392CA), Color(0xFF004C6B)],
                 begin: Alignment.centerLeft,
                 end: Alignment.centerRight,
               ),
@@ -163,7 +163,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: const Icon(Icons.delivery_dining_rounded,
-                          color: Color(0xFFEA580C), size: 36),
+                          color: Color(0xFF0392CA), size: 36),
                     ),
                   ],
                 ),

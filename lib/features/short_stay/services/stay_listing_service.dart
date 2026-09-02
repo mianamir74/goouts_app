@@ -95,16 +95,15 @@ class StayListingService {
     return out;
   }
 
-  Future<List<Map<String, dynamic>>> reviews(String listingId,
-      {int limit = 3}) async {
-    final q = await _col
-        .doc(listingId)
-        .collection('reviews')
-        .orderBy('createdAt', descending: true)
-        .limit(limit)
-        .get();
-    return q.docs.map((d) => {'id': d.id, ...d.data()}).toList(growable: false);
-  }
+  // ── ⚠ reviews() WAS HERE AND HAS MOVED. 29 August 2026. ──────────────────
+  //
+  // It read stay_listings/{id}/reviews and returned raw maps, and it was the
+  // only reader because nothing could write a review at all. Now that reviews
+  // are created, the read lives with the write in StayReviewService, typed as
+  // StayReview.
+  //
+  // Two services reading one collection is precisely how this codebase gets a
+  // rating that renders in one place and not another. One reader, one shape.
 
   // ── Saved listings. The only listing related write a guest may make. ──────
   String? get _uid => FirebaseAuth.instance.currentUser?.uid;

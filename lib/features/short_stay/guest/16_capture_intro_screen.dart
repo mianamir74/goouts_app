@@ -11,11 +11,17 @@
 // way out of the door, and it is the set that decides a claim.
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../models/stay_booking.dart';
 import '../models/stay_enums.dart';
+import '../models/stay_listing.dart';
+import '../services/stay_booking_service.dart';
+import '../services/stay_listing_service.dart';
 import '../stay_routes.dart';
 import '../theme/stay_colors.dart';
+// For StaySpacing.buttonHeight on the Start button.
+import '../theme/stay_type.dart';
 
-class DepositProtectionScreen extends StatelessWidget {
+class DepositProtectionScreen extends StatefulWidget {
   const DepositProtectionScreen({
     super.key,
     required this.bookingId,
@@ -24,6 +30,53 @@ class DepositProtectionScreen extends StatelessWidget {
 
   final String bookingId;
   final CaptureKind kind;
+
+  @override
+  State<DepositProtectionScreen> createState() =>
+      _DepositProtectionScreenState();
+}
+
+class _DepositProtectionScreenState extends State<DepositProtectionScreen> {
+  // ── ⚠ THE HERO WAS A STOCK PHOTOGRAPH OF SOMEBODY ELSE'S FLAT ─────────────
+  //
+  //  Fixed 29 August 2026. This screen carried a hardcoded Unsplash URL:
+  //
+  //      'https://images.unsplash.com/photo-1512917774080-...'
+  //
+  //  A stranger's living room, 240px tall, at the top of the one screen whose
+  //  entire job is to say "photograph THIS property, it is your evidence". A
+  //  guest could reasonably read it as the place they had booked.
+  //
+  //  Same fault as the invented "Emma, July 2024" review that used to appear on
+  //  every listing: plausible stock content standing in for real data, on a
+  //  screen where being believed is the point.
+  //
+  //  It now shows the property's own cover photo, and NOTHING AT ALL when
+  //  there isn't one. An empty space is honest; a stock interior is not.
+  StayListing? _listing;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCover();
+  }
+
+  /// bookingId to booking to listingId to listing. Two reads, once, and both
+  /// swallowed on failure — the explanation and the Start button are what this
+  /// screen is for, and neither depends on a photograph.
+  Future<void> _loadCover() async {
+    try {
+      final StayBooking? b =
+          await StayBookingService.instance.byId(widget.bookingId);
+      if (b == null || b.listingId.isEmpty) return;
+      final StayListing? l =
+          await StayListingService.instance.byId(b.listingId);
+      if (!mounted) return;
+      setState(() => _listing = l);
+    } catch (_) {
+      // No hero. See above.
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +93,7 @@ class DepositProtectionScreen extends StatelessWidget {
           'Deposit Protection',
           style: GoogleFonts.inter(
             fontSize: 20,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w700,
             color: GoOutsColors.deepNavy,
           ),
         ),
@@ -59,7 +112,7 @@ class DepositProtectionScreen extends StatelessWidget {
                     'Protect your deposit',
                     style: GoogleFonts.inter(
                       fontSize: 20,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w700,
                       color: GoOutsColors.deepNavy,
                     ),
                   ),
@@ -96,18 +149,27 @@ class DepositProtectionScreen extends StatelessWidget {
   }
 
   Widget _buildHeroImage() {
+    final String? url = _listing?.coverPhotoUrl;
+    // ⚠ NOTHING, not a placeholder. See the note at the top of the State.
+    if (url == null || url.isEmpty) return const SizedBox(height: 16);
+
     return Container(
       width: double.infinity,
       height: 240,
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
+        color: GoOutsColors.dividerGray,
         borderRadius: BorderRadius.circular(24),
-        image: const DecorationImage(
-          image: NetworkImage(
-            'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80&w=800',
-          ),
-          fit: BoxFit.cover,
-        ),
+      ),
+      child: Image.network(
+        url,
+        fit: BoxFit.cover,
+        // Decode at display width rather than at whatever the host uploaded.
+        cacheWidth: 1000,
+        // A broken image URL leaves the rounded grey block, which reads as a
+        // photo that has not loaded rather than as a fault.
+        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
       ),
     );
   }
@@ -119,7 +181,10 @@ class DepositProtectionScreen extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color(0xFFD0F0FF),
+            // Was const Color(0xFFD0F0FF), a fifth pale blue. paleBlueTint is
+            // the tint every other icon tile in this feature sits on, including
+            // the partners tile on the filters screen and the day out cards.
+            color: GoOutsColors.paleBlueTint,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(icon, color: GoOutsColors.iconBlue, size: 28),
@@ -133,7 +198,7 @@ class DepositProtectionScreen extends StatelessWidget {
                 title,
                 style: GoogleFonts.inter(
                   fontSize: 15,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w700,
                   color: GoOutsColors.deepNavy,
                 ),
               ),
@@ -185,21 +250,28 @@ class DepositProtectionScreen extends StatelessWidget {
       onPressed: () => Navigator.of(context).pushReplacementNamed(
         StayRoutes.captureChecklist,
         arguments: <String, dynamic>{
-          'bookingId': bookingId,
-          'captureKind': kind.wire,
+          'bookingId': widget.bookingId,
+          'captureKind': widget.kind.wire,
         },
       ),
       style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFF00668F),
-        minimumSize: const Size(double.infinity, 56),
+        // ⚠ WAS A HARDCODED const Color(0xFF00668F). That is not in
+        // stay_colors.dart and appears nowhere else in the feature — a fourth
+        // blue, on the one button that starts the whole deposit journey.
+        // GoOutsColors.primaryBlue is what every other primary button uses.
+        backgroundColor: GoOutsColors.primaryBlue,
+        // 52, the one button height in the spacing scale. This was 56.
+        minimumSize: const Size(double.infinity, StaySpacing.buttonHeight),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
         elevation: 0,
       ),
       child: Text(
         'Start',
+        // button-text, 16/600. Was 15/bold.
         style: GoogleFonts.inter(
-          fontSize: 15,
-          fontWeight: FontWeight.bold,
+          fontSize: 16,
+          height: 24 / 16,
+          fontWeight: FontWeight.w600,
           color: Colors.white,
         ),
       ),

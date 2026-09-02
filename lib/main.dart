@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'firebase_options.dart';
@@ -70,6 +71,25 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // ── ⚠ THE OFFLINE CACHE HAS NO SIZE LIMIT. 29 August 2026. ────────────────
+  //
+  //  Offline persistence itself is ALREADY ON — it is the default on Android
+  //  and iOS, so `persistenceEnabled: true` would be a no-op and is not set
+  //  here. What is not the default is the size: Firestore caps the local cache
+  //  at 100MB and evicts the least recently used documents past that.
+  //
+  //  ⚠ THE DAYS OUT DOCUMENTS ARE EXACTLY WHAT GETS EVICTED. London's is a few
+  //  hundred kilobytes and is read once per session, which is the profile of a
+  //  document an LRU cache throws away first — so the one design decision that
+  //  makes this feature cheap, one document per city held on the device, was
+  //  being quietly undone by the default.
+  //
+  //  Unlimited here means "as much as the device will give us", not unbounded
+  //  growth: Firestore still only stores what has actually been read.
+  FirebaseFirestore.instance.settings = const Settings(
+    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
   );
 
   // ── Crashlytics ─────────────────────────────────────────────────────────────
@@ -161,6 +181,20 @@ void routeFromMessage(RemoteMessage msg) {
     // it fell through to /notifications, which is not where the message is.
     case 'stay_message_thread':
       nav.pushNamed(StayRoutes.messageHost, arguments: <String, dynamic>{
+        'bookingId': (data['bookingId'] ?? '').toString(),
+      });
+      break;
+    // ⚠ BOTH KEYS ARE SET IN stay_reviews.js, and both land on the TRIP, not
+    // on the notifications list.
+    //
+    // Added 29 August 2026. Without these cases they fell through to the
+    // default below and dropped somebody on a list of notifications — one tap
+    // away from the thing they were told about, which is the same as nowhere.
+    // The trip screen is where the review card lives, so "your host has left
+    // a review" opens the place where you can answer it.
+    case 'stay_review_waiting':
+    case 'stay_review_published':
+      nav.pushNamed(StayRoutes.trip, arguments: <String, dynamic>{
         'bookingId': (data['bookingId'] ?? '').toString(),
       });
       break;

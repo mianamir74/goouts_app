@@ -42,12 +42,24 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../models/money.dart';
 import '../models/stay_amenities.dart';
+// Days out, shown BEFORE booking as of 29 August 2026. Until today the whole
+// attractions pipeline was reachable only from the trip screen, which needs a
+// booking to exist.
+import '../models/stay_attraction.dart';
+// CancellationPolicy, for the section this screen never had.
+import '../models/stay_enums.dart';
+import '../services/stay_attractions_service.dart';
 import '../models/stay_listing.dart';
 import '../models/stay_property_types.dart';
 import '../services/stay_booking_service.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../services/stay_listing_service.dart';
 import '../services/stay_recently_viewed.dart';
+// ⚠ ONE READER FOR REVIEWS, 29 August 2026. StayListingService.reviews() also
+// read this subcollection, returning raw maps; both are gone and this is the
+// only way in. Two readers of one collection is how "rating shows in one place
+// and not another" starts, and this codebase has paid for that pattern before.
+import '../services/stay_review_service.dart';
 import '../stay_routes.dart';
 import '../theme/stay_colors.dart';
 
@@ -64,17 +76,65 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
   final StayListingService _service = StayListingService.instance;
 
   late Future<StayListing?> _listing;
-  late Future<List<Map<String, dynamic>>> _reviews;
+  late Future<List<StayReview>> _reviews;
 
   /// The guest's own rate. Cached in the service, so this costs one call the
   /// first time Short Stay is opened and nothing after that.
   StayCashbackRate _rate = StayCashbackRate.unknown;
 
+  // ── ⚠ DAYS OUT WERE INVISIBLE UNTIL AFTER YOU BOOKED. 29 August 2026. ─────
+  //
+  //  StayRoutes.daysOut was pushed from exactly ONE place in the whole app:
+  //  15_trip_detail_screen, which a guest reaches only once a booking exists.
+  //
+  //  So the entire attractions pipeline — the Overpass build, the clustering,
+  //  the partner counts, the photographs somebody is now choosing by hand —
+  //  was reserved for people who had already committed. The one thing that
+  //  answers "why book through GoOuts rather than anywhere else" was being
+  //  shown only to people who had already decided.
+  //
+  //  It belongs here, on the screen where somebody is deciding.
+  //
+  //  ⚠ COSTS NOTHING EXTRA. forProperty is cached per grid cell in the service,
+  //  and a cell covers about 28km by 32km: the second property somebody opens
+  //  in Birmingham reads no document at all.
+  StayAttractions? _attractions;
+  String? _attractionsFor;
+
+  /// ⚠ KEYED ON THE PROPERTY, NOT THE TOWN. It used to be the town name, which
+  /// meant two properties in different parts of one city looked identical to
+  /// this guard even though they now read different grid cells.
+  ///
+  /// ⚠ AND IT TAKES THE LISTING, NOT THE ADDRESS. lat and lng live on
+  /// StayListing; StayAddress holds only line1, town, postcode and country.
+  /// Reaching for listing.address.lat is the obvious guess and it is wrong.
+  void _ensureAttractions(StayListing listing) {
+    final String key =
+        '${listing.lat ?? ''}|${listing.lng ?? ''}|${listing.address.town}';
+    if (key == '||') return;
+    if (_attractionsFor == key) return;
+    _attractionsFor = key;
+    StayAttractionsService.instance
+        .forProperty(
+      lat: listing.lat,
+      lng: listing.lng,
+      town: listing.address.town,
+    )
+        .then((StayAttractions? a) {
+      if (!mounted) return;
+      setState(() => _attractions = a);
+    }).catchError((_) {
+      // A day out panel that cannot load is a missing panel, not an error on a
+      // screen somebody is trying to book from.
+      return null;
+    });
+  }
+
   @override
   void initState() {
     super.initState();
     _listing = _service.byId(widget.listingId);
-    _reviews = _service.reviews(widget.listingId);
+    _reviews = StayReviewService.instance.forListing(widget.listingId);
     _loadRate();
 
     // ── ⚠ THE ONLY PLACE A VIEW IS RECORDED. Added 27 August 2026. ──────────
@@ -166,8 +226,17 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                             _buildPartnerHighlightCard(
                                 listing.locationContext!),
                           ],
+                          // ⚠ AFTER GETTING AROUND, BEFORE REVIEWS. Transport
+                          // then "and here is where you would go" is the order
+                          // somebody actually thinks in when planning a trip.
+                          // Reviews are about the property; this is about the
+                          // days either side of it.
+                          _buildDaysOutSection(listing),
                           const Divider(height: 32),
                           _buildReviewsSection(listing),
+                          // ⚠ ADDED 29 August 2026. It was not on this screen
+                          // at all. See the note on the method.
+                          _buildCancellationSection(listing),
                           _buildHouseRules(listing),
                           _buildWhereYoullBe(listing),
                           const SizedBox(height: 100), // Space for bottom bar
@@ -748,9 +817,274 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
   // ── Reviews ──────────────────────────────────────────────────────────────
   //
   // Was one invented review from "Emma • July 2024" shown on every property.
-  // Reviews are written by real guests after a stay (task #106); until that
-  // exists this section will legitimately be empty, and empty is what it now
-  // says.
+  //
+  // ⚠ REAL AS OF 29 August 2026. Reviews are now written by real guests after
+  // a stay, through screen 25 and functions/stay_reviews.js. Until that day
+  // NOTHING ON THE PLATFORM COULD CREATE ONE — this section, the rating chip
+  // on screen 02 and the "Rating" sort order were all reading a subcollection
+  // that only the demo seed had ever written to, so every genuinely listed
+  // property was going to sit at zero stars for ever.
+  // ── Cancellation ─────────────────────────────────────────────────────────
+  //
+  //  ⚠ THIS SCREEN DID NOT MENTION CANCELLATION AT ALL until 29 August 2026.
+  //
+  //  Every listing carries a cancellationPolicy, the host chooses it in step 7
+  //  of the wizard, there is a whole refund engine behind it — quoteStayCancellation,
+  //  cancelStayBooking, screens 28 and 29 — and a guest deciding to spend £165
+  //  a night could not find out whether they could get any of it back. They
+  //  learned the policy AFTER booking, on the cancel screen.
+  //
+  //  ⚠ NO PERCENTAGES AND NO DATES HERE, DELIBERATELY. The tiers live in
+  //  platform_config/short_stay and are read SERVER side; the enum's own
+  //  comment says "a refund amount is NEVER computed on the client". Printing
+  //  "free until 48 hours before" from a client that does not hold the numbers
+  //  is how a screen ends up contradicting the refund it later gives.
+  //
+  //  So this names the policy and says where the real figure comes from. The
+  //  exact amount appears on screen 28, quoted by the server, before anybody
+  //  confirms anything.
+
+  Widget _buildCancellationSection(StayListing listing) {
+    final CancellationPolicy p = listing.cancellationPolicy;
+    final (IconData icon, String meaning) = switch (p) {
+      CancellationPolicy.flexible => (
+          Icons.event_available_outlined,
+          'The most forgiving of the three. Cancel well before you arrive and '
+              'you get the most back.',
+        ),
+      CancellationPolicy.moderate => (
+          Icons.event_note_outlined,
+          'A middle tier. How much comes back depends on how close to arrival '
+              'you cancel.',
+        ),
+      CancellationPolicy.strict => (
+          Icons.event_busy_outlined,
+          'The firmest of the three. Cancelling close to arrival returns '
+              'little or nothing.',
+        ),
+    };
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(height: 32),
+        Text(
+          'Cancellation',
+          style: GoogleFonts.inter(
+              fontSize: 15,
+              height: 20 / 15,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.3,
+              color: GoOutsColors.deepNavy),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 20, color: GoOutsColors.tealSecondary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${p.label} cancellation',
+                    style: GoogleFonts.inter(
+                        fontSize: 14,
+                        height: 20 / 14,
+                        fontWeight: FontWeight.w600,
+                        color: GoOutsColors.deepNavy),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    meaning,
+                    style: GoogleFonts.inter(
+                        fontSize: 13.5,
+                        height: 1.45,
+                        color: GoOutsColors.bodyText),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    // ⚠ SAYS WHERE THE REAL NUMBER COMES FROM rather than
+                    // guessing at it. See the note above.
+                    'You will see exactly what is refundable, to the penny, '
+                    'before you confirm anything.',
+                    style: GoogleFonts.inter(
+                        fontSize: 12,
+                        height: 1.45,
+                        color: GoOutsColors.bodyText),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // ── Days out ─────────────────────────────────────────────────────────────
+  //
+  //  See the note on _attractions. This was reachable only after booking.
+  //
+  //  ⚠ RENDERS NOTHING AT ALL WHEN THE CITY IS NOT BUILT, rather than an empty
+  //  "Days out" heading. On a screen somebody is deciding to spend money from,
+  //  a section that announces itself and then has nothing in it reads as a
+  //  broken app, and a plain absence reads as nothing.
+  Widget _buildDaysOutSection(StayListing listing) {
+    _ensureAttractions(listing);
+
+    final StayAttractions? a = _attractions;
+    if (a == null || a.clusters.isEmpty) return const SizedBox.shrink();
+
+    final List<StayCluster> nearest = StayAttractionsService.nearest(
+      a.clusters,
+      listing.lat,
+      listing.lng,
+    ).take(3).toList();
+    if (nearest.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(height: 32),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Days out from here',
+                style: GoogleFonts.inter(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: GoOutsColors.deepNavy),
+              ),
+            ),
+            if (a.clusters.length > nearest.length)
+              TextButton(
+                onPressed: () => Navigator.of(context).pushNamed(
+                  StayRoutes.daysOut,
+                  arguments: <String, dynamic>{
+                    'listingId': listing.id,
+                    // Browsing, not travelling. Lights Search rather than
+                    // Trips on the bottom bar of the screens beyond this one.
+                    'fromListing': true,
+                  },
+                ),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: const Size(0, 32),
+                ),
+                child: Text('See all ${a.clusters.length}',
+                    style: GoogleFonts.inter(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                        color: GoOutsColors.primaryBlue)),
+              ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          // ⚠ MILES, NEVER MINUTES. Same rule as screens 07, 08 and 09: we
+          // have no routing API, so a journey time would be invented on a
+          // screen somebody plans an afternoon around.
+          'Grouped by what you can do in one trip, nearest first.',
+          style: GoogleFonts.inter(
+              fontSize: 13.5, height: 1.4, color: GoOutsColors.bodyText),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 176,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: nearest.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (_, i) => _daysOutCard(listing, nearest[i]),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _daysOutCard(StayListing listing, StayCluster c) {
+    final double? mi = (listing.lat != null && listing.lng != null)
+        ? StayAttractionsService.milesBetween(
+            listing.lat!, listing.lng!, c.lat, c.lng)
+        : null;
+
+    return SizedBox(
+      width: 208,
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => Navigator.of(context).pushNamed(
+            StayRoutes.cluster,
+            arguments: <String, dynamic>{
+              'listingId': listing.id,
+              'clusterId': c.id,
+              'fromListing': true,
+            },
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                height: 96,
+                width: double.infinity,
+                child: c.photo == null
+                    ? Container(
+                        color: GoOutsColors.dividerGray,
+                        child: const Icon(Icons.museum_outlined,
+                            color: GoOutsColors.outlineVariant),
+                      )
+                    : Image.network(
+                        c.photo!.url,
+                        fit: BoxFit.cover,
+                        cacheWidth: 440,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: GoOutsColors.dividerGray,
+                          child: const Icon(Icons.museum_outlined,
+                              color: GoOutsColors.outlineVariant),
+                        ),
+                      ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      c.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: GoOutsColors.deepNavy),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      <String>[
+                        if (mi != null) '${mi.toStringAsFixed(1)} miles',
+                        if (c.partnerCount > 0)
+                          '${c.partnerCount} partners',
+                      ].join('  ·  '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                          fontSize: 12, color: GoOutsColors.bodyText),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildReviewsSection(StayListing listing) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -769,8 +1103,9 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
             ),
           ],
         ),
+        _categoryBreakdown(listing),
         const SizedBox(height: 8),
-        FutureBuilder<List<Map<String, dynamic>>>(
+        FutureBuilder<List<StayReview>>(
           future: _reviews,
           builder: (context, snap) {
             if (snap.connectionState == ConnectionState.waiting) {
@@ -779,8 +1114,8 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                 child: Center(child: CircularProgressIndicator()),
               );
             }
-            final List<Map<String, dynamic>> reviews =
-                snap.data ?? const <Map<String, dynamic>>[];
+            final List<StayReview> reviews =
+                snap.data ?? const <StayReview>[];
             if (reviews.isEmpty) {
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
@@ -802,39 +1137,138 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
     );
   }
 
-  Widget _reviewTile(Map<String, dynamic> r) {
-    final String name = (r['guestName'] as String?)?.trim().isNotEmpty == true
-        ? r['guestName'] as String
-        : 'Guest';
-    final String body = (r['comment'] as String?) ?? '';
-    final DateTime? when = _toDate(r['createdAt']);
-    final String subtitle =
-        when == null ? name : '$name • ${_monthYear(when)}';
+  /// The six category averages, as bars.
+  ///
+  /// ⚠ THIS EXISTS BECAUSE THE DATA DOES. submitStayReview aggregates the six
+  /// sub scores onto the listing, and screen 25 asks a guest for all six. Had
+  /// nothing displayed them, this would have been the fourth thing in Short
+  /// Stay collected from a person and then never shown to anybody — which is
+  /// the pattern the whole review loop was found by.
+  ///
+  /// ⚠ SKIPS A CATEGORY WITH TOO FEW ANSWERS rather than showing it at zero.
+  /// The scores are optional; one guest who disliked the parking must not put
+  /// "Location 2.0" under a property nobody else remarked on.
+  Widget _categoryBreakdown(StayListing listing) {
+    final Map<String, StayCategoryRating> cats = listing.ratingCategories;
+    final List<MapEntry<String, String>> shown = _categoryLabels.entries
+        .where((e) => cats[e.key]?.hasEnough == true)
+        .toList();
+    if (shown.isEmpty) return const SizedBox.shrink();
 
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: const CircleAvatar(backgroundColor: GoOutsColors.paleBlueTint),
-      title: Text(subtitle,
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-      subtitle: body.isEmpty
-          ? null
-          : Text(body,
-              style: GoogleFonts.inter(color: GoOutsColors.bodyText)),
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        children: [
+          for (final MapEntry<String, String> e in shown)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 110,
+                    child: Text(e.value,
+                        style: GoogleFonts.inter(
+                            fontSize: 13.5, color: GoOutsColors.bodyText)),
+                  ),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: LinearProgressIndicator(
+                        value: cats[e.key]!.avg / 5,
+                        minHeight: 5,
+                        backgroundColor: GoOutsColors.dividerGray,
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                            GoOutsColors.primaryBlue),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    width: 26,
+                    child: Text(
+                      cats[e.key]!.avg.toStringAsFixed(1),
+                      textAlign: TextAlign.right,
+                      style: GoogleFonts.inter(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          color: GoOutsColors.deepNavy),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 
-  // Firestore hands back a Timestamp, but a hand-edited document or an older
-  // write can hold an ISO string. Both are accepted; anything else is treated
-  // as no date rather than crashing the tile.
-  static DateTime? _toDate(Object? v) {
-    if (v == null) return null;
-    if (v is DateTime) return v;
-    if (v is String) return DateTime.tryParse(v);
-    try {
-      return (v as dynamic).toDate() as DateTime;
-    } catch (_) {
-      return null;
-    }
+  /// ⚠ THE KEYS MATCH stay_reviews.js CATEGORIES AND screen 25's
+  /// kReviewCategories. Three places, one list. A seventh category added to
+  /// the form without being added here is collected and never shown.
+  static const Map<String, String> _categoryLabels = <String, String>{
+    'cleanliness': 'Cleanliness',
+    'accuracy': 'Accuracy',
+    'checkIn': 'Check in',
+    'communication': 'Communication',
+    'location': 'Location',
+    'value': 'Value',
+  };
+
+  /// ⚠ NOW SHOWS THE STARS. This tile rendered a name, a month and the text
+  /// and never once drew the rating, on the screen whose whole heading is
+  /// "4.8 · 12 reviews". A reader could see the average and could read the
+  /// words, and could not tell which review was the two.
+  Widget _reviewTile(StayReview r) {
+    final String subtitle = r.createdAt == null
+        ? r.guestName
+        : '${r.guestName} • ${_monthYear(r.createdAt!)}';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const CircleAvatar(
+              radius: 18, backgroundColor: GoOutsColors.paleBlueTint),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(subtitle,
+                    style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: GoOutsColors.deepNavy)),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    for (int i = 1; i <= 5; i++)
+                      Icon(
+                        i <= r.rating
+                            ? Icons.star_rounded
+                            : Icons.star_border_rounded,
+                        size: 14,
+                        color: i <= r.rating
+                            ? GoOutsColors.warning
+                            : GoOutsColors.starGray,
+                      ),
+                  ],
+                ),
+                if (r.hasComment) ...[
+                  const SizedBox(height: 4),
+                  Text(r.comment,
+                      style: GoogleFonts.inter(
+                          fontSize: 13.5,
+                          height: 20 / 13.5,
+                          color: GoOutsColors.bodyText)),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   static const List<String> _months = <String>[
@@ -1047,17 +1481,35 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                   mapToolbarEnabled: false,
                   compassEnabled: false,
                 ),
-                // ⚠ NO TAP HANDLER, ON PURPOSE.
+                // ── ⚠ NOW TAPPABLE. 29 August 2026. ────────────────────────
                 //
-                // The obvious move was to open StayRoutes.neighbourhood on tap.
-                // That route resolves to `const NeighbourhoodScreen()` — it
-                // takes NO listingId, and stay_routes.dart:129 records that
-                // screens 07 to 10 are still unwired. Tapping would have sent
-                // the guest to an empty screen about nowhere in particular.
+                // This carried a note saying there was deliberately no tap
+                // handler, because StayRoutes.neighbourhood resolved to
+                // `const NeighbourhoodScreen()` — no listingId, in front of an
+                // Unsplash photograph with fake pins on it — so tapping would
+                // have sent a guest to an empty screen about nowhere.
                 //
-                // Stitch's own map here is a flat image with no interaction, so
-                // a dead map is the design, not a shortcut. Wire this to the
-                // neighbourhood screen when that screen takes a property.
+                // The note ended "wire this when that screen takes a property".
+                // It does now, and this is the most valuable place to open it
+                // from: a guest deciding BETWEEN properties is exactly who
+                // cares which one has fourteen cashback partners round it.
+                //
+                // ⚠ A TRANSPARENT OVERLAY, not onTap on the map. Every gesture
+                // on this GoogleMap is disabled so it reads as a picture, and a
+                // disabled map still swallows taps aimed at it.
+                Positioned.fill(
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => Navigator.of(context).pushNamed(
+                        StayRoutes.neighbourhood,
+                        arguments: <String, dynamic>{
+                          'listingId': widget.listingId,
+                        },
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),

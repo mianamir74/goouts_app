@@ -43,6 +43,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
+import '../services/stay_message_service.dart';
 import '../theme/stay_colors.dart';
 
 class MessageHostScreen extends StatefulWidget {
@@ -104,7 +105,7 @@ class _MessageHostScreenState extends State<MessageHostScreen> {
               children: <Widget>[
                 _permanentRecordNotice(),
                 Expanded(child: _messages(uid)),
-                _composer(uid),
+                _composer(),
               ],
             ),
     );
@@ -301,7 +302,11 @@ class _MessageHostScreenState extends State<MessageHostScreen> {
 
   // ── COMPOSER ──────────────────────────────────────────────────────────────
 
-  Widget _composer(String uid) => Container(
+  /// ⚠ TAKES NOTHING EITHER, for the same reason as _send. Its only use of the
+  /// uid was passing it down; the analyzer would not have complained, because
+  /// an unused parameter is not a lint, so this would have sat here as a
+  /// pointless argument threaded through two functions for good.
+  Widget _composer() => Container(
         padding: EdgeInsets.fromLTRB(
           12,
           10,
@@ -390,7 +395,7 @@ class _MessageHostScreenState extends State<MessageHostScreen> {
                           ),
                         )
                       : IconButton.filled(
-                          onPressed: () => _send(uid),
+                          onPressed: _send,
                           icon: const Icon(Icons.send_rounded, size: 18),
                           style: IconButton.styleFrom(
                             backgroundColor: GoOutsColors.primaryBlue,
@@ -404,7 +409,11 @@ class _MessageHostScreenState extends State<MessageHostScreen> {
         ),
       );
 
-  Future<void> _send(String uid) async {
+  /// ⚠ TAKES NOTHING NOW. It used to take the signed in uid so it could stamp
+  /// senderUid, and the service reads that from FirebaseAuth itself. Leaving
+  /// the parameter in place would have been an argument passed and ignored,
+  /// which is the shape of half the bugs in this feature.
+  Future<void> _send() async {
     final String text = _input.text.trim();
     if (text.isEmpty || _sending) return;
 
@@ -414,21 +423,16 @@ class _MessageHostScreenState extends State<MessageHostScreen> {
     });
 
     try {
-      await FirebaseFirestore.instance
-          .collection('stay_bookings')
-          .doc(widget.bookingId)
-          .collection('messages')
-          .add(<String, dynamic>{
-        'senderUid': uid,
-        // 'guest' here, 'host' in the host app. The only difference between
-        // the two writers.
-        'senderRole': 'guest',
-        'text': text,
-        // ⚠ SERVER TIME. serverTimestamp() resolves to request.time during
-        // rule evaluation, which is what the rule compares against. A
-        // DateTime.now() is rejected, and that is deliberate.
-        'sentAt': FieldValue.serverTimestamp(),
-      });
+      // ⚠ THROUGH THE SERVICE AS OF 29 August 2026. The .add() that used to be
+      // written out here had four fields and every one of them is load
+      // bearing — senderRole, and sentAt in particular, which MUST be
+      // serverTimestamp() because the rule compares against request.time.
+      //
+      // Screen 27 now sends a note to the host too, and a second hand written
+      // copy of those four fields is how one of them quietly drifts. See
+      // services/stay_message_service.dart.
+      await StayMessageService.instance
+          .send(bookingId: widget.bookingId, text: text);
 
       if (!mounted) return;
       _input.clear();

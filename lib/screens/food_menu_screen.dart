@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 import '../services/cart_service.dart';
+import '../widgets/food_bottom_nav.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  FoodMenuScreen  —  restaurant menu browsing (Task #72)
@@ -20,7 +21,7 @@ class FoodMenuScreen extends StatefulWidget {
 
 class _FoodMenuScreenState extends State<FoodMenuScreen> {
   // ── Brand colours ──────────────────────────────────────────────────────────
-  static const Color _primary  = Color(0xFFEA580C);  // orange
+  static const Color _primary  = Color(0xFF0392CA);  // GoOuts blue. Was 0xFFEA580C.
   static const Color _navy     = Color(0xFF0D1B3E);
   static const Color _green    = Color(0xFF10B981);
   static const Color _bg       = Color(0xFFF2F4F7);
@@ -267,6 +268,8 @@ class _FoodMenuScreenState extends State<FoodMenuScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      bottomNavigationBar:
+          const FoodBottomNav(current: FoodTab.restaurants),
       backgroundColor: _bg,
       body: _loading
           ? _buildSkeleton()

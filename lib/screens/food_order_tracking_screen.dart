@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../widgets/live_tracking_map.dart';
 import '../widgets/goouts_sheet.dart';
+import '../widgets/food_bottom_nav.dart';
 
 class FoodOrderTrackingScreen extends StatefulWidget {
   const FoodOrderTrackingScreen({super.key});
@@ -17,7 +18,7 @@ class FoodOrderTrackingScreen extends StatefulWidget {
 
 class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
   // ── Brand colours ──────────────────────────────────────────────────────────
-  static const Color _primary = Color(0xFFEA580C);
+  static const Color _primary = Color(0xFF0392CA);
   static const Color _navy    = Color(0xFF0D1B3E);
   static const Color _green   = Color(0xFF10B981);
   static const Color _amber   = Color(0xFFF59E0B);
@@ -489,26 +490,29 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
                 tipAmount = (tipOptions[selectedTipIdx]['amount'] as double);
               }
 
-              // Suppressed 14 August 2026, not deleted. Read alongside
-              // driverId below; the rating write does not use it today but the
-              // pair is what the next revision needs.
-              // ignore: unused_local_variable
-              final uid = _order?['userId'] as String?;
-              final driverId = _order?['driverId'] as String?;
-
-              // Save rating to order doc
-              await _db.collection('food_orders').doc(_orderId).update({
-                'driverRating' : selectedStars,
-                'driverTip'    : tipAmount,
-                'ratedAt'      : FieldValue.serverTimestamp(),
+              // ── ⚠ THE RATING AND THE TIP GO THROUGH A CALLABLE NOW ─────
+              //
+              //  This used to write driverRating and driverTip onto the order
+              //  directly, and then increment `pendingTips` on the DRIVER's
+              //  own document from the customer's phone.
+              //
+              //  ⚠ THAT SECOND WRITE HAS ALWAYS BEEN REFUSED. food_drivers
+              //  requires ownsDoc(driverId), so a customer could never write
+              //  there — meaning no driver has ever received a tip through
+              //  this screen, silently, while the customer was told it was
+              //  sent. The bug was as much "the feature does not work" as
+              //  "the feature is insecure".
+              //
+              //  ⚠ AND THE TWO WRITES WERE SEPARATE, so even with permission
+              //  the rating could land while the tip did not. rateFoodDelivery
+              //  does both in one transaction, or neither.
+              await FirebaseFunctions.instanceFor(region: 'europe-west1')
+                  .httpsCallable('rateFoodDelivery')
+                  .call<Map<String, dynamic>>({
+                'orderId': _orderId,
+                'stars': selectedStars,
+                'tip': tipAmount,
               });
-
-              // Save tip to driver doc if driver assigned
-              if (driverId != null && tipAmount > 0) {
-                await _db.collection('food_drivers').doc(driverId).set({
-                  'pendingTips': FieldValue.increment(tipAmount),
-                }, SetOptions(merge: true));
-              }
 
               if (ctx.mounted) {
                 Navigator.pop(ctx);
@@ -987,23 +991,33 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
 
     if (selected.isEmpty) return;
 
-    final additionalTotal = selected.fold<double>(
-        0, (running, i) => running + ((i['subtotal'] as num?)?.toDouble() ?? 0));
-
-    final addition = {
-      'additionId'      : DateTime.now().millisecondsSinceEpoch.toString(),
-      'items'           : selected,
-      'additionalTotal' : additionalTotal,
-      'status'          : 'pending',
-      'requestedAt'     : FieldValue.serverTimestamp(),
-      'respondedAt'     : null,
-    };
+    // ⚠ THE CLIENT SIDE TOTAL THAT USED TO BE BUILT HERE IS GONE, NOT LEFT
+    // UNUSED. It folded the line subtotals into an `additionalTotal` and put
+    // it in an `addition` map that was written straight onto the order. Left
+    // sitting here computing a price nothing sends, it is the obvious thing
+    // for somebody to reconnect in six months when the callable looks like
+    // indirection.
 
     try {
-      await _db.collection('food_orders').doc(_orderId).update({
-        'additions': FieldValue.arrayUnion([addition]),
-        'updatedAt': FieldValue.serverTimestamp(),
+      // ── ⚠ THE SAME PRICE HOLE AS CHECKOUT, SOMEWHERE NOBODY LOOKED ───────
+      //
+      //  This built an `additions` entry with an `additionalTotal` worked out
+      //  in Dart and pushed it onto the order with arrayUnion. So even once
+      //  checkout was fixed, anybody could have added a hundred pounds of food
+      //  at a price of their own choosing to an order already being cooked.
+      //
+      //  requestFoodAddition prices it against the same menu, by the same
+      //  function, as the original basket. Only item ids and quantities go up.
+      await FirebaseFunctions.instanceFor(region: 'europe-west1')
+          .httpsCallable('requestFoodAddition')
+          .call<Map<String, dynamic>>({
+        'orderId': _orderId,
+        'items': _pickerQty.entries
+            .where((e) => e.value > 0)
+            .map((e) => {'itemId': e.key, 'quantity': e.value})
+            .toList(),
       });
+
       if (mounted) {
         Navigator.pop(context); // close bottom sheet
         _pickerQty.clear();
@@ -1058,6 +1072,12 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
+      // ⚠ THIS SCREEN NEEDS THE BAR MORE THAN ANY OTHER. Checkout reaches it
+      // with pushReplacement, so there is no checkout underneath to go back
+      // to — the back arrow lands on the restaurant menu, which is a strange
+      // place to be returned to while your dinner is being cooked. Without a
+      // tab bar a customer watching their order had no clean way out at all.
+      bottomNavigationBar: const FoodBottomNav(current: FoodTab.orders),
         backgroundColor: _bg,
         appBar: AppBar(
           backgroundColor: Colors.white,
@@ -1068,7 +1088,7 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
                   color: _navy, fontWeight: FontWeight.w700)),
         ),
         body: const Center(
-            child: CircularProgressIndicator(color: Color(0xFFEA580C))),
+            child: CircularProgressIndicator(color: Color(0xFF0392CA))),
       );
     }
 
@@ -1079,6 +1099,12 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
     final additions = List<Map<String, dynamic>>.from(order['additions'] ?? []);
 
     return Scaffold(
+      // ⚠ THIS SCREEN NEEDS THE BAR MORE THAN ANY OTHER. Checkout reaches it
+      // with pushReplacement, so there is no checkout underneath to go back
+      // to — the back arrow lands on the restaurant menu, which is a strange
+      // place to be returned to while your dinner is being cooked. Without a
+      // tab bar a customer watching their order had no clean way out at all.
+      bottomNavigationBar: const FoodBottomNav(current: FoodTab.orders),
       backgroundColor: _bg,
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -1102,7 +1128,7 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
               .contains(status))
             IconButton(
               icon: const Icon(Icons.chat_bubble_outline_rounded,
-                  color: Color(0xFFEA580C)),
+                  color: Color(0xFF0392CA)),
               tooltip: 'Chat with driver',
               onPressed: () => Navigator.pushNamed(
                 context,
@@ -1650,7 +1676,7 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [_amber, const Color(0xFFF97316)],
+            colors: [_amber, const Color(0xFF004C6B)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -1796,7 +1822,7 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
                 child: _menuLoading
                     ? const Center(
                         child: CircularProgressIndicator(
-                            color: Color(0xFFEA580C)))
+                            color: Color(0xFF0392CA)))
                     : _menuItems.isEmpty
                         ? Center(
                             child: Text('Menu not available',

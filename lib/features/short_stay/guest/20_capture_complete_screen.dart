@@ -49,7 +49,10 @@ class CaptureCompleteScreen extends StatelessWidget {
               isCheckOut ? 'Check out photos done' : 'Check in photos done',
               style: GoogleFonts.inter(
                 fontSize: 20,
-                fontWeight: FontWeight.bold,
+                height: 28 / 20,
+                // w700, not `bold`. Same weight, one name — `bold` is how a
+                // w800 crept back into three screens on the last pass.
+                fontWeight: FontWeight.w700,
                 color: GoOutsColors.deepNavy,
               ),
             ),
@@ -70,6 +73,8 @@ class CaptureCompleteScreen extends StatelessWidget {
                         if (_photos.isNotEmpty) _grid(),
                         if (_skipped.isNotEmpty) _skippedSection(),
                         const SizedBox(height: 16),
+                        _whatHappensNext(isCheckOut),
+                        const SizedBox(height: 12),
                         _lockedNote(),
                       ],
                     ),
@@ -81,7 +86,9 @@ class CaptureCompleteScreen extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: GoOutsColors.primaryBlue,
                   foregroundColor: GoOutsColors.cardSurface,
-                  minimumSize: const Size(double.infinity, 54),
+                  // 52, not 54. The Stitch spacing scale has one button
+                  // height and this screen had drifted two pixels off it.
+                  minimumSize: const Size(double.infinity, 52),
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -89,8 +96,12 @@ class CaptureCompleteScreen extends StatelessWidget {
                 ),
                 child: Text(
                   'Done',
+                  // button-text is 16/600. This was 15/bold, which is a size
+                  // the scale does not use for a button and a weight written
+                  // by its other name.
                   style: GoogleFonts.inter(
-                      fontSize: 15, fontWeight: FontWeight.bold),
+                      fontSize: 16, height: 24 / 16,
+                      fontWeight: FontWeight.w600),
                 ),
               ),
             ),
@@ -150,7 +161,9 @@ class CaptureCompleteScreen extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            e.room,
+            // Through the label map, or the damage entry renders as
+            // "__existing_damage" under its own photograph.
+            stayRoomLabel(e.room),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: GoogleFonts.inter(
@@ -212,6 +225,72 @@ class CaptureCompleteScreen extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      );
+
+  /// What happens to these photographs now.
+  ///
+  /// ── ⚠ NOT THE STITCH WORDING, AND DELIBERATELY ───────────────────────────
+  ///
+  /// Stitch says "Your host will review these captures within 24 hours. You'll
+  /// receive a notification once the stay is fully confirmed."
+  ///
+  /// Both halves of that are untrue of this system. NOTHING requires a host to
+  /// look at these, there is no 24 hour review, and no notification is sent
+  /// when they do. What actually exists is stay_config's claimWindowHours,
+  /// which is 72, and stay_claims.js which enforces it: after 72 hours from
+  /// check out a host cannot open a claim at all.
+  ///
+  /// So the honest version is better for the guest anyway — it tells them the
+  /// date they are in the clear, rather than promising them an inspection that
+  /// nobody performs.
+  ///
+  /// ⚠ THE 72 IS ALSO IN stay_booking.dart AS claimWindowCloses AND IN
+  /// stay_config.js AS claimWindowHours. If it changes, it changes in all
+  /// three or this screen starts lying.
+  Widget _whatHappensNext(bool isCheckOut) => Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: GoOutsColors.infoBlueBg,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.info_outline,
+                size: 16, color: GoOutsColors.primaryBlue),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'What happens now',
+                    style: GoogleFonts.inter(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: GoOutsColors.primaryBlue,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    isCheckOut
+                        ? 'Your host has 72 hours from check out to raise a '
+                            'damage claim. After that the stay is closed and '
+                            'nothing can be claimed against it.'
+                        : 'Your host can see these straight away. They are '
+                            'what you would point to if a claim were ever '
+                            'made about the state you found the place in.',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      height: 1.45,
+                      color: GoOutsColors.bodyText,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       );
 

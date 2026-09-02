@@ -142,6 +142,15 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
               const SizedBox(height: 16),
               _whenCard(b),
               const SizedBox(height: 16),
+              // ⚠ HIGH UP, AND ONLY AFTER CHECK OUT. This is the guest's ONLY
+              // way into screen 25 — nothing else on the platform pushes
+              // StayRoutes.review — so burying it under the map would be the
+              // same as not having built it. Above the fold, below the dates,
+              // and it disappears the moment they have written one.
+              if (b.canGuestReview || b.awaitingOtherReview) ...<Widget>[
+                _reviewCard(b),
+                const SizedBox(height: 16),
+              ],
               _contactHostCard(b),
               const SizedBox(height: 16),
               _accessCard(),
@@ -517,6 +526,85 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
         ),
       );
 
+  /// The guest's only route into screen 25.
+  ///
+  /// ⚠ TWO STATES, AND THE SECOND ONE IS NOT AN ERROR. Reviews are double
+  /// blind, so a guest who has written waits on the host — often for the full
+  /// fourteen days. Going silent at that point would read as "my review
+  /// vanished". It says what is happening instead.
+  ///
+  /// ⚠ AND IT DOES NOT PROMISE ANYTHING ABOUT THE HOST'S REVIEW. We cannot
+  /// know whether they will write one. The window closing is the only thing
+  /// that is certain, so that is what the guest is told.
+  Widget _reviewCard(StayBooking b) {
+    final bool waiting = b.awaitingOtherReview;
+    return _card(
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(waiting ? Icons.hourglass_bottom : Icons.star_rounded,
+                  size: 18,
+                  color: waiting
+                      ? GoOutsColors.bodyText
+                      : GoOutsColors.warning),
+              const SizedBox(width: 8),
+              Text(
+                waiting ? 'Your review is in' : 'How was your stay?',
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: GoOutsColors.deepNavy,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            waiting
+                ? 'It goes up when your host writes theirs, or when the '
+                    'review window closes. Neither of you sees the other '
+                    'until then.'
+                : 'Rate the place and tell the next guest what it was really '
+                    'like. You have '
+                    '${StayBooking.reviewWindowDays} days from check out.',
+            style: GoogleFonts.inter(
+              fontSize: 13.5,
+              height: 1.4,
+              color: GoOutsColors.bodyText,
+            ),
+          ),
+          if (!waiting) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                // ⚠ NOTHING TO REFRESH ON THE WAY BACK, and that is worth
+                // stating. This screen is a StreamBuilder on
+                // StayBookingService.watch, so the moment submitStayReview
+                // writes reviewSubmittedByGuest the card swaps itself to the
+                // waiting state on its own. An explicit reload here would be a
+                // second, slower copy of something already correct.
+                onPressed: () => Navigator.of(context).pushNamed(
+                  StayRoutes.review,
+                  arguments: <String, dynamic>{'bookingId': b.id},
+                ),
+                icon: const Icon(Icons.rate_review_outlined, size: 18),
+                label: const Text('Review your stay'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 46),
+                  backgroundColor: GoOutsColors.primaryBlue,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _photosCard(StayBooking b) {
     return StreamBuilder<List<StayEvidence>>(
       stream: StayEvidenceService.instance
@@ -657,6 +745,40 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
                   ],
                 ),
               ),
+          ],
+          // ⚠ THE ONLY WAY INTO SCREEN 09, added 29 August 2026.
+          //
+          // This card shows four partners and enrichListingLocation stores up
+          // to ten, so six were being collected and never shown to anybody.
+          // Screen 09 was a live route that nothing pushed, in front of an
+          // Unsplash photograph pretending to be a map — so the data had
+          // nowhere to go and the screen had no data. Both fixed by this row.
+          if (ctx.nearestPartners.length > nearest.length) ...[
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: () => Navigator.of(context).pushNamed(
+                StayRoutes.neighbourhood,
+                arguments: <String, dynamic>{'listingId': _listing?.id ?? ''},
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Text(
+                      'See all ${ctx.nearestPartners.length}',
+                      style: GoogleFonts.inter(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.arrow_forward,
+                        size: 15, color: Colors.white),
+                  ],
+                ),
+              ),
+            ),
           ],
         ],
       ),

@@ -26,6 +26,8 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/stay_enums.dart';
+// kStayDamageRoom and stayRoomLabel, for the pre-existing damage entry.
+import '../models/stay_evidence.dart';
 
 class CameraCaptureScreen extends StatefulWidget {
   const CameraCaptureScreen({
@@ -161,11 +163,23 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen>
 
   @override
   Widget build(BuildContext context) {
+    // ⚠ THE DAMAGE ENTRY NEEDS THE OPPOSITE INSTRUCTION.
+    //
+    // "Stand in the doorway and capture the whole room" is right for a room and
+    // wrong for a scratch — a wide shot of a living room is no evidence at all
+    // that the coffee table was already marked. Close and clear is the whole
+    // value of the photograph.
+    //
+    // It also went through widget.room unmapped, so it would have read
+    // "__existing_damage. Stand in the doorway...".
     final guidance = widget.guidance ??
-        (widget.room.isEmpty
-            ? 'Capture the whole room in one photograph.'
-            : '${widget.room}. Stand in the doorway and capture the whole '
-                'room.');
+        (widget.room == kStayDamageRoom
+            ? 'Get close enough that the damage is obvious in the photograph. '
+                'Take one for each thing you find.'
+            : widget.room.isEmpty
+                ? 'Capture the whole room in one photograph.'
+                : '${stayRoomLabel(widget.room)}. Stand in the doorway and '
+                    'capture the whole room.');
 
     return Scaffold(
       backgroundColor: Colors.black,

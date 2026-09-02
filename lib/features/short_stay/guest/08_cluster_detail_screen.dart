@@ -26,10 +26,16 @@ class ClusterDetailScreen extends StatefulWidget {
     super.key,
     required this.listingId,
     required this.clusterId,
+    this.fromListing = false,
   });
 
   final String listingId;
   final String clusterId;
+
+  /// True when the guest is BROWSING a property rather than looking at a trip
+  /// they have booked. Decides which bottom tab is lit — see the long note on
+  /// the same field in 07_days_out_screen.dart.
+  final bool fromListing;
 
   @override
   State<ClusterDetailScreen> createState() => _ClusterDetailScreenState();
@@ -53,15 +59,28 @@ class _ClusterDetailScreenState extends State<ClusterDetailScreen> {
           await StayListingService.instance.byId(widget.listingId);
       final StayAttractions? a = l == null
           ? null
-          : await StayAttractionsService.instance.forTown(l.address.town);
+          : await StayAttractionsService.instance.forProperty(
+              lat: l.lat,
+              lng: l.lng,
+              town: l.address.town,
+            );
 
-      StayCluster? found;
-      for (final StayCluster c in a?.clusters ?? const <StayCluster>[]) {
-        if (c.id == widget.clusterId) {
-          found = c;
-          break;
-        }
-      }
+      // ⚠ THROUGH THE SERVICE, as of 29 August 2026. This loop was written out
+      // here while StayAttractionsService.cluster(town, clusterId) did exactly
+      // the same thing and was called by nothing — the service even carries a
+      // doc comment saying "for the detail screen", meaning it was written for
+      // this line and then not used by it.
+      //
+      // forProperty is cached per cell, so routing through the service costs no
+      // extra read.
+      final StayCluster? found = a == null
+          ? null
+          : await StayAttractionsService.instance.cluster(
+              widget.clusterId,
+              lat: l!.lat,
+              lng: l.lng,
+              town: l.address.town,
+            );
 
       if (!mounted) return;
       setState(() {
@@ -100,7 +119,7 @@ class _ClusterDetailScreenState extends State<ClusterDetailScreen> {
         backgroundColor: GoOutsColors.cardSurface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        toolbarHeight: 52,
+        toolbarHeight: _listing == null ? 52 : 62,
         shape: const Border(
           bottom: BorderSide(color: GoOutsColors.outlineVariant, width: 0.5),
         ),
@@ -108,14 +127,33 @@ class _ClusterDetailScreenState extends State<ClusterDetailScreen> {
           icon: const Icon(Icons.arrow_back, color: GoOutsColors.primaryBlue),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text(
-          c?.name ?? 'Day out',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: _screenTitle.copyWith(color: GoOutsColors.primaryBlue),
+        titleSpacing: 0,
+        // The property name underneath, so a guest three screens deep in a
+        // property they were considering can see which one, and knows what
+        // back returns to.
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Text(
+              c?.name ?? 'Day out',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: _screenTitle.copyWith(color: GoOutsColors.primaryBlue),
+            ),
+            if (_listing != null)
+              Text(
+                'from ${_listing!.title}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: _body.copyWith(color: GoOutsColors.bodyText),
+              ),
+          ],
         ),
       ),
-      bottomNavigationBar: const StayBottomNav(current: StayTab.trips),
+      bottomNavigationBar: StayBottomNav(
+        current: widget.fromListing ? StayTab.search : StayTab.trips,
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : c == null
@@ -130,6 +168,21 @@ class _ClusterDetailScreenState extends State<ClusterDetailScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           _distanceLine(c),
+                          // ⚠ ABOVE "What is here", because it answers the
+                          // earlier question. The list of places says what is
+                          // in the group; this says whether it is worth the
+                          // trip, and somebody decides that first.
+                          //
+                          // Renders nothing at all when empty — a plainer
+                          // screen, not a gap.
+                          if (c.hasAbout) ...<Widget>[
+                            const SizedBox(height: 16),
+                            Text(
+                              c.about,
+                              style: _body.copyWith(
+                                  color: GoOutsColors.deepNavy, height: 1.5),
+                            ),
+                          ],
                           const SizedBox(height: 20),
                           Text('What is here', style: _sectionHeader),
                           const SizedBox(height: 10),

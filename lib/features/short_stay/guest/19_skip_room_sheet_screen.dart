@@ -104,7 +104,7 @@ class _SkipRoomSheetState extends State<SkipRoomSheet> {
                 title,
                 style: GoogleFonts.inter(
                   fontSize: 15,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w700,
                   color: GoOutsColors.deepNavy,
                 ),
               ),
@@ -183,7 +183,7 @@ class _SkipRoomSheetState extends State<SkipRoomSheet> {
                 ),
                 child: Text(
                   'Confirm skip',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w700),
                 ),
               ),
               const SizedBox(height: 8),

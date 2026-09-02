@@ -111,6 +111,18 @@ class StayListing {
   final double ratingAvg;
   final int ratingCount;
 
+  /// The six sub scores, each with its OWN average and its OWN count.
+  ///
+  /// Written by submitStayReview in functions/stay_reviews.js as
+  /// `{cleanliness: {avg: 4.8, count: 11}, ...}`.
+  ///
+  /// ⚠ SEPARATE COUNTS, NOT ONE SHARED DENOMINATOR. The scores are optional
+  /// and a guest may answer four of the six. A shared count would drag any
+  /// category people skip towards zero, and "Location 2.1" on a property
+  /// nobody complained about is worse than showing no figure at all — which
+  /// is why a category with a count of zero renders as nothing here.
+  final Map<String, StayCategoryRating> ratingCategories;
+
   const StayListing({
     required this.id,
     required this.hostUid,
@@ -140,6 +152,7 @@ class StayListing {
     required this.locationContext,
     required this.ratingAvg,
     required this.ratingCount,
+    this.ratingCategories = const <String, StayCategoryRating>{},
   });
 
   factory StayListing.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) =>
@@ -230,6 +243,8 @@ class StayListing {
               (m['locationContext'] as Map).cast<String, dynamic>()),
       ratingAvg: (m['ratingAvg'] as num?)?.toDouble() ?? 0,
       ratingCount: (m['ratingCount'] as num?)?.toInt() ?? 0,
+      ratingCategories:
+          StayCategoryRating.parseAll(m['ratingCategories'] as Map?),
     );
   }
 
@@ -272,6 +287,40 @@ class StayListing {
 /// A first name and a joining year. Nothing here identifies a home, a bank
 /// account or a document. See the note on StayListing.host for why it is copied
 /// rather than looked up.
+/// One of the six category scores on a listing: its average and how many
+/// guests actually answered it.
+///
+/// ⚠ THE COUNT IS PART OF THE FACT, not bookkeeping. "Cleanliness 5.0" from
+/// one guest and from forty are different claims, and a screen that shows only
+/// the number cannot tell them apart. Anything with a count of zero is not
+/// rendered at all — see hasEnough.
+class StayCategoryRating {
+  const StayCategoryRating({required this.avg, required this.count});
+
+  final double avg;
+  final int count;
+
+  /// Below this a figure is noise dressed as a measurement. One person who
+  /// disliked the parking should not put "Location 2.0" under a property
+  /// nobody else complained about.
+  static const int minToShow = 2;
+
+  bool get hasEnough => count >= minToShow;
+
+  static Map<String, StayCategoryRating> parseAll(Map? raw) {
+    if (raw == null) return const <String, StayCategoryRating>{};
+    final Map<String, StayCategoryRating> out = <String, StayCategoryRating>{};
+    raw.forEach((Object? k, Object? v) {
+      if (k is! String || v is! Map) return;
+      final double a = (v['avg'] as num?)?.toDouble() ?? 0;
+      final int c = (v['count'] as num?)?.toInt() ?? 0;
+      if (c <= 0) return;
+      out[k] = StayCategoryRating(avg: a, count: c);
+    });
+    return out;
+  }
+}
+
 class StayHostSummary {
   const StayHostSummary({
     required this.name,

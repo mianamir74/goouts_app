@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../widgets/food_bottom_nav.dart';
 
 class FoodOrderHistoryScreen extends StatefulWidget {
   const FoodOrderHistoryScreen({super.key});
@@ -11,7 +12,7 @@ class FoodOrderHistoryScreen extends StatefulWidget {
 }
 
 class _FoodOrderHistoryScreenState extends State<FoodOrderHistoryScreen> {
-  static const Color _primary = Color(0xFFEA580C);
+  static const Color _primary = Color(0xFF0392CA);
   static const Color _navy    = Color(0xFF0D1B3E);
   static const Color _green   = Color(0xFF10B981);
   static const Color _red     = Color(0xFFEF4444);
@@ -82,6 +83,8 @@ class _FoodOrderHistoryScreenState extends State<FoodOrderHistoryScreen> {
     final pendingBankCount = _orders.where((o) => o['refundStatus'] == 'pending_bank_refund').length;
 
     return Scaffold(
+      bottomNavigationBar:
+          const FoodBottomNav(current: FoodTab.orders),
       backgroundColor: const Color(0xFFF2F4F7),
       appBar: AppBar(
         backgroundColor: Colors.white,
