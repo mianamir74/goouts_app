@@ -26,6 +26,22 @@ class _FoodOrderHistoryScreenState extends State<FoodOrderHistoryScreen> {
   List<Map<String, dynamic>> _orders = [];
   String _filter = 'all'; // all | active | completed | cancelled | refund_pending
 
+  // ── Perks card: cashback earned from food this calendar year ───────────────
+  //
+  // ⚠ SUMMED FROM THE SAME 100 ORDERS THE LIST ALREADY LOADED, not a second
+  // query. cashbackEarned is only ever present on delivered orders that have
+  // actually posted the reward, so an order still cooking correctly
+  // contributes nothing yet rather than a guessed figure.
+  double get _yearCashback {
+    final thisYear = DateTime.now().year;
+    return _orders.fold<double>(0.0, (total, o) {
+      final date = o['_date'] as DateTime?;
+      if (date == null || date.year != thisYear) return total;
+      final earned = (o['cashbackEarned'] as num?)?.toDouble() ?? 0.0;
+      return total + earned;
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -102,6 +118,14 @@ class _FoodOrderHistoryScreenState extends State<FoodOrderHistoryScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: _primary))
           : Column(children: [
+              // ⚠ GATED ON A REAL NUMBER, NOT ON HAVING ORDERS. Nothing in
+              // the backend writes cashbackEarned onto a food order yet (see
+              // delivery_confirmation_screen.dart), so this would otherwise
+              // show £0.00 to every customer forever — a card that looks
+              // broken rather than one that is honestly empty. It appears on
+              // its own the day a real crediting mechanism starts writing
+              // the field, no further change needed here.
+              if (_yearCashback > 0) _buildPerksCard(),
               // Filter chips
               Container(
                 color: Colors.white,
@@ -152,6 +176,56 @@ class _FoodOrderHistoryScreenState extends State<FoodOrderHistoryScreen> {
                       ),
               ),
             ]),
+    );
+  }
+
+  // ── Perks card: what the cashback thread that runs through the rest of
+  // GoOuts looks like on the food side. Ported from the Stitch reference —
+  // real total from the orders already loaded above, no invented tier or
+  // progress bar since neither has a confirmed source here.
+  Widget _buildPerksCard() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE0F3FB),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('FOOD DELIVERY CASHBACK',
+                        style: GoogleFonts.inter(
+                            fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: _primary)),
+                    const SizedBox(height: 4),
+                    Text('Earned from food this year',
+                        style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: _navy)),
+                  ],
+                ),
+              ),
+              Container(
+                width: 40,
+                height: 40,
+                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                child: const Icon(Icons.account_balance_wallet_outlined, color: _primary, size: 20),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text('£${_yearCashback.toStringAsFixed(2)}',
+              style: GoogleFonts.inter(fontSize: 30, fontWeight: FontWeight.w800, color: _navy, letterSpacing: -0.5)),
+          const SizedBox(height: 6),
+          Text('Available in your GoOuts wallet, alongside cashback from every other partner venue.',
+              style: GoogleFonts.inter(fontSize: 12, color: _navy.withValues(alpha: 0.75))),
+        ],
+      ),
     );
   }
 

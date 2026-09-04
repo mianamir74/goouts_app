@@ -131,10 +131,17 @@ class StayRoutes {
     // wired, to stay_attractions/{citySlug} built from OpenStreetMap. Both take
     // a listingId, which is what they lacked.
     //
-    // Still unwired: 09 (neighbourhood) and 10 (what's on). 10 needs DATED
-    // EVENTS, which OpenStreetMap does not hold — that is a PredictHQ or
-    // Ticketmaster job and is deliberately deferred rather than faked.
-    // 23-25 (claims and reviews) remain deferred under task #106.
+    // Still unwired: 10 (what's on). It needs DATED EVENTS, which
+    // OpenStreetMap does not hold — that is a PredictHQ or Ticketmaster job
+    // and is deliberately deferred rather than faked, not routed at all
+    // below (see the parked archive under goouts/design/parked/whats_on).
+    //
+    // 09 (neighbourhood) and 23-25 (claims and reviews) were also unwired
+    // when this note was written. They no longer are — see neighbourhood,
+    // claim, contestClaim and review in the switch below. Left this
+    // paragraph rather than deleting it outright, since "still unwired"
+    // claims that quietly go stale are exactly the kind of comment that
+    // sends the next person looking for a bug that was fixed weeks ago.
     final listingId = id('listingId');
     final bookingId = id('bookingId');
 

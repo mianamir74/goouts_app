@@ -62,8 +62,10 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
   /// which now compute the real figure from the order.
   ///
   /// This field stays zero on purpose. The order document carries no cashback
-  /// value at all: grandTotal, foodTotal, subtotal, deliveryFee and items, and
-  /// nothing else. There is no honest way to compute a clawback here.
+  /// value at all: total, subtotal, deliveryFee and items, and nothing else.
+  /// (Before 31 Aug 2026 the fields were named grandTotal/foodTotal; the
+  /// reads below check both.) There is no honest way to compute a clawback
+  /// here.
   ///
   /// Zero means the sheet shows the GROSS refund and hides the "you earned £X
   /// cashback" note entirely. The server applies the real deduction when it
@@ -139,12 +141,26 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
       });
       _recalcWindow();
       _recalcCancel();
-      // Auto-show rating sheet when delivery completes
+      // Auto-open delivery confirmation when delivery completes.
+      //
+      // ⚠ WAS A BOTTOM SHEET (_showRatingSheet, still below, now unused by
+      // this trigger but left in place rather than deleted — nothing else
+      // references it and removing a working, already-audited callable call
+      // for the sake of tidiness is how the next person loses a reference
+      // implementation). DeliveryConfirmationScreen is a full route now, so
+      // this pushes rather than opening a sheet. Same _ratingShown guard,
+      // same one-time trigger.
       final newStatus = _order?['status'] as String?;
       if (!_ratingShown && newStatus == 'delivered' && prevStatus != 'delivered') {
         _ratingShown = true;
         Future.delayed(const Duration(milliseconds: 800), () {
-          if (mounted) _showRatingSheet();
+          if (mounted) {
+            Navigator.pushNamed(
+              context,
+              '/food-delivery-confirmation',
+              arguments: {'orderId': _orderId, 'order': _order},
+            );
+          }
         });
       }
     });
@@ -203,7 +219,10 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
       return;
     }
 
-    final foodTotal  = (_order?['foodTotal'] ?? _order?['orderTotal'] ?? 0.0).toDouble();
+    // ⚠ subtotal FIRST. createFoodOrder (31 Aug 2026) writes subtotal/total,
+    // not foodTotal/orderTotal — reading only the old names showed a £0.00
+    // cancellation fee and a £0.00 refund on every order placed since.
+    final foodTotal  = (_order?['subtotal'] ?? _order?['foodTotal'] ?? _order?['orderTotal'] ?? 0.0).toDouble();
     final acceptedAt = _order?['acceptedAt'] as Timestamp?;
 
     if (status == 'accepted') {
@@ -294,7 +313,11 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
     // _cancelFee is already computed and already displayed on the dialog the
     // customer just agreed to, so the refund is simply the total less that fee.
     // Free cancellations carry a fee of 0 and fall out of the same expression.
-    final double orderTotal = ((_order?['grandTotal'] as num?) ?? 0).toDouble();
+    //
+    // ⚠ total FIRST, grandTotal as a fallback that nothing writes any more —
+    // same field rename as _recalcCancel above.
+    final double orderTotal = ((_order?['total'] as num?) ??
+        (_order?['grandTotal'] as num?) ?? 0).toDouble();
 
     // Step 2: pick refund method
     final refundMethod = await _showRefundMethodSheet(
@@ -453,6 +476,15 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
   );
 
   // ── Rating + Tip sheet ────────────────────────────────────────────────────
+  //
+  // Suppressed 4 September 2026, not deleted. _subscribeToOrder now opens
+  // DeliveryConfirmationScreen instead of this sheet — see the note there.
+  // Kept because _showComplaintSheet below, the auto-prompt on a rating of
+  // 3 stars or under with real categories (missing items, wrong items, cold
+  // food and so on), only has this as a caller. The confirmation screen does
+  // not yet trigger it; wiring that through is follow-up work, not a reason
+  // to delete a working complaint flow in the meantime.
+  // ignore: unused_element
   void _showRatingSheet() {
     int selectedStars  = 5;
     int selectedTipIdx = 1; // default £1.00
@@ -1514,8 +1546,9 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
 
       final double itemPrice = ((sub['originalPrice'] as num?) ?? 0).toDouble();
       final int itemQty = ((sub['originalQty'] as num?) ?? 1).toInt();
-      final double orderTotal =
-          ((_order?['grandTotal'] as num?) ?? 0).toDouble();
+      // ⚠ total FIRST — same field rename as the cancellation flow above.
+      final double orderTotal = ((_order?['total'] as num?) ??
+          (_order?['grandTotal'] as num?) ?? 0).toDouble();
 
       final chosen = await _showRefundMethodSheet(
         refundAmount:

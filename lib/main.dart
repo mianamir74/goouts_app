@@ -52,7 +52,9 @@ import 'screens/biometric_lock_screen.dart';
 import 'screens/food_delivery_screen.dart';
 import 'screens/food_address_picker_screen.dart';
 import 'screens/food_menu_screen.dart';
+import 'screens/checkout_screen.dart';
 import 'screens/food_order_tracking_screen.dart';
+import 'screens/delivery_confirmation_screen.dart';
 import 'screens/food_delivery_chat_screen.dart';
 import 'screens/food_order_history_screen.dart';
 import 'screens/refer_friend_screen.dart';
@@ -326,13 +328,13 @@ class _GoOutsAppState extends State<GoOutsApp> {
         '/food-delivery': (context) => const FoodDeliveryScreen(),
         '/food-address-picker': (context) => const FoodAddressPickerScreen(),
         '/food-menu': (context) => const FoodMenuScreen(),
-        // Task #73 — cart/checkout screen (placeholder until built)
-        '/food-cart': (context) => Scaffold(
-          appBar: AppBar(title: const Text('Your Cart')),
-          body: const Center(child: Text('Cart coming soon — Task #73')),
-        ),
+        // Task #73 — was a placeholder. checkout_screen.dart was already
+        // fully built and already carries the createFoodOrder security fix
+        // (see food_orders.js) — it was simply never routed to.
+        '/food-cart': (context) => const CheckoutScreen(),
         // Task #74 — live order tracking + Add to Order
         '/food-order-tracking': (context) => const FoodOrderTrackingScreen(),
+        '/food-delivery-confirmation': (context) => const DeliveryConfirmationScreen(),
         '/food-delivery-chat': (context) => const FoodDeliveryChatScreen(),
         '/food-order-history': (context) => const FoodOrderHistoryScreen(),
         '/refer-friend': (context) => const ReferFriendScreen(),

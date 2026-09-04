@@ -101,7 +101,11 @@ const List<GoOutsService> gooutsPartnerCategories = <GoOutsService>[
   ),
   GoOutsService(
     icon: Icons.restaurant_rounded,
-    label: 'Restaurants',
+    // Singular for display only — the 80px home tile wraps 'Restaurants' to
+    // two lines with just the 's' stranded on its own. explore_screen.dart
+    // already shows this same category as 'Restaurant' via its own
+    // _normLabel map, so this matches what's already on screen elsewhere.
+    label: 'Restaurant',
     category: 'Restaurants',
     color: Color(0xFF3B1F0A),
   ),
