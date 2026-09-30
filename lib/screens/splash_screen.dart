@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -116,7 +117,10 @@ class _SplashScreenState extends State<SplashScreen>
   Widget build(BuildContext context) {
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
     return Scaffold(
-      body: Container(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = Container(
         width: double.infinity,
         height: double.infinity,
         decoration: const BoxDecoration(
@@ -329,6 +333,15 @@ class _SplashScreenState extends State<SplashScreen>
             ),
           ],
         ),
+      );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: content,
+            ),
+          );
+        },
       ),
     );
   }

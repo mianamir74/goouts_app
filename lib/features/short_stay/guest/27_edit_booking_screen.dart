@@ -23,6 +23,7 @@
 // Every edit re-quotes through quoteStayAmendment. The screen never multiplies
 // a nightly rate by a night count to show a total — that is how the displayed
 // figure and the charged figure drift apart.
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -203,7 +204,10 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
           ),
         ),
       ),
-      body: _loading
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? Center(
@@ -231,7 +235,16 @@ class _EditBookingScreenState extends State<EditBookingScreen> {
                     _noteCard(),
                     const SizedBox(height: 100),
                   ],
-                ),
+                );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: content,
+            ),
+          );
+        },
+      ),
       bottomSheet:
           (_loading || _error != null) ? null : _bottomBar(),
     );

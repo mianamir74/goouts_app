@@ -30,6 +30,7 @@
 // to host_04 is what unblocks the rest of this screen. Until then, the note at
 // the bottom tells the guest the truth: the host sends arrival details
 // directly.
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -48,9 +49,29 @@ import '../theme/stay_colors.dart';
 import '../widgets/stay_bottom_nav.dart';
 
 class TripDetailsScreen extends StatefulWidget {
-  const TripDetailsScreen({super.key, required this.bookingId});
+  const TripDetailsScreen({
+    super.key,
+    required this.bookingId,
+    this.embedded = false,
+  });
 
   final String bookingId;
+
+  // ── ⚠ ADDED for the desktop "My Trips" split view, 14 September 2026. ────
+  //
+  // 14_my_bookings_screen.dart's desktop branch drops this screen's own
+  // content straight into its right-hand pane instead of pushing a route —
+  // there is no "back" on a split view, the list on the left IS the way back.
+  //
+  // embedded: true skips the Scaffold/AppBar/bottomNavigationBar/desktop-
+  // centering wrapper below and returns just the scrollable body content
+  // (_content), sized to whatever pane already holds it.
+  //
+  // Defaults to false, so every existing call — StayRoutes.bookingDetails,
+  // the only other call site — is completely unaffected. The mobile push
+  // flow (and desktop viewports under 900px reached via that route) still
+  // get the full Scaffold exactly as before.
+  final bool embedded;
 
   @override
   State<TripDetailsScreen> createState() => _TripDetailsScreenState();
@@ -71,6 +92,14 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ── EMBEDDED, for the desktop "My Trips" split view ───────────────────
+    //
+    // 14_my_bookings_screen.dart's desktop branch builds this widget straight
+    // into its right-hand pane. Skip the Scaffold/AppBar/bottomNavigationBar
+    // — that pane already sits inside 14's own Scaffold and DesktopTopNav —
+    // and hand back just the scrollable content itself.
+    if (widget.embedded) return _content(context);
+
     return Scaffold(
       backgroundColor: GoOutsColors.background,
       appBar: AppBar(
@@ -95,79 +124,102 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
       // was four dead labels; StayBottomNav actually navigates, and resets the
       // stack rather than pushing another copy of a screen you are already on.
       bottomNavigationBar: const StayBottomNav(current: StayTab.trips),
-      body: StreamBuilder<StayBooking?>(
-        stream: StayBookingService.instance.watch(widget.bookingId),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final StayBooking? b = snapshot.data;
-          if (b == null) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Text('This trip could not be loaded.',
-                    style: GoogleFonts.inter(
-                        fontSize: 15, color: GoOutsColors.bodyText)),
-              ),
-            );
-          }
-          _ensureListing(b.listingId);
-
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              // ── ⚠ A CLAIM MUST BE FINDABLE WITHOUT THE NOTIFICATION ───────
-              //
-              // Added 25 August 2026 with the claims flow. The push is the only
-              // other way a guest learns a claim has been made against them,
-              // and pushes get dismissed, silenced, or never granted at all.
-              //
-              // A 72 hour clock the person cannot see running is not a window,
-              // it is a trapdoor — so it sits at the TOP of this screen, above
-              // the trip itself, for as long as it is waiting on them.
-              // ── Order follows Stitch 15-trip_detail. 27 August 2026. ──────
-              //
-              // Stitch runs: property and address with Directions, the two
-              // check-in and check-out cards, the host, access instructions,
-              // the check-in photos block, then quick links, then a map.
-              //
-              // The claim banner stays ABOVE all of it, for the reason above.
-              // Everything else is Stitch's sequence.
-              _claimBanner(b.id),
-              _header(b),
-              _addressRow(),
-              const SizedBox(height: 16),
-              _checkTimesRow(),
-              const SizedBox(height: 16),
-              _whenCard(b),
-              const SizedBox(height: 16),
-              // ⚠ HIGH UP, AND ONLY AFTER CHECK OUT. This is the guest's ONLY
-              // way into screen 25 — nothing else on the platform pushes
-              // StayRoutes.review — so burying it under the map would be the
-              // same as not having built it. Above the fold, below the dates,
-              // and it disappears the moment they have written one.
-              if (b.canGuestReview || b.awaitingOtherReview) ...<Widget>[
-                _reviewCard(b),
-                const SizedBox(height: 16),
-              ],
-              _contactHostCard(b),
-              const SizedBox(height: 16),
-              _accessCard(),
-              const SizedBox(height: 16),
-              _photosCard(b),
-              if (_listing?.locationContext != null) ...[
-                const SizedBox(height: 16),
-                _partnersCard(_listing!.locationContext!),
-              ],
-              _houseRulesCard(),
-              const SizedBox(height: 16),
-              _mapCard(),
-              const SizedBox(height: 24),
-            ],
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = _content(context);
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: content,
+            ),
           );
         },
       ),
+    );
+  }
+
+  // ── Body content ─────────────────────────────────────────────────────────
+  //
+  // Factored out of build() on 14 September 2026 so the desktop split view's
+  // right-hand pane (embedded: true, above) and this screen's own mobile/
+  // narrow-desktop Scaffold can share exactly the same StreamBuilder and
+  // section order rather than two copies drifting apart. No logic changed in
+  // the move — this is the same widget tree build() produced inline before.
+  Widget _content(BuildContext context) {
+    return StreamBuilder<StayBooking?>(
+      stream: StayBookingService.instance.watch(widget.bookingId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final StayBooking? b = snapshot.data;
+        if (b == null) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Text('This trip could not be loaded.',
+                  style: GoogleFonts.inter(
+                      fontSize: 15, color: GoOutsColors.bodyText)),
+            ),
+          );
+        }
+        _ensureListing(b.listingId);
+
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            // ── ⚠ A CLAIM MUST BE FINDABLE WITHOUT THE NOTIFICATION ───────
+            //
+            // Added 25 August 2026 with the claims flow. The push is the only
+            // other way a guest learns a claim has been made against them,
+            // and pushes get dismissed, silenced, or never granted at all.
+            //
+            // A 72 hour clock the person cannot see running is not a window,
+            // it is a trapdoor — so it sits at the TOP of this screen, above
+            // the trip itself, for as long as it is waiting on them.
+            // ── Order follows Stitch 15-trip_detail. 27 August 2026. ──────
+            //
+            // Stitch runs: property and address with Directions, the two
+            // check-in and check-out cards, the host, access instructions,
+            // the check-in photos block, then quick links, then a map.
+            //
+            // The claim banner stays ABOVE all of it, for the reason above.
+            // Everything else is Stitch's sequence.
+            _claimBanner(b.id),
+            _header(b),
+            _addressRow(),
+            const SizedBox(height: 16),
+            _checkTimesRow(),
+            const SizedBox(height: 16),
+            _whenCard(b),
+            const SizedBox(height: 16),
+            // ⚠ HIGH UP, AND ONLY AFTER CHECK OUT. This is the guest's ONLY
+            // way into screen 25 — nothing else on the platform pushes
+            // StayRoutes.review — so burying it under the map would be the
+            // same as not having built it. Above the fold, below the dates,
+            // and it disappears the moment they have written one.
+            if (b.canGuestReview || b.awaitingOtherReview) ...<Widget>[
+              _reviewCard(b),
+              const SizedBox(height: 16),
+            ],
+            _contactHostCard(b),
+            const SizedBox(height: 16),
+            _accessCard(),
+            const SizedBox(height: 16),
+            _photosCard(b),
+            if (_listing?.locationContext != null) ...[
+              const SizedBox(height: 16),
+              _partnersCard(_listing!.locationContext!),
+            ],
+            _houseRulesCard(),
+            const SizedBox(height: 16),
+            _mapCard(),
+            const SizedBox(height: 24),
+          ],
+        );
+      },
     );
   }
 

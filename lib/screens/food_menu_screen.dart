@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
+import '../features/short_stay/widgets/desktop_top_nav.dart';
 import '../services/cart_service.dart';
 import '../widgets/food_bottom_nav.dart';
 
@@ -267,6 +269,58 @@ class _FoodMenuScreenState extends State<FoodMenuScreen> {
   // ═══════════════════════════════════════════════════════════════════════════
   @override
   Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+        return desktop ? _buildDesktop(context) : _buildMobile(context);
+      },
+    );
+  }
+
+  // Shared by mobile and desktop — the slivers themselves never change,
+  // only what frames them (bottom tab bar vs top nav, full width vs a
+  // centred reading column).
+  List<Widget> _menuSlivers() => [
+        // ── Restaurant header ────────────────────────────────────
+        _buildSliverHeader(),
+        // ── CASHBACK STRIP ────────────────────────────────────────
+        //
+        // Added 22 August 2026. This screen mentioned cashback
+        // nowhere at all — a GoOuts menu that reads exactly like
+        // any other delivery app's menu. The rate is carried in
+        // from the restaurant card so the two cannot disagree.
+        if (_cashbackPct != null && _cashbackPct! > 0)
+          SliverToBoxAdapter(child: _buildCashbackStrip()),
+        // ── Popular Picks / AI upsell ─────────────────────────────
+        if (_popularItems.isNotEmpty)
+          SliverToBoxAdapter(child: _buildPopularPicksSection()),
+        // ── Category tabs (sticky) ───────────────────────────────
+        if (_categories.isNotEmpty)
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _CategoryTabsDelegate(
+              categories:     _categories,
+              activeIndex:    _activeCatIndex,
+              scrollCtrl:     _tabScrollCtrl,
+              onTap:          _scrollToCategory,
+              primaryColor:   _primary,
+            ),
+          ),
+        // ── Menu sections ────────────────────────────────────────
+        if (_categories.isEmpty)
+          SliverFillRemaining(child: _buildEmptyMenu())
+        else
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (ctx, i) => _buildCategorySection(i),
+              childCount: _categories.length,
+            ),
+          ),
+        // Extra bottom padding so cart bar doesn't cover last item
+        const SliverToBoxAdapter(child: SizedBox(height: 100)),
+      ];
+
+  Widget _buildMobile(BuildContext context) {
     return Scaffold(
       bottomNavigationBar:
           const FoodBottomNav(current: FoodTab.restaurants),
@@ -277,47 +331,8 @@ class _FoodMenuScreenState extends State<FoodMenuScreen> {
               children: [
                 CustomScrollView(
                   controller: _itemsScrollCtrl,
-                  slivers: [
-                    // ── Restaurant header ────────────────────────────────────
-                    _buildSliverHeader(),
-                    // ── CASHBACK STRIP ────────────────────────────────────────
-                    //
-                    // Added 22 August 2026. This screen mentioned cashback
-                    // nowhere at all — a GoOuts menu that reads exactly like
-                    // any other delivery app's menu. The rate is carried in
-                    // from the restaurant card so the two cannot disagree.
-                    if (_cashbackPct != null && _cashbackPct! > 0)
-                      SliverToBoxAdapter(child: _buildCashbackStrip()),
-                    // ── Popular Picks / AI upsell ─────────────────────────────
-                    if (_popularItems.isNotEmpty)
-                      SliverToBoxAdapter(child: _buildPopularPicksSection()),
-                    // ── Category tabs (sticky) ───────────────────────────────
-                    if (_categories.isNotEmpty)
-                      SliverPersistentHeader(
-                        pinned: true,
-                        delegate: _CategoryTabsDelegate(
-                          categories:     _categories,
-                          activeIndex:    _activeCatIndex,
-                          scrollCtrl:     _tabScrollCtrl,
-                          onTap:          _scrollToCategory,
-                          primaryColor:   _primary,
-                        ),
-                      ),
-                    // ── Menu sections ────────────────────────────────────────
-                    if (_categories.isEmpty)
-                      SliverFillRemaining(child: _buildEmptyMenu())
-                    else
-                      SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (ctx, i) => _buildCategorySection(i),
-                          childCount: _categories.length,
-                        ),
-                      ),
-                    // Extra bottom padding so cart bar doesn't cover last item
-                    const SliverToBoxAdapter(child: SizedBox(height: 100)),
-                  ],
+                  slivers: _menuSlivers(),
                 ),
-
                 // ── Floating cart bar ────────────────────────────────────────
                 Positioned(
                   left: 0, right: 0, bottom: 0,
@@ -325,6 +340,55 @@ class _FoodMenuScreenState extends State<FoodMenuScreen> {
                 ),
               ],
             ),
+    );
+  }
+
+  // ── Desktop web ──────────────────────────────────────────────────────────
+  //
+  // ADDED 9 September 2026. Top nav instead of the mobile bottom tab bar; the
+  // hero banner and menu are held to an 1100px column rather than the
+  // ConstrainedBox+Center-without-SizedBox trap this pass already hit once —
+  // CustomScrollView does not need that fix, since (unlike a Column) it
+  // greedily fills the width it is given rather than shrink-wrapping, so a
+  // plain Center+ConstrainedBox centres it correctly on its own.
+  Widget _buildDesktop(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _bg,
+      body: Column(
+        children: [
+          const DesktopTopNav(current: DesktopNavTab.food),
+          Expanded(
+            child: _loading
+                ? _buildSkeleton()
+                : Stack(
+                    children: [
+                      Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 1100),
+                          child: CustomScrollView(
+                            controller: _itemsScrollCtrl,
+                            slivers: _menuSlivers(),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        left: 0, right: 0, bottom: 0,
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 1100),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 24),
+                              child: _CartBar(cart: _cart, primary: _primary),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -909,6 +973,9 @@ class _FoodMenuScreenState extends State<FoodMenuScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 640)
+          : null,
       builder: (ctx) => _ItemSearchSheet(
         categories: _categories,
         onAdd:    _addItem,

@@ -21,6 +21,7 @@
 // otherwise cancel on a stale figure. The number shown after the fact comes
 // from the commit, not the preview, so what the guest is told last is what was
 // actually applied.
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -125,7 +126,10 @@ class _CancelBookingScreenState extends State<CancelBookingScreen> {
           ),
         ),
       ),
-      body: _loading
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? _errorBody()
@@ -143,7 +147,16 @@ class _CancelBookingScreenState extends State<CancelBookingScreen> {
                     _warningCard(),
                     const SizedBox(height: 100),
                   ],
-                ),
+                );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: content,
+            ),
+          );
+        },
+      ),
       bottomSheet:
           (_loading || _error != null) ? null : _bottomActions(),
     );

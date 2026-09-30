@@ -1,4 +1,5 @@
-import 'dart:io';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
@@ -93,42 +94,58 @@ class _WalletScreenState extends State<WalletScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ⚠ DESKTOP WEB CENTERING ADDED 14 September 2026. No kIsWeb layout
+    // treatment existed here (the kIsWeb this file already had was only the
+    // Apple/Google Pay icon guard). Same "full-bleed mobile column" issue as
+    // the other root tabs, fixed the same way.
     return Scaffold(
       backgroundColor: _primary,
       body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(),
-            _buildBalanceCard(context),
-            const SizedBox(height: 16),
-            Expanded(
-              child: Container(
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF2F4F7),
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(24),
-                    topRight: Radius.circular(24),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+            final Widget content = Column(
+              children: [
+                _buildHeader(),
+                _buildBalanceCard(context),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF2F4F7),
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(24),
+                        topRight: Radius.circular(24),
+                      ),
+                    ),
+                    child: _loadingData
+                        ? _buildShimmer()
+                        : SingleChildScrollView(
+                            padding: const EdgeInsets.only(top: 20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildCashbackCard(),
+                                const SizedBox(height: 20),
+                                _buildSpendingSummary(),
+                                const SizedBox(height: 20),
+                                _buildRecentTransactions(context),
+                                const SizedBox(height: 24),
+                              ],
+                            ),
+                          ),
                   ),
                 ),
-                child: _loadingData
-                    ? _buildShimmer()
-                    : SingleChildScrollView(
-                        padding: const EdgeInsets.only(top: 20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildCashbackCard(),
-                            const SizedBox(height: 20),
-                            _buildSpendingSummary(),
-                            const SizedBox(height: 20),
-                            _buildRecentTransactions(context),
-                            const SizedBox(height: 24),
-                          ],
-                        ),
-                      ),
+              ],
+            );
+            if (!desktop) return content;
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: content,
               ),
-            ),
-          ],
+            );
+          },
         ),
       ),
       bottomNavigationBar: _buildBottomNav(),
@@ -498,15 +515,23 @@ class _WalletScreenState extends State<WalletScreen> {
                         arguments: 'fromWallet');
                   }
                 },
+                // ⚠ FIXED 9 September 2026, found in a web audit.
+                // Platform.isIOS throws on web the INSTANT it is evaluated —
+                // dart:io has no OS to report there — so this widget crashed
+                // every time it tried to build, not just when tapped. `!kIsWeb
+                // &&` short-circuits before Platform.isIOS is ever reached on
+                // web, so this now just always shows the Google Wallet
+                // wording there, which is a harmless default — neither wallet
+                // button does anything meaningful from a browser tap anyway.
                 icon: Icon(
-                  Platform.isIOS
+                  !kIsWeb && Platform.isIOS
                       ? Icons.apple_rounded
                       : Icons.account_balance_wallet_outlined,
                   color: Colors.white,
                   size: 18,
                 ),
                 label: Text(
-                  Platform.isIOS
+                  !kIsWeb && Platform.isIOS
                       ? 'Add to Apple Wallet'
                       : 'Add to Google Wallet',
                   style: GoogleFonts.inter(

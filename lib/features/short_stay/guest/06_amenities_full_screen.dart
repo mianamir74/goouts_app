@@ -55,6 +55,7 @@
 //     ships with photos: [] for exactly this reason.
 // ─────────────────────────────────────────────────────────────────────────────
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
 
 import '../models/stay_amenities.dart';
@@ -107,7 +108,10 @@ class _AmenitiesFullScreenState extends State<AmenitiesFullScreen> {
         title: Text('Amenities',
             style: _screenTitle.copyWith(color: GoOutsColors.primaryBlue)),
       ),
-      body: FutureBuilder<StayListing?>(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = FutureBuilder<StayListing?>(
         future: _listing,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -148,6 +152,15 @@ class _AmenitiesFullScreenState extends State<AmenitiesFullScreen> {
                 _group('Also provided',
                     unknown.map(stayAmenityFor).toList(growable: false), has),
             ],
+          );
+        },
+      );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: content,
+            ),
           );
         },
       ),

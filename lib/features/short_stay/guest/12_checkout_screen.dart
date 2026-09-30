@@ -43,9 +43,14 @@
 // payment section belongs here. Restore it then, with a real card. Not before.
 import 'dart:math';
 
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../widgets/desktop_top_nav.dart';
 import '../models/money.dart';
 import '../models/stay_booking_request.dart';
 import '../models/stay_enums.dart';
@@ -54,6 +59,14 @@ import '../services/stay_booking_service.dart';
 import '../services/stay_listing_service.dart';
 import '../stay_routes.dart';
 import '../theme/stay_colors.dart';
+
+// The Short Stay section of the single, unified Terms & Conditions document
+// (terms.html Part 13). Added 22 September 2026 alongside the mandatory
+// acceptance checkbox below — there is deliberately no separate Short Stay
+// terms document, so this deep links into the same page every other part
+// of the app already points at for terms.html.
+const String kShortStayTermsUrl =
+    'https://www.goouts.co.uk/terms.html#short-stay';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key, required this.request});
@@ -71,6 +84,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String? _error;
 
   bool _submitting = false;
+
+  /// Must be ticked before a booking can be submitted. Gates [canSubmit] in
+  /// [_buildBottomAction] — see that method's comment for why this exists.
+  bool _agreedToTerms = false;
+
+  Future<void> _openShortStayTerms() async {
+    final Uri uri = Uri.parse(kShortStayTermsUrl);
+    await launchUrl(uri, webOnlyWindowName: '_blank');
+  }
 
   /// How the REMAINDER is paid after the wallet has been applied.
   ///
@@ -162,6 +184,84 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+        return desktop ? _buildDesktop(context) : _buildMobile(context);
+      },
+    );
+  }
+
+  List<Widget> _checkoutSections() => [
+        _buildListingSummary(),
+        if (!_quote!.available) _buildUnavailableNotice(),
+        _buildPriceBreakdown(),
+        if (_quote!.cashback.value > 0) _buildCashbackCard(),
+        if (!_quote!.depositHold.isZero) _buildDepositInfo(),
+        _buildCancellationPolicy(),
+        // One or the other, never both. paymentAvailable is the server's
+        // answer, so a config change flips this screen without an app
+        // release.
+        if (_quote!.paymentAvailable)
+          _buildPaymentMethod()
+        else
+          _buildNoPaymentNotice(),
+      ];
+
+  // ── Desktop web ──────────────────────────────────────────────────────────
+  //
+  // ADDED 9 September 2026. Top nav replaces the AppBar's back arrow (a
+  // "Cancel" text link takes its place, since Back is ambiguous once there
+  // is no longer a mobile back gesture), content centred to a 900px reading
+  // column matching the booking dates screen it follows.
+  Widget _buildDesktop(BuildContext context) {
+    return Scaffold(
+      backgroundColor: GoOutsColors.background,
+      body: Column(
+        children: [
+          const DesktopTopNav(current: DesktopNavTab.stay),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                    ? _errorBody()
+                    : Stack(
+                        children: [
+                          SingleChildScrollView(
+                            child: DesktopCenter(
+                              maxWidth: 900,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 24),
+                                  Text(
+                                    'Checkout',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.w800,
+                                      color: GoOutsColors.deepNavy,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  ..._checkoutSections(),
+                                  const SizedBox(height: 140),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Align(
+                            alignment: Alignment.bottomCenter,
+                            child: _buildBottomAction(desktop: true),
+                          ),
+                        ],
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobile(BuildContext context) {
     return Scaffold(
       backgroundColor: GoOutsColors.background,
       appBar: AppBar(
@@ -200,21 +300,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ? _errorBody()
               : ListView(
                   padding: const EdgeInsets.only(bottom: 24),
-                  children: [
-                    _buildListingSummary(),
-                    if (!_quote!.available) _buildUnavailableNotice(),
-                    _buildPriceBreakdown(),
-                    if (_quote!.cashback.value > 0) _buildCashbackCard(),
-                    if (!_quote!.depositHold.isZero) _buildDepositInfo(),
-                    _buildCancellationPolicy(),
-                    // One or the other, never both. paymentAvailable is the
-                    // server's answer, so a config change flips this screen
-                    // without an app release.
-                    if (_quote!.paymentAvailable)
-                      _buildPaymentMethod()
-                    else
-                      _buildNoPaymentNotice(),
-                  ],
+                  children: _checkoutSections(),
                 ),
       bottomSheet: (_loading || _error != null) ? null : _buildBottomAction(),
     );
@@ -918,68 +1004,154 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return '$who ${_fromCard.formatted} will be charged.';
   }
 
-  Widget _buildBottomAction() {
-    final bool canSubmit = _quote!.available && !_submitting;
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: GoOutsColors.dividerGray)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+  // Added 22 September 2026. A guest must explicitly accept the Short Stay
+  // terms (terms.html Part 13, covering the capture/claims/retention flow
+  // and the rest of the Short Stay-specific obligations) before the submit
+  // button becomes tappable. This is the one place in the booking flow that
+  // actually creates the booking, so it is the right and only place to gate
+  // on it, rather than a separate confirmation step.
+  Widget _buildTermsAgreement() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // The "Secure payment / SSL Encrypted" badges that used to sit here
-          // were reassurance about a transaction that does not happen. What a
-          // guest needs to know at this button is what it commits them to.
-          Text(
-            _payLine(),
-            textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
-                fontSize: 12, color: GoOutsColors.bodyText),
-          ),
-          const SizedBox(height: 12),
-          ElevatedButton(
-            onPressed: canSubmit ? _submit : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: GoOutsColors.primaryBlue,
-              disabledBackgroundColor: GoOutsColors.dividerGray,
-              minimumSize: const Size(double.infinity, 56),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+          SizedBox(
+            height: 24,
+            width: 24,
+            child: Checkbox(
+              value: _agreedToTerms,
+              onChanged: (bool? v) =>
+                  setState(() => _agreedToTerms = v ?? false),
+              activeColor: GoOutsColors.primaryBlue,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
-            child: _submitting
-                ? const SizedBox(
-                    height: 22,
-                    width: 22,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white),
-                  )
-                : Text(
-                    // "Pay" appears ONLY when money genuinely moves — which
-                    // in demo means the wallet share. The card share is
-                    // recorded, not charged, so the button must not promise
-                    // to take it.
-                    _quote!.paymentAvailable && _fromWallet.value > 0
-                        ? 'Pay ${_fromWallet.formatted}'
-                        : _isInstant
-                            ? 'Confirm booking'
-                            : 'Request to book',
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _agreedToTerms = !_agreedToTerms),
+              behavior: HitTestBehavior.opaque,
+              child: RichText(
+                text: TextSpan(
+                  style: GoogleFonts.inter(
+                      fontSize: 13, color: GoOutsColors.bodyText, height: 1.4),
+                  children: [
+                    const TextSpan(text: 'I agree to the '),
+                    TextSpan(
+                      text: 'Short Stay Terms and Conditions',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: GoOutsColors.primaryBlue,
+                        fontWeight: FontWeight.w600,
+                        decoration: TextDecoration.underline,
+                      ),
+                      recognizer: TapGestureRecognizer()
+                        ..onTap = _openShortStayTerms,
                     ),
-                  ),
+                    const TextSpan(text: '.'),
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
+  Widget _buildBottomAction({bool desktop = false}) {
+    final bool canSubmit =
+        _quote!.available && !_submitting && _agreedToTerms;
+
+    final Widget content = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildTermsAgreement(),
+        // The "Secure payment / SSL Encrypted" badges that used to sit here
+        // were reassurance about a transaction that does not happen. What a
+        // guest needs to know at this button is what it commits them to.
+        Text(
+          _payLine(),
+          textAlign: TextAlign.center,
+          style: GoogleFonts.inter(
+              fontSize: 12, color: GoOutsColors.bodyText),
+        ),
+        const SizedBox(height: 12),
+        ElevatedButton(
+          onPressed: canSubmit ? _submit : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: GoOutsColors.primaryBlue,
+            disabledBackgroundColor: GoOutsColors.dividerGray,
+            minimumSize: const Size(double.infinity, 56),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
+          ),
+          child: _submitting
+              ? const SizedBox(
+                  height: 22,
+                  width: 22,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white),
+                )
+              : Text(
+                  // "Pay" appears ONLY when money genuinely moves — which
+                  // in demo means the wallet share. The card share is
+                  // recorded, not charged, so the button must not promise
+                  // to take it.
+                  _quote!.paymentAvailable && _fromWallet.value > 0
+                      ? 'Pay ${_fromWallet.formatted}'
+                      : _isInstant
+                          ? 'Confirm booking'
+                          : 'Request to book',
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+        ),
+      ],
+    );
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(
+          desktop ? 0 : 16, 20, desktop ? 0 : 16, desktop ? 20 : 32),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: GoOutsColors.dividerGray)),
+      ),
+      child: desktop
+          ? DesktopCenter(maxWidth: 900, child: content)
+          : content,
+    );
+  }
+
+  // ⚠ ADDED 9 September 2026, building the web version of this app. The
+  // mobile app never needed this check — its own launch flow (SplashScreen
+  // → signup/login) structurally makes it impossible to reach checkout
+  // signed out. The web entry point deliberately drops a visitor straight
+  // into Short Stay browsing WITHOUT that wall (see main.dart's web home
+  // route), so this screen — the one place that actually writes a booking
+  // — is where signed-out now has to be caught instead. Without this, an
+  // anonymous web visitor's tap would reach the server, fail on the
+  // Cloud Function's own auth check, and land on the generic "something
+  // went wrong" dialog below with no explanation of why.
+  bool _requireSignedIn() {
+    if (FirebaseAuth.instance.currentUser != null) return true;
+    Navigator.of(context).pushNamed(
+      '/login',
+      arguments: <String, dynamic>{
+        'returnMessage': 'Sign in to complete your booking.',
+      },
+    );
+    return false;
+  }
+
   Future<void> _submit() async {
     if (_submitting) return;
+    if (!_requireSignedIn()) return;
     setState(() => _submitting = true);
 
     final StayBookingRequest r = widget.request;

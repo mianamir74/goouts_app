@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:confetti/confetti.dart';
@@ -40,6 +41,9 @@ class _BonusAddedScreenState extends State<BonusAddedScreen> {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       useSafeArea: true,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 480)
+          : null,
       builder: (_) => Container(
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
         decoration: BoxDecoration(
@@ -244,9 +248,56 @@ class _BonusAddedScreenState extends State<BonusAddedScreen> {
           ),
         ),
       ),
-      body: Stack(
-        children: [
-          SafeArea(
+      // ⚠ DESKTOP WEB CENTERING ADDED 14 September 2026. No kIsWeb treatment
+      // existed here - same fix as registration_success_screen.dart. The
+      // confetti overlay stays a full-Stack sibling on purpose, same reason
+      // as there.
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = _buildContent();
+          return Stack(
+            children: [
+              desktop
+                  ? Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 480),
+                        child: content,
+                      ),
+                    )
+                  : content,
+              // Confetti
+              Align(
+                alignment: Alignment.topCenter,
+                child: ConfettiWidget(
+                  confettiController: _confettiController,
+                  blastDirection: pi / 2,
+                  blastDirectionality: BlastDirectionality.explosive,
+                  emissionFrequency: 0.08,
+                  numberOfParticles: 20,
+                  maxBlastForce: 40,
+                  minBlastForce: 15,
+                  gravity: 0.3,
+                  shouldLoop: false,
+                  colors: const [
+                    Color(0xFF0392CA),
+                    Color(0xFFFFD700),
+                    Color(0xFFFF6B6B),
+                    Color(0xFF6BCB77),
+                    Color(0xFFFF922B),
+                    Colors.white,
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildContent() {
+    return SafeArea(
             child: SingleChildScrollView(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -619,33 +670,6 @@ class _BonusAddedScreenState extends State<BonusAddedScreen> {
                 ),
               ),
             ),
-          ),
-
-          // Confetti
-          Align(
-            alignment: Alignment.topCenter,
-            child: ConfettiWidget(
-              confettiController: _confettiController,
-              blastDirection: pi / 2,
-              blastDirectionality: BlastDirectionality.explosive,
-              emissionFrequency: 0.08,
-              numberOfParticles: 20,
-              maxBlastForce: 40,
-              minBlastForce: 15,
-              gravity: 0.3,
-              shouldLoop: false,
-              colors: const [
-                Color(0xFF0392CA),
-                Color(0xFFFFD700),
-                Color(0xFFFF6B6B),
-                Color(0xFF6BCB77),
-                Color(0xFFFF922B),
-                Colors.white,
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 

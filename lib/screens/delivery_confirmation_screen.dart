@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../widgets/food_complaint_sheet.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  DeliveryConfirmationScreen
@@ -140,6 +142,32 @@ class _DeliveryConfirmationScreenState
         'tip': _resolvedTip,
       });
       if (mounted) setState(() => _submitted = true);
+
+      // ⚠ WIRED 4 September 2026. This trigger, and the sheet itself, always
+      // existed — food_order_tracking_screen.dart's old rating bottom sheet
+      // had both. This screen replaced that bottom sheet without carrying
+      // the complaint trigger over, so a low rating here went nowhere. Same
+      // threshold (3 stars or under) as the original. See
+      // widgets/food_complaint_sheet.dart for the sheet itself, now shared
+      // rather than duplicated.
+      if (mounted && _rating <= 3) {
+        final restaurantId = (_order['restaurantId'] as String?) ?? '';
+        final restaurantName =
+            (_order['restaurantName'] as String?) ?? 'the restaurant';
+        final driverId = _order['driverId'] as String?;
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            showFoodComplaintSheet(
+              context: context,
+              orderId: _orderId,
+              restaurantId: restaurantId,
+              restaurantName: restaurantName,
+              driverId: driverId,
+              stars: _rating,
+            );
+          }
+        });
+      }
     } catch (_) {
       if (mounted) {
         setState(() => _submitting = false);
@@ -172,7 +200,10 @@ class _DeliveryConfirmationScreenState
         title: Text('Delivery Confirmation',
             style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w600, color: _navy)),
       ),
-      body: SafeArea(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
           children: [
@@ -204,6 +235,15 @@ class _DeliveryConfirmationScreenState
             _buildRatingAndTip(),
           ],
         ),
+      );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: content,
+            ),
+          );
+        },
       ),
       // ⚠ NO BOTTOM NAV. Checkout and tracking deliberately have none —
       // a mid-flow screen should not let a tap send the customer sideways

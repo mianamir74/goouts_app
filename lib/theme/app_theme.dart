@@ -47,6 +47,31 @@ class AppTheme {
           textStyle: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700),
         ),
       ),
+      // ⚠ READ THIS BEFORE ADDING A NEW TextField/InputDecoration ANYWHERE
+      // IN THE APP, found + fixed 9 September 2026. This theme applies a
+      // 2px blue `focusedBorder` to every text field app-wide — good for a
+      // real form field (login, signup, amounts), but a genuine bug for a
+      // custom-styled field embedded in its OWN container (a search pill,
+      // a chat input, an inline "write a review" box): those fields set
+      // `border: InputBorder.none` expecting NO border ever, but
+      // `focusedBorder` is a SEPARATE field in InputDecoration — Flutter
+      // does not infer "focusedBorder: none" from "border: none". Left
+      // unset, it falls back to THIS theme's blue border, which then
+      // renders on top of the field's own container the moment it's
+      // tapped, looking like a second box had appeared out of nowhere.
+      //
+      // 21 fields across 15 files had exactly this bug (reported as e.g.
+      // "when I input text it shows another box"). Fixed by giving each of
+      // them enabledBorder/focusedBorder/errorBorder/disabledBorder/
+      // focusedErrorBorder: InputBorder.none alongside their `border:
+      // InputBorder.none` — not by changing this theme, since real form
+      // fields elsewhere DO want this blue focus ring and have no border
+      // of their own to lose it against.
+      //
+      // ⚠ IF YOU ADD A NEW TextField inside its own custom-decorated
+      // Container (search bar, chat box, anything not a plain form field):
+      // set ALL FIVE border properties to InputBorder.none, not just
+      // `border`. One is not enough.
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.surfaceContainerLow,

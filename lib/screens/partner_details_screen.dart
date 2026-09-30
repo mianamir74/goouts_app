@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -31,9 +33,13 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
   static const int _pointsPerReview = 2;
   static const int _pointsForBonus = 100;
 
-  // Social Boost — loaded from route args in build()
+  // Social Boost — loaded from route args in build(). socialBoostEnabled is
+  // only a hint for whether to even ask the server; quoteSocialBoost is the
+  // authority on whether a Boost is actually on offer, and what it is worth.
+  // The old flat socialBoostPct (default 10%) is gone — the app no longer
+  // works out any Boost figure itself (SOCIAL_BOOST_PLAN.md Phase 5).
   bool _socialBoostEnabled = false;
-  double _socialBoostPct   = 10.0;
+  String _partnerId = '';
 
   @override
   void initState() {
@@ -84,7 +90,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
 
     // Social Boost — sync to state fields so methods can access them
     _socialBoostEnabled = args?['socialBoostEnabled'] as bool? ?? false;
-    _socialBoostPct     = (args?['socialBoostPercent'] as num?)?.toDouble() ?? 10.0;
+    _partnerId          = args?['id']?.toString() ?? '';
 
     final merchantId = VisitVerifier.merchantIdFromName(name);
     final verifyCode = args?['verificationCode'] as String? ?? '';
@@ -140,8 +146,11 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
           ),
         ],
       ),
-      body: Stack(
-        children: [
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = Stack(
+            children: [
           SingleChildScrollView(
             padding: const EdgeInsets.only(bottom: 90),
             child: Column(
@@ -487,6 +496,15 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
             ),
           ),
         ],
+      );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: content,
+            ),
+          );
+        },
       ),
     );
   }
@@ -550,6 +568,9 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 560)
+          : null,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setPickerState) {
           if (visits.isEmpty) {
@@ -791,6 +812,9 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 560)
+          : null,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) {
           // Check Firebase once if we have a transaction ID
@@ -1074,6 +1098,10 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                filled: false,
                 contentPadding: const EdgeInsets.all(16),
               ),
             ),
@@ -1285,6 +1313,9 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
       context: ctx,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: kIsWeb && MediaQuery.of(ctx).size.width >= 900
+          ? const BoxConstraints(maxWidth: 560)
+          : null,
       builder: (sheetCtx) => _PinAuthSheet(uid: uid),
     );
   }
@@ -1317,6 +1348,9 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
       isScrollControlled: true,
       isDismissible: true,
       backgroundColor: Colors.transparent,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 640)
+          : null,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheet) {
 
@@ -1859,6 +1893,9 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 480)
+          : null,
       builder: (_) => Container(
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
         decoration: BoxDecoration(
@@ -1958,6 +1995,9 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       useSafeArea: true,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 560)
+          : null,
       builder: (ctx) {
         final billCtrl      = TextEditingController();
         final cbRedeemCtrl  = TextEditingController();
@@ -2303,7 +2343,6 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
       cashbackToUse:      chosen?['cashback'] ?? 0.0,
       walletToUse:        chosen?['wallet']   ?? 0.0,
       socialBoostEnabled: _socialBoostEnabled,
-      socialBoostPct:     _socialBoostPct,
     );
   }
 
@@ -2314,7 +2353,6 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
     double cashbackToUse      = 0.0,
     double walletToUse        = 0.0,
     bool   socialBoostEnabled = false,
-    double socialBoostPct     = 10.0,
   }) async {
     double cashbackPct = 0.0;
     final pctMatch = RegExp(r'(\d+(?:\.\d+)?)').firstMatch(cashback);
@@ -2329,6 +2367,9 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
       isDismissible: false,
       enableDrag: false,
       backgroundColor: Colors.transparent,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 480)
+          : null,
       builder: (_) => Container(
         decoration: const BoxDecoration(
           color: Colors.white,
@@ -2453,7 +2494,6 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
       cashbackUsed: cashbackToUse,
       walletUsed: walletToUse,
       socialBoostEnabled: socialBoostEnabled,
-      socialBoostPct: socialBoostPct,
     );
 
     // If £100 milestone just triggered — show GoOuts Plus celebration
@@ -2479,7 +2519,6 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
     double cashbackUsed       = 0.0,
     double walletUsed         = 0.0,
     bool   socialBoostEnabled = false,
-    double socialBoostPct     = 10.0,
   }) {
     showModalBottomSheet(
       context: context,
@@ -2487,6 +2526,9 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
       enableDrag: false,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 560)
+          : null,
       builder: (_) => SafeArea(
         child: Container(
           margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -2623,13 +2665,13 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
                       Future.delayed(
                           const Duration(milliseconds: 400), () {
                         if (!context.mounted) return;
-                        if (socialBoostEnabled) {
+                        if (socialBoostEnabled &&
+                            _partnerId.isNotEmpty &&
+                            transactionId.isNotEmpty) {
                           _showSocialBoostSheet(
                             context,
-                            merchant: merchant,
+                            partnerId: _partnerId,
                             transactionId: transactionId,
-                            socialBoostPct: socialBoostPct,
-                            billAmount: spendAmount,
                             onDone: () => Future.delayed(
                               const Duration(milliseconds: 300),
                               () { if (context.mounted) _showReviewSheet(context, merchant, transactionId: transactionId); },
@@ -2755,6 +2797,12 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
                     color: enabled ? _dark : Colors.grey[400]),
                 decoration: InputDecoration(
                   border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  errorBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none,
+                  focusedErrorBorder: InputBorder.none,
+                  filled: false,
                   hintText: hint,
                   hintStyle: GoogleFonts.inter(
                       fontSize: 16,
@@ -2816,25 +2864,59 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
       );
 
   // ── Social Boost Sheet trigger ─────────────────────────────────────────────
-  void _showSocialBoostSheet(
+  //
+  // REWRITTEN 30 September 2026, SOCIAL_BOOST_PLAN.md Phase 5.
+  //
+  // Used to compute `billAmount * socialBoostPct / 100` right here and show
+  // it as the bonus. Nothing on the server agreed with that number, and the
+  // rate card is tiered by audience, not a flat percent of the bill.
+  //
+  // Now it asks quoteSocialBoost first, sending only ids. If the server says
+  // no — Boost not live, venue not opted in, bill too small, already boosted
+  // here this month, venue budget used up — the sheet is simply not shown and
+  // the customer goes straight on to the review, as if Boost did not exist.
+  // A failed call is treated the same way: better to skip an offer than show
+  // one the server will not honour.
+  Future<void> _showSocialBoostSheet(
     BuildContext context, {
-    required String merchant,
+    required String partnerId,
     required String transactionId,
-    required double socialBoostPct,
-    required double billAmount,
     VoidCallback? onDone,
-  }) {
-    final double bonusAmount = billAmount * (socialBoostPct / 100);
+  }) async {
+    Map<String, dynamic>? quote;
+    try {
+      final res = await FirebaseFunctions.instanceFor(region: 'europe-west1')
+          .httpsCallable('quoteSocialBoost')
+          .call<dynamic>(<String, dynamic>{
+        'partnerId': partnerId,
+        'transactionId': transactionId,
+      }).timeout(const Duration(seconds: 12));
+      final data = res.data;
+      if (data is Map && data['available'] == true) {
+        quote = Map<String, dynamic>.from(data);
+      }
+    } catch (e) {
+      debugPrint('quoteSocialBoost failed, skipping Social Boost: $e');
+    }
+
+    if (!context.mounted) return;
+    if (quote == null) {
+      onDone?.call();
+      return;
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 560)
+          : null,
       builder: (_) => _SocialBoostSheet(
-        merchant:       merchant,
-        transactionId:  transactionId,
-        socialBoostPct: socialBoostPct,
-        bonusAmount:    bonusAmount,
-        onDone:         onDone,
+        partnerId:     partnerId,
+        transactionId: transactionId,
+        quote:         quote!,
+        onDone:        onDone,
       ),
     );
   }
@@ -3086,18 +3168,34 @@ class _PinAuthSheetState extends State<_PinAuthSheet>
 }
 
 // ── Social Boost Sheet ────────────────────────────────────────────────────────
+//
+// REWRITTEN 30 September 2026, SOCIAL_BOOST_PLAN.md Phase 5.
+//
+// What the old sheet did that it must not:
+//   • Showed a bonus worked out on the phone (flat % of the bill).
+//   • Offered Facebook, which cannot be verified and is switched off.
+//   • Promised the bonus "instantly". It is paid only after the post has been
+//     live for the hold period, and only once verified.
+//   • "Submit Handle" waited three seconds and then said "Bonus Unlocked! +£X
+//     has been added" — nothing was checked and nothing was added.
+//   • Wrote the claim to a top-level transactions/{id} document that does not
+//     exist (transactions live under users/{uid}/transactions), with the
+//     bonus amount chosen by the phone.
+//
+// Now: every figure comes from quoteSocialBoost; submitting calls
+// claimSocialBoost, which re-checks everything server side and records the
+// claim as PENDING. The last screen says exactly that — pending, checked by
+// us, paid after N days if the post stays up — and nothing more.
 class _SocialBoostSheet extends StatefulWidget {
-  final String merchant;
+  final String partnerId;
   final String transactionId;
-  final double socialBoostPct;
-  final double bonusAmount;
+  final Map<String, dynamic> quote;
   final VoidCallback? onDone;
 
   const _SocialBoostSheet({
-    required this.merchant,
+    required this.partnerId,
     required this.transactionId,
-    required this.socialBoostPct,
-    required this.bonusAmount,
+    required this.quote,
     this.onDone,
   });
 
@@ -3105,201 +3203,245 @@ class _SocialBoostSheet extends StatefulWidget {
   State<_SocialBoostSheet> createState() => _SocialBoostSheetState();
 }
 
-class _SocialBoostSheetState extends State<_SocialBoostSheet>
-    with SingleTickerProviderStateMixin {
-  static const Color _dark     = Color(0xFF0D1B3E);
-  // Suppressed 14 August 2026, not deleted.
-  // Duplicate of _green at the top of this file. Left in place rather than
-  // removed blind, because the two constants are in different classes.
-  // ignore: unused_field
-  static const Color _green    = Color(0xFF0A7A3E);
+class _SocialBoostSheetState extends State<_SocialBoostSheet> {
+  static const Color _dark   = Color(0xFF0D1B3E);
+  static const Color _purple = Color(0xFF8B5CF6);
+  static const LinearGradient _brand = LinearGradient(
+    colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)],
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+  );
 
-  // States: idle | handle_input | pending | verified
+  // idle | handle_input | submitting | submitted
   String _state = 'idle';
-  // Suppressed 14 August 2026, not deleted.
-  // Written from the verification response, never displayed. The status UI is
-  // the missing half.
-  // ignore: unused_field
-  String? _verificationStatus;
-  final _handleCtrl = TextEditingController();
-  // Suppressed 14 August 2026, not deleted.
-  // Toggled three times but never read — no spinner is bound to it.
-  // ignore: unused_field
-  bool _submitting  = false;
+  String? _error;
+  bool _doneCalled = false;
+  final _handleCtrl    = TextEditingController();
+  final _followersCtrl = TextEditingController();
 
-  late AnimationController _pulseCtrl;
-  // Suppressed 14 August 2026, not deleted.
-  // Created in initState, never applied to a widget.
-  // ignore: unused_field
-  late Animation<double>   _pulseAnim;
+  Map<String, dynamic> get _terms =>
+      Map<String, dynamic>.from(widget.quote['terms'] as Map? ?? const {});
+
+  int get _upToPence => (widget.quote['upToBonusPence'] as num?)?.toInt() ?? 0;
+
+  int get _holdDays => (_terms['holdDays'] as num?)?.toInt() ?? 7;
+
+  int get _minFollowers => (_terms['minFollowers'] as num?)?.toInt() ?? 250;
+
+  List<String> get _requiredTags =>
+      (_terms['requiredTags'] as List? ?? const [])
+          .map((e) => e.toString())
+          .where((e) => e.isNotEmpty)
+          .toList();
+
+  List<Map<String, dynamic>> get _tiers =>
+      (widget.quote['tiers'] as List? ?? const [])
+          .whereType<Map>()
+          .map((t) => Map<String, dynamic>.from(t))
+          .toList();
+
+  static String _gbp(int pence) => '£${(pence / 100).toStringAsFixed(2)}';
+
+  static String _count(int n) {
+    final s = n.toString();
+    final b = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) b.write(',');
+      b.write(s[i]);
+    }
+    return b.toString();
+  }
 
   @override
   void initState() {
     super.initState();
-    _pulseCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 900))
-      ..repeat(reverse: true);
-    _pulseAnim = Tween<double>(begin: 0.85, end: 1.0)
-        .animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
+    _prefillHandle();
+  }
 
-    // Listen for real-time verification if already pending
-    if (widget.transactionId.isNotEmpty) {
-      FirebaseFirestore.instance
-          .collection('transactions')
-          .doc(widget.transactionId)
-          .snapshots()
-          .listen((snap) {
-        final status = snap.data()?['socialCampaign']?['verificationStatus'] as String?;
-        if (status == 'VERIFIED_AND_RELEASED' && mounted) {
-          setState(() { _state = 'verified'; _verificationStatus = status; });
-        }
-      });
-    }
+  Future<void> _prefillHandle() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users').doc(uid).get();
+      final h = doc.data()?['instagramHandle'] as String?;
+      if (h != null && h.isNotEmpty && mounted && _handleCtrl.text.isEmpty) {
+        _handleCtrl.text = h;
+      }
+    } catch (_) {}
   }
 
   @override
   void dispose() {
-    _pulseCtrl.dispose();
     _handleCtrl.dispose();
+    _followersCtrl.dispose();
     super.dispose();
   }
 
-  // Suppressed 15 August 2026, not deleted.
-  // Share sheet for a partner. Written but never attached to a share button —
-  // the entry point is the missing half, not this.
-  // ignore: unused_element
-  Future<void> _onShareTap() async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
+  // onDone runs exactly once, however the sheet is closed.
+  void _finish() {
+    if (_doneCalled) return;
+    _doneCalled = true;
+    if (Navigator.of(context).canPop()) Navigator.pop(context);
+    widget.onDone?.call();
+  }
 
-    // Check if handle is stored
-    final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
-    final storedHandle = userDoc.data()?['instagramHandle'] as String?;
-    if (!mounted) return;
-
-    if (storedHandle == null || storedHandle.isEmpty) {
-      setState(() => _state = 'handle_input');
+  Future<void> _submit() async {
+    final handle = _handleCtrl.text.trim();
+    if (!RegExp(r'^@?[A-Za-z0-9._]{1,30}$').hasMatch(handle)) {
+      setState(() => _error = 'Enter your Instagram username, e.g. @yourname');
       return;
     }
+    final followers =
+        int.tryParse(_followersCtrl.text.replaceAll(RegExp(r'[^0-9]'), ''));
 
-    await _doShare(uid, storedHandle);
-  }
-
-  // Suppressed 15 August 2026, not deleted.
-  // Saves the user's social handle then shares. Pairs with _onShareTap above;
-  // both are waiting on the same missing button.
-  // ignore: unused_element
-  Future<void> _saveHandleAndShare() async {
-    final handle = _handleCtrl.text.trim();
-    if (handle.isEmpty) return;
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
-
-    setState(() => _submitting = true);
-
-    // Save handle to users doc
-    final cleanHandle = handle.startsWith('@') ? handle : '@$handle';
-    await FirebaseFirestore.instance.collection('users').doc(uid).update({
-      'instagramHandle': cleanHandle,
-    });
-
-    await _doShare(uid, cleanHandle);
-  }
-
-  Future<void> _doShare(String uid, String handle) async {
-    // Write socialCampaign to transaction
-    if (widget.transactionId.isNotEmpty) {
-      await FirebaseFirestore.instance
-          .collection('transactions')
-          .doc(widget.transactionId)
-          .update({
-        'socialCampaign': {
-          'isOptedIn':          true,
-          'userHandle':         handle,
-          'requiredTags':       ['@GoOuts_App', '@${widget.merchant.replaceAll(' ', '')}'],
-          'verificationStatus': 'PENDING_VERIFICATION',
-          'metaMediaId':        null,
-        },
-        'amounts.socialBonus': widget.bonusAmount,
-      });
+    setState(() { _state = 'submitting'; _error = null; });
+    try {
+      final res = await FirebaseFunctions.instanceFor(region: 'europe-west1')
+          .httpsCallable('claimSocialBoost')
+          .call<dynamic>(<String, dynamic>{
+        'partnerId': widget.partnerId,
+        'transactionId': widget.transactionId,
+        'handle': handle,
+        if (followers != null) 'declaredFollowers': followers,
+      }).timeout(const Duration(seconds: 15));
+      final data = res.data;
+      if (data is Map && data['ok'] == true) {
+        // Caption with the required tags, ready to paste into Instagram.
+        final tags = _requiredTags.join(' ');
+        await Clipboard.setData(ClipboardData(
+            text: 'Great visit to ${widget.quote['partnerName'] ?? ''}! '
+                '$tags #GoOuts'));
+        if (mounted) setState(() => _state = 'submitted');
+        return;
+      }
+      final reason = data is Map ? data['reason']?.toString() : null;
+      if (mounted) {
+        setState(() {
+          _state = 'handle_input';
+          _error = reason == 'already_claimed'
+              ? 'You have already claimed a Social Boost for this visit.'
+              : 'Social Boost is no longer available for this visit.';
+        });
+      }
+    } on FirebaseFunctionsException catch (e) {
+      if (mounted) {
+        setState(() {
+          _state = 'handle_input';
+          _error = e.code == 'invalid-argument'
+              ? (e.message ?? 'Please check your username.')
+              : 'Could not send your claim. Please try again.';
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _state = 'handle_input';
+          _error = 'Could not send your claim. Please try again.';
+        });
+      }
     }
-
-    // Copy caption to clipboard
-    final caption =
-        'Just had an amazing time at ${widget.merchant}! 🙌 '
-        'Powered by @GoOuts_App ✨ #GoOuts #CashbackLife';
-    await Clipboard.setData(ClipboardData(text: caption));
-
-    // Native share
-    // Using url_launcher to open Instagram if available, else generic share
-    // We do the simple approach: copy to clipboard + show pending state
-    if (mounted) setState(() { _state = 'pending'; _submitting = false; });
-  }
-
-  void _dismiss() {
-    Navigator.pop(context);
-    widget.onDone?.call();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Drag handle
-          const SizedBox(height: 12),
-          Container(
-            width: 40, height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-
-          // X button row
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                GestureDetector(
-                  onTap: _dismiss,
-                  child: Container(
-                    width: 32, height: 32,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.close_rounded, size: 18, color: Colors.grey[500]),
-                  ),
+    return PopScope(
+      canPop: _state != 'submitting',
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop && !_doneCalled) {
+          _doneCalled = true;
+          widget.onDone?.call();
+        }
+      },
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
                 ),
-              ],
-            ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    GestureDetector(
+                      onTap: _state == 'submitting' ? null : _finish,
+                      child: Container(
+                        width: 32, height: 32,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.close_rounded,
+                            size: 18, color: Colors.grey[500]),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_state == 'idle') _buildIdle(),
+              if (_state == 'handle_input' || _state == 'submitting')
+                _buildHandleInput(),
+              if (_state == 'submitted') _buildSubmitted(),
+              const SizedBox(height: 8),
+            ],
           ),
-
-          if (_state == 'idle') _buildIdle(),
-          if (_state == 'handle_input') _buildHandleInput(),
-          if (_state == 'pending') _buildPending(),
-          if (_state == 'verified') _buildVerified(),
-
-          const SizedBox(height: 8),
-        ],
+        ),
       ),
     );
   }
 
-  // ── Idle state ──────────────────────────────────────────────────────────────
+  Widget _gradientButton(String label, VoidCallback? onTap, {bool busy = false}) {
+    return SizedBox(
+      width: double.infinity, height: 52,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: _brand,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: TextButton(
+          onPressed: busy ? null : onTap,
+          style: TextButton.styleFrom(
+            foregroundColor: Colors.white,
+            padding: EdgeInsets.zero,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14)),
+          ),
+          child: busy
+              ? const SizedBox(
+                  width: 22, height: 22,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2.5, color: Colors.white))
+              : Text(label,
+                  style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white)),
+        ),
+      ),
+    );
+  }
+
+  // ── Idle: the offer, every number from the server ─────────────────────────
   Widget _buildIdle() {
+    final tags = _requiredTags;
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       child: Column(
         children: [
-          // Gradient icon
           Container(
             width: 72, height: 72,
             decoration: BoxDecoration(
@@ -3310,86 +3452,89 @@ class _SocialBoostSheetState extends State<_SocialBoostSheet>
               ),
               borderRadius: BorderRadius.circular(22),
             ),
-            child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 34),
+            child: const Icon(Icons.camera_alt_rounded,
+                color: Colors.white, size: 34),
           ),
           const SizedBox(height: 16),
-
-          Text('Share & Earn Extra Cashback!',
+          Text('Share your visit, earn a Social Boost Bonus',
               style: GoogleFonts.inter(
-                  fontSize: 20, fontWeight: FontWeight.w800, color: _dark),
+                  fontSize: 19, fontWeight: FontWeight.w800, color: _dark),
               textAlign: TextAlign.center),
-          const SizedBox(height: 8),
-
-          // Bonus badge
+          const SizedBox(height: 10),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-              ),
+              gradient: _brand,
               borderRadius: BorderRadius.circular(24),
             ),
-            child: Text(
-              '+£${widget.bonusAmount.toStringAsFixed(2)} Extra  •  ${widget.socialBoostPct.toStringAsFixed(0)}% Social Boost',
-              style: GoogleFonts.inter(
-                  fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white),
+            child: Text('Up to +${_gbp(_upToPence)} extra cashback',
+                style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white)),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F3FF),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Your bonus depends on your local followers',
+                    style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: _dark)),
+                const SizedBox(height: 8),
+                for (final t in _tiers)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          t['to'] == null
+                              ? '${_count((t['from'] as num).toInt())}+ followers'
+                              : '${_count((t['from'] as num).toInt())}–'
+                                  '${_count((t['to'] as num).toInt() - 1)} followers',
+                          style: GoogleFonts.inter(
+                              fontSize: 12.5, color: Colors.grey[700]),
+                        ),
+                        Text(
+                          '+${_gbp((t['bonusPence'] as num?)?.toInt() ?? 0)}',
+                          style: GoogleFonts.inter(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: _purple),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
           ),
-          const SizedBox(height: 12),
-
+          const SizedBox(height: 14),
           Text(
-            'Post a photo or video at ${widget.merchant} on\nInstagram or Facebook tagging @GoOuts_App\nto unlock your bonus cashback instantly.',
-            style: GoogleFonts.inter(fontSize: 13, color: Colors.grey[500], height: 1.5),
+            'Post a photo or video from your visit on Instagram'
+            '${tags.isEmpty ? '' : ' tagging ${tags.join(' and ')}'}. '
+            'Your account needs at least ${_count(_minFollowers)} followers '
+            'near this venue and must be public. We check the post, and the '
+            'bonus is added once it has stayed up for $_holdDays days.',
+            style: GoogleFonts.inter(
+                fontSize: 13, color: Colors.grey[600], height: 1.5),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 8),
-
-          // Social logos row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _socialChip(Icons.camera_alt_rounded, 'Instagram',
-                  const LinearGradient(colors: [Color(0xFFF58529), Color(0xFFDD2A7B), Color(0xFF8134AF)],
-                      begin: Alignment.topLeft, end: Alignment.bottomRight)),
-              const SizedBox(width: 12),
-              _socialChip(Icons.facebook_rounded, 'Facebook',
-                  const LinearGradient(colors: [Color(0xFF1877F2), Color(0xFF0C5FD1)],
-                      begin: Alignment.topLeft, end: Alignment.bottomRight)),
-            ],
-          ),
           const SizedBox(height: 20),
-
-          // Share button
-          SizedBox(
-            width: double.infinity, height: 52,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)],
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                ),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: TextButton(
-                onPressed: () => setState(() => _state = 'handle_input'),
-                style: TextButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.zero,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-                child: Text('Share & Earn Now',
-                    style: GoogleFonts.inter(
-                        fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
+          _gradientButton('Take part',
+              () => setState(() => _state = 'handle_input')),
+          const SizedBox(height: 8),
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Maybe Later',
+            onPressed: _finish,
+            child: Text('No thanks',
                 style: GoogleFonts.inter(fontSize: 13, color: Colors.grey[500])),
           ),
         ],
@@ -3397,98 +3542,73 @@ class _SocialBoostSheetState extends State<_SocialBoostSheet>
     );
   }
 
-  // ── Handle input state ──────────────────────────────────────────────────────
+  // ── Handle input ──────────────────────────────────────────────────────────
   Widget _buildHandleInput() {
+    final busy = _state == 'submitting';
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Enter Your Social Handle',
+          Text('Your Instagram account',
               style: GoogleFonts.inter(
                   fontSize: 18, fontWeight: FontWeight.w800, color: _dark)),
           const SizedBox(height: 6),
-          Text('We\'ll look up your post to verify the tag.',
+          Text('We use this to find your post and check the tag.',
               style: GoogleFonts.inter(fontSize: 13, color: Colors.grey[500])),
           const SizedBox(height: 16),
           TextField(
             controller: _handleCtrl,
+            enabled: !busy,
+            autocorrect: false,
             decoration: InputDecoration(
               hintText: '@yourusername',
-              prefixIcon: const Icon(Icons.alternate_email_rounded, color: Color(0xFF8B5CF6)),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              prefixIcon: const Icon(Icons.alternate_email_rounded,
+                  color: _purple),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12)),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFF8B5CF6), width: 2),
+                borderSide: const BorderSide(color: _purple, width: 2),
               ),
             ),
           ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _followersCtrl,
+            enabled: !busy,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              hintText: 'Roughly how many followers? (optional)',
+              prefixIcon: const Icon(Icons.people_outline_rounded,
+                  color: _purple),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: _purple, width: 2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text('We confirm the real figure ourselves before any bonus is paid.',
+              style: GoogleFonts.inter(fontSize: 11.5, color: Colors.grey[500])),
+          if (_error != null) ...[
+            const SizedBox(height: 10),
+            Text(_error!,
+                style: GoogleFonts.inter(
+                    fontSize: 12.5, color: const Color(0xFFDC2626))),
+          ],
           const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity, height: 52,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)],
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                ),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: TextButton(
-                onPressed: () {
-                  if (_handleCtrl.text.trim().isEmpty) return;
-                  setState(() => _state = 'pending');
-                  Future.delayed(const Duration(seconds: 3), () {
-                    if (mounted) setState(() => _state = 'verified');
-                  });
-                },
-                style: TextButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.zero,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-                child: Text('Submit Handle',
-                    style: GoogleFonts.inter(
-                        fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
-              ),
-            ),
-          ),
+          _gradientButton('Send my claim', _submit, busy: busy),
         ],
       ),
     );
   }
 
-  // ── Pending state ───────────────────────────────────────────────────────────
-  Widget _buildPending() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
-      child: Column(
-        children: [
-          const SizedBox(
-            width: 56, height: 56,
-            child: CircularProgressIndicator(
-              strokeWidth: 3,
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Text('Verifying Your Post…',
-              style: GoogleFonts.inter(
-                  fontSize: 18, fontWeight: FontWeight.w700, color: _dark)),
-          const SizedBox(height: 8),
-          Text(
-            'We\'re checking for your tag. This usually takes a few seconds.',
-            style: GoogleFonts.inter(fontSize: 13, color: Colors.grey[500]),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Verified state ──────────────────────────────────────────────────────────
-  Widget _buildVerified() {
+  // ── Submitted: honest, pending ────────────────────────────────────────────
+  Widget _buildSubmitted() {
+    final tags = _requiredTags;
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       child: Column(
@@ -3496,59 +3616,40 @@ class _SocialBoostSheetState extends State<_SocialBoostSheet>
           Container(
             width: 72, height: 72,
             decoration: BoxDecoration(
-              color: const Color(0xFF0A7A3E).withValues(alpha: 0.12),
+              color: _purple.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.check_circle_rounded, color: Color(0xFF0A7A3E), size: 40),
+            child: const Icon(Icons.hourglass_top_rounded,
+                color: _purple, size: 36),
           ),
           const SizedBox(height: 16),
-          Text('Bonus Unlocked! 🎉',
+          Text('Claim received',
               style: GoogleFonts.inter(
                   fontSize: 20, fontWeight: FontWeight.w800, color: _dark)),
           const SizedBox(height: 8),
           Text(
-            '+£${widget.bonusAmount.toStringAsFixed(2)} has been added to your cashback.',
-            style: GoogleFonts.inter(fontSize: 14, color: Colors.grey[600]),
+            'Now post on Instagram'
+            '${tags.isEmpty ? '' : ' and tag ${tags.join(' and ')}'}. '
+            'We\'ve copied a caption for you. Once we\'ve checked the post '
+            'and it has stayed up for $_holdDays days, your bonus is added '
+            'to your cashback. Nothing is added yet.',
+            style: GoogleFonts.inter(
+                fontSize: 13.5, color: Colors.grey[600], height: 1.5),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity, height: 52,
-            child: ElevatedButton(
-              onPressed: () {
-                widget.onDone?.call();
-                Navigator.pop(context);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0A7A3E),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-              child: Text('Done',
-                  style: GoogleFonts.inter(
-                      fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
-            ),
+          const SizedBox(height: 20),
+          _gradientButton('Open Instagram', () async {
+            final uri = Uri.parse('https://www.instagram.com/');
+            try {
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            } catch (_) {}
+          }),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: _finish,
+            child: Text('Done',
+                style: GoogleFonts.inter(fontSize: 14, color: Colors.grey[600])),
           ),
-          ],
-        ),
-      );
-    }
-
-  // ── Social chip helper ──────────────────────────────────────────────────────
-  Widget _socialChip(IconData icon, String label, LinearGradient gradient) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        gradient: gradient,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: Colors.white, size: 16),
-          const SizedBox(width: 6),
-          Text(label,
-              style: GoogleFonts.inter(
-                  fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
         ],
       ),
     );

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -454,7 +455,10 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
     return Scaffold(
       backgroundColor: _bg,
       appBar: _buildAppBar(),
-      body: StreamBuilder<DocumentSnapshot>(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = StreamBuilder<DocumentSnapshot>(
         stream: _svc.ticketStream(widget.ticketId),
         builder: (context, ticketSnap) {
           if (ticketSnap.hasData) {
@@ -540,6 +544,15 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
               // ── Input bar ───────────────────────────────────────────────────
               if (!_isClosed) _buildInputBar(),
             ],
+          );
+        },
+      );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 760),
+              child: content,
+            ),
           );
         },
       ),
@@ -714,6 +727,12 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
                   hintStyle: GoogleFonts.inter(
                       fontSize: 14, color: Colors.grey[400]),
                   border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  errorBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none,
+                  focusedErrorBorder: InputBorder.none,
+                  filled: false,
                   contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16, vertical: 11),
                 ),

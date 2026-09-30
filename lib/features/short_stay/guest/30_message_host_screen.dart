@@ -39,6 +39,7 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -96,7 +97,10 @@ class _MessageHostScreenState extends State<MessageHostScreen> {
           ),
         ),
       ),
-      body: widget.bookingId.isEmpty || uid == null
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = widget.bookingId.isEmpty || uid == null
           ? _notice(
               'This conversation could not be opened.',
               'Go back to your booking and try again.',
@@ -107,7 +111,16 @@ class _MessageHostScreenState extends State<MessageHostScreen> {
                 Expanded(child: _messages(uid)),
                 _composer(),
               ],
+            );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: content,
             ),
+          );
+        },
+      ),
     );
   }
 

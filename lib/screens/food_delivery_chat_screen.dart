@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -174,8 +175,11 @@ class _FoodDeliveryChatScreenState extends State<FoodDeliveryChatScreen> {
           ]),
         ]),
       ),
-      body: Column(
-        children: [
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = Column(
+            children: [
           // Messages list
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
@@ -280,6 +284,15 @@ class _FoodDeliveryChatScreenState extends State<FoodDeliveryChatScreen> {
             ]),
           ),
         ],
+      );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: content,
+            ),
+          );
+        },
       ),
     );
   }

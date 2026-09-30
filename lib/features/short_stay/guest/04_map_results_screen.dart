@@ -42,6 +42,7 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 // ⚠ hide TextDirection. package:intl EXPORTS ITS OWN TextDirection, a bidi
@@ -486,7 +487,10 @@ class _MapResultsScreenState extends State<MapResultsScreen> {
         ],
       ),
       bottomNavigationBar: const StayBottomNav(current: StayTab.search),
-      body: Stack(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = Stack(
         children: <Widget>[
           if (plottable.isEmpty)
             _emptyMap()
@@ -523,6 +527,15 @@ class _MapResultsScreenState extends State<MapResultsScreen> {
 
           if (plottable.isNotEmpty) _carousel(plottable),
         ],
+      );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 900),
+              child: content,
+            ),
+          );
+        },
       ),
     );
   }

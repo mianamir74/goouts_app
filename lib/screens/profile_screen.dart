@@ -1,5 +1,6 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -25,7 +26,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   static const Color _green = Color(0xFF0A7A3E);
   bool _kycSubmitted = false;
   bool _kycPending = false;
-  File? _profileImage;
+  // ⚠ CHANGED 9 September 2026, found in a web audit. Was `File?`. dart:io's
+  // File does not exist on web, and Image.file (below) does not either — it
+  // throws UnimplementedError the moment it is built there. Bytes work
+  // identically on both platforms, so this is not a kIsWeb branch, it
+  // replaces the File-based approach everywhere.
+  Uint8List? _profileImageBytes;
   String? _photoUrl;
   bool _uploadingPhoto = false;
   double _walletBalance = 0.0;
@@ -38,6 +44,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
       backgroundColor: Colors.transparent,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 480)
+          : null,
       builder: (_) => Container(
         decoration: const BoxDecoration(
           color: Colors.white,
@@ -71,15 +80,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     // Same reason as elsewhere: the picker is a separate system UI and this
     // screen can be unloaded behind it on a low memory device.
     if (!mounted) return;
-    final file = File(picked.path);
-    setState(() { _profileImage = file; _uploadingPhoto = true; });
+    final bytes = await picked.readAsBytes();
+    if (!mounted) return;
+    setState(() { _profileImageBytes = bytes; _uploadingPhoto = true; });
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         final ref = FirebaseStorage.instance
             .ref()
             .child('users/${user.uid}/profile_photo.jpg');
-        await ref.putFile(file);
+        await ref.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
         final url = await ref.getDownloadURL();
         await UserService().updateUser({'photoUrl': url});
         if (mounted) setState(() => _photoUrl = url);
@@ -200,35 +210,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ⚠ DESKTOP WEB CENTERING ADDED 14 September 2026. No kIsWeb layout
+    // treatment existed here - same "full-bleed mobile column" issue as the
+    // other root tabs, fixed the same way.
     return Scaffold(
       backgroundColor: const Color(0xFFF2F4F7),
       body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(context),
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    _buildProfileCard(),
-                    const SizedBox(height: 12),
-                    _buildKycBanner(context),
-                    const SizedBox(height: 12),
-                    _buildPersonalInfoCard(context),
-                    const SizedBox(height: 12),
-                    _buildSecurityCard(context),
-                    const SizedBox(height: 12),
-                    _buildAddressesCard(context),
-                    const SizedBox(height: 12),
-                    _buildPreferencesCard(context),
-                    const SizedBox(height: 12),
-                    _buildSignOut(context),
-                    const SizedBox(height: 24),
-                  ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+            final Widget content = Column(
+              children: [
+                _buildHeader(context),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        _buildProfileCard(),
+                        const SizedBox(height: 12),
+                        _buildKycBanner(context),
+                        const SizedBox(height: 12),
+                        _buildPersonalInfoCard(context),
+                        const SizedBox(height: 12),
+                        _buildSecurityCard(context),
+                        const SizedBox(height: 12),
+                        _buildAddressesCard(context),
+                        const SizedBox(height: 12),
+                        _buildPreferencesCard(context),
+                        const SizedBox(height: 12),
+                        _buildSignOut(context),
+                        const SizedBox(height: 24),
+                      ],
+                    ),
+                  ),
                 ),
+              ],
+            );
+            if (!desktop) return content;
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: content,
               ),
-            ),
-          ],
+            );
+          },
         ),
       ),
       bottomNavigationBar: _buildBottomNav(context),
@@ -329,8 +354,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           // a freshly picked photo never previewed. Check for a
                           // non-empty string, and show the locally picked file
                           // first so the new photo appears immediately.
-                          : _profileImage != null
-                              ? Image.file(_profileImage!, fit: BoxFit.cover)
+                          : _profileImageBytes != null
+                              ? Image.memory(_profileImageBytes!,
+                                  fit: BoxFit.cover)
                               : (_photoUrl != null && _photoUrl!.isNotEmpty)
                                   ? Image.network(_photoUrl!,
                                       fit: BoxFit.cover,
@@ -904,6 +930,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             Divider(height: 1, color: Colors.grey[100]),
             _menuRow(
+              icon: Icons.storefront_rounded,
+              title: 'Become a Partner',
+              subtitle: 'Run a restaurant, shop, or host a property',
+              trailing: const Icon(Icons.chevron_right_rounded,
+                  color: Colors.grey, size: 20),
+              onTap: () => Navigator.pushNamed(context, '/become-a-partner'),
+            ),
+            Divider(height: 1, color: Colors.grey[100]),
+            _menuRow(
               icon: Icons.help_outline_rounded,
               title: 'FAQ',
               subtitle: null,
@@ -992,6 +1027,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 480)
+          : null,
       builder: (_) => StatefulBuilder(
         builder: (ctx, setSheet) => Padding(
           padding: EdgeInsets.only(
@@ -1131,6 +1169,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 560)
+          : null,
       builder: (_) => Padding(
         padding: EdgeInsets.only(
             bottom: MediaQuery.of(context).viewInsets.bottom),
@@ -1266,6 +1307,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 560)
+          : null,
       builder: (_) => StatefulBuilder(
         builder: (ctx, setSheet) => Padding(
           padding: EdgeInsets.only(

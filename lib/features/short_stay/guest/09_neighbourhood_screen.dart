@@ -37,6 +37,7 @@
 // which is the question the map was there to answer.
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
@@ -163,11 +164,23 @@ class _NeighbourhoodScreenState extends State<NeighbourhoodScreen> {
         ],
       ),
       bottomNavigationBar: const StayBottomNav(current: StayTab.rewards),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _all.isEmpty
-              ? _empty()
-              : _body(),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _all.isEmpty
+                  ? _empty()
+                  : _body();
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: content,
+            ),
+          );
+        },
+      ),
     );
   }
 

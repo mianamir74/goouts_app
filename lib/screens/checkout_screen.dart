@@ -1,11 +1,15 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../features/short_stay/widgets/desktop_top_nav.dart';
 import '../services/cart_service.dart';
 import '../services/delivery_address_service.dart';
+import '../services/scheduled_delivery_service.dart';
 import 'food_order_tracking_screen.dart';
+import '../widgets/delivery_time_picker.dart';
 import '../widgets/goouts_sheet.dart';
 
 class CheckoutScreen extends StatefulWidget {
@@ -30,6 +34,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _auth = FirebaseAuth.instance;
   final _cart = CartService.instance;
   final _addressService = DeliveryAddressService();
+  final _scheduledService = ScheduledDeliveryService();
 
   // ── State ──────────────────────────────────────────────────────────────────
   bool   _loading         = true;
@@ -221,9 +226,32 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
+  // ⚠ ADDED 9 September 2026, building the web version of this app. Same
+  // gap found and fixed on the Short Stay side (11_booking_dates_screen.dart
+  // / 12_checkout_screen.dart): the phone app can never reach this screen
+  // signed out — its launch flow requires signup/login first — so
+  // _placeOrder's `if (uid == null) throw Exception('Not signed in')` had
+  // never actually been hit by a real user. It just fell into the generic
+  // catch block below and showed "Failed to place order. Please try
+  // again." — which is not true (nothing failed, nobody asked them to sign
+  // in) and retrying does nothing since they are still signed out. The web
+  // entry point drops a visitor into food browsing without that wall, so
+  // this is now a reachable path and needed a real gate, not a vague error.
+  bool _requireSignedIn() {
+    if (_auth.currentUser != null) return true;
+    Navigator.of(context).pushNamed(
+      '/login',
+      arguments: <String, dynamic>{
+        'returnMessage': 'Sign in to place your order.',
+      },
+    );
+    return false;
+  }
+
   // ── Place order ────────────────────────────────────────────────────────────
   Future<void> _placeOrder() async {
     if (_placing) return;
+    if (!_requireSignedIn()) return;
     if (_deliveryAddress.isEmpty) {
       _showSnack('Please add a delivery address first.', error: true);
       return;
@@ -278,6 +306,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         // so any drift between what is shown and what is charged becomes a
         // visible error instead of a silent overcharge.
         'expectedTotal': _cart.subtotal + _effectiveDeliveryFee,
+        // ⚠ ADDED 10 September 2026. null/absent = "Deliver now" (today's
+        // behaviour, unchanged). createFoodOrder re-validates the lead time
+        // itself rather than trusting this — see food_orders.js.
+        'scheduledFor': _scheduledService.scheduledFor?.millisecondsSinceEpoch,
       });
 
       final orderId = '${res.data['orderId'] ?? ''}';
@@ -290,6 +322,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
       // Clear cart
       _cart.clear();
+      // Reset the scheduling choice so the NEXT order defaults back to
+      // "Deliver now" rather than silently reusing a time picked for a
+      // different order.
+      _scheduledService.clear();
 
       if (mounted) {
         // Navigate to tracking screen — pass args via RouteSettings
@@ -342,6 +378,37 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   // ══════════════════════════════════════════════════════════════════════════
   @override
   Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+        return desktop ? _buildDesktop(context) : _buildMobile(context);
+      },
+    );
+  }
+
+  // ── Desktop web ──────────────────────────────────────────────────────────
+  //
+  // ADDED 9 September 2026. Top nav instead of the AppBar back arrow, order
+  // summary and place-order bar held to a centred 900px column matching the
+  // Short Stay checkout screen this mirrors.
+  Widget _buildDesktop(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _bg,
+      body: Column(
+        children: [
+          const DesktopTopNav(current: DesktopNavTab.food),
+          Expanded(
+            child: _loading
+                ? const Center(
+                    child: CircularProgressIndicator(color: _primary))
+                : _buildBody(desktop: true),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobile(BuildContext context) {
     return Scaffold(
       backgroundColor: _bg,
       appBar: AppBar(
@@ -374,7 +441,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody({bool desktop = false}) {
     final subtotal     = _cart.subtotal;
     final delivery     = _effectiveDeliveryFee;
     final total        = subtotal + delivery;
@@ -382,10 +449,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final totalVat     = double.parse(
         (foodVat + (subtotal * 0.10 * 0.20) + (delivery * 0.20)).toStringAsFixed(2));
 
-    return Stack(
-      children: [
-        ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 140),
+    final Widget list = ListView(
+          padding: EdgeInsets.fromLTRB(
+              desktop ? 0 : 16, 16, desktop ? 0 : 16, 140),
           children: [
             // ── Social Boost applied banner ───────────────────────────────
             if (_boostApplied)
@@ -431,6 +497,46 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         ),
                       ],
                     ),
+            ),
+            const SizedBox(height: 14),
+
+            // ── Delivery time ────────────────────────────────────────────
+            // ⚠ ADDED 10 September 2026. Reuses ScheduledDeliveryService —
+            // the same selection made on the food-delivery landing page
+            // (if any) shows up here already picked, and can be changed
+            // right up until the order is placed.
+            ListenableBuilder(
+              listenable: _scheduledService,
+              builder: (context, _) => _sectionCard(
+                icon: Icons.schedule_rounded,
+                iconColor: _blue,
+                title: 'Delivery Time',
+                child: GestureDetector(
+                  onTap: () => showDeliveryTimeSheet(context),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          deliveryTimeLabel(
+                              context, _scheduledService.scheduledFor),
+                          style: GoogleFonts.inter(
+                              fontSize: 14,
+                              color: _navy,
+                              fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => showDeliveryTimeSheet(context),
+                        child: Text('Change',
+                            style: GoogleFonts.inter(
+                                color: _blue,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
             const SizedBox(height: 14),
 
@@ -572,86 +678,102 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
             ),
           ],
-        ),
+        );
 
-        // ── Place order button (fixed bottom) ─────────────────────────────
+    // ── Place order button (fixed bottom) ───────────────────────────────────
+    final Widget bottomBarContent = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Boost prompt if not yet checked and has boost
+        if (!_boostChecked && _boostCodeId != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: GestureDetector(
+              onTap: _showBoostPopup,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF7C3AED), Color(0xFF0392CA)],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.bolt_rounded,
+                      color: Colors.white, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'You have a free delivery reward! Tap to apply.',
+                      style: GoogleFonts.inter(
+                          color: Colors.white, fontSize: 13,
+                          fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_ios_rounded,
+                      color: Colors.white70, size: 14),
+                ]),
+              ),
+            ),
+          ),
+        SizedBox(
+          width: double.infinity,
+          height: 54,
+          child: ElevatedButton(
+            onPressed: _placing ? null : _placeOrder,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _primary,
+              disabledBackgroundColor: _primary.withValues(alpha: 0.6),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
+              elevation: 0,
+            ),
+            child: _placing
+                ? const SizedBox(width: 22, height: 22,
+                    child: CircularProgressIndicator(
+                        color: Colors.white, strokeWidth: 2))
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('Place Order · £${total.toStringAsFixed(2)}',
+                        style: GoogleFonts.inter(
+                            fontSize: 16, fontWeight: FontWeight.w800)),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.arrow_forward_rounded, size: 20),
+                    ],
+                  ),
+          ),
+        ),
+      ],
+    );
+
+    return Stack(
+      children: [
+        desktop
+            ? Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 900),
+                  child: list,
+                ),
+              )
+            : list,
         Positioned(
           bottom: 0, left: 0, right: 0,
           child: Container(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+            width: double.infinity,
+            padding: EdgeInsets.fromLTRB(
+                desktop ? 0 : 16, 12, desktop ? 0 : 16, 28),
             decoration: BoxDecoration(
               color: Colors.white,
               boxShadow: [BoxShadow(
                   color: Colors.black.withValues(alpha: 0.08),
                   blurRadius: 20, offset: const Offset(0, -4))],
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Boost prompt if not yet checked and has boost
-                if (!_boostChecked && _boostCodeId != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: GestureDetector(
-                      onTap: _showBoostPopup,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 10),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF7C3AED), Color(0xFF0392CA)],
-                          ),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Row(children: [
-                          const Icon(Icons.bolt_rounded,
-                              color: Colors.white, size: 18),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'You have a free delivery reward! Tap to apply.',
-                              style: GoogleFonts.inter(
-                                  color: Colors.white, fontSize: 13,
-                                  fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                          const Icon(Icons.arrow_forward_ios_rounded,
-                              color: Colors.white70, size: 14),
-                        ]),
-                      ),
-                    ),
-                  ),
-                SizedBox(
-                  width: double.infinity,
-                  height: 54,
-                  child: ElevatedButton(
-                    onPressed: _placing ? null : _placeOrder,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _primary,
-                      disabledBackgroundColor: _primary.withValues(alpha: 0.6),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14)),
-                      elevation: 0,
-                    ),
-                    child: _placing
-                        ? const SizedBox(width: 22, height: 22,
-                            child: CircularProgressIndicator(
-                                color: Colors.white, strokeWidth: 2))
-                        : Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text('Place Order · £${total.toStringAsFixed(2)}',
-                                style: GoogleFonts.inter(
-                                    fontSize: 16, fontWeight: FontWeight.w800)),
-                              const SizedBox(width: 8),
-                              const Icon(Icons.arrow_forward_rounded, size: 20),
-                            ],
-                          ),
-                  ),
-                ),
-              ],
-            ),
+            child: desktop
+                ? DesktopCenter(maxWidth: 900, child: bottomBarContent)
+                : bottomBarContent,
           ),
         ),
       ],
@@ -836,6 +958,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 560)
+          : null,
       builder: (ctx) => _AddressPickerSheet(
           addressService: _addressService),
     );

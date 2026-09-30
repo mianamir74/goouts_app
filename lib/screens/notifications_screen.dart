@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
 import 'support_ticket_chat_screen.dart';
 import '../widgets/goouts_sheet.dart';
@@ -166,7 +167,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return Scaffold(
       backgroundColor: _surfaceColor,
       appBar: _buildAppBar(),
-      body: SafeArea(child: _buildBody()),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = SafeArea(child: _buildBody());
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: content,
+            ),
+          );
+        },
+      ),
       bottomNavigationBar: _buildBottomNav(),
     );
   }

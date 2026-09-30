@@ -30,6 +30,7 @@
 // A booking stores listingId, not the title or the photo. Rather than one read
 // per card, every id in the list goes through StayListingService.byIds, which
 // chunks at 30 for whereIn. Ten bookings cost one extra query, not ten.
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -41,7 +42,9 @@ import '../models/stay_reference.dart';
 import '../services/stay_listing_service.dart';
 import '../stay_routes.dart';
 import '../theme/stay_colors.dart';
+import '../widgets/desktop_top_nav.dart';
 import '../widgets/stay_bottom_nav.dart';
+import '15_trip_detail_screen.dart';
 
 class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({super.key});
@@ -54,6 +57,26 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   /// listingId -> listing, filled as bookings arrive.
   final Map<String, StayListing> _listings = <String, StayListing>{};
   final Set<String> _requested = <String>{};
+
+  // ── Desktop split view, added 14 September 2026 ───────────────────────
+  //
+  // Mobile keeps navigating away entirely (push to 15_trip_detail_screen.dart)
+  // — these two fields only exist for the desktop branch below, which shows
+  // the list and the selected booking's detail side by side and never pushes
+  // a route to look at one.
+
+  /// Which of the desktop's own Upcoming/Past tabs is showing. Separate from
+  /// the mobile Scaffold's DefaultTabController — the desktop branch renders
+  /// its own tab row rather than sharing that TabBar's widgets, so it needs
+  /// its own index.
+  int _desktopTabIndex = 0;
+
+  /// The booking selected in the desktop left-hand list. Left null rather
+  /// than defaulted eagerly in initState — the booking stream has not loaded
+  /// anything yet at that point — so _buildDesktop falls back to "first
+  /// booking in the current list" itself on every build until the guest
+  /// actually clicks a card.
+  String? _selectedBookingId;
 
   /// Loads any listing referenced by a booking that has not been fetched.
   ///
@@ -96,6 +119,24 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ── DESKTOP WEB SPLIT, added 14 September 2026 ─────────────────────────
+    //
+    // Same top-level shape as 01_short_stay_home_screen.dart and
+    // 05_listing_detail_screen.dart: a LayoutBuilder picks a genuinely
+    // separate desktop layout (own Scaffold, own DesktopTopNav, no mobile
+    // AppBar/TabBar/bottomNavigationBar) rather than centering the mobile
+    // column. _buildMobile below is exactly what build() produced before —
+    // moved into a method, not rewritten — so width<900 (and any non-web
+    // platform) is unchanged.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+        return desktop ? _buildDesktop(context) : _buildMobile(context);
+      },
+    );
+  }
+
+  Widget _buildMobile(BuildContext context) {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
@@ -134,48 +175,349 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
         // Rewards / Profile with no tap handling on a screen that is PUSHED,
         // not a tab — so it was four dead labels sitting under a real app.
         bottomNavigationBar: const StayBottomNav(current: StayTab.trips),
-        body: StreamBuilder<List<StayBooking>>(
-          stream: StayBookingService.instance.myBookings(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
-              return _error(snapshot.error.toString());
-            }
+        body: _bookingsBody(context, builder: (context, upcoming, past) {
+          return TabBarView(
+            children: [
+              _list(upcoming, emptyTitle: 'No trips booked yet',
+                  emptyBody: 'When you book somewhere, it appears here with '
+                      'everything you need for the stay.'),
+              _list(past, emptyTitle: 'Nothing here yet',
+                  emptyBody: 'Stays you have finished, and any you cancelled, '
+                      'are kept here.'),
+            ],
+          );
+        }),
+      ),
+    );
+  }
 
-            final List<StayBooking> all =
-                snapshot.data ?? const <StayBooking>[];
-            _ensureListings(all);
+  // ══════════════════════════════════════════════════════════════════════════
+  //  DESKTOP WEB LAYOUT — see the note at the top of build().
+  // ══════════════════════════════════════════════════════════════════════════
+  //
+  // A genuine desktop split view, matching the Stitch reference
+  // (06_desktop_my_bookings_trips): DesktopTopNav across the top, then
+  // "My Trips" with the Upcoming/Past tabs beside it, then a Row — a narrow
+  // scrollable list of bookings on the left, the selected booking's full
+  // detail (15_trip_detail_screen.dart's own body, embedded rather than
+  // pushed — see that file's `embedded` flag) filling the rest on the right.
+  // Nothing here navigates; selecting a card just changes _selectedBookingId
+  // and the right pane rebuilds in place.
+  //
+  // ⚠ THE STITCH MOCK'S GoCover/QR/KEYPAD BLOCKS ARE NOT REPRODUCED. Those
+  // sections describe product surfaces (deposit protection status, a phone
+  // hand-off QR code, a revealed keypad code) that do not exist anywhere in
+  // this codebase — 15_trip_detail_screen.dart's own header comment explains
+  // in detail why (no checkInTime/arrivalInstructions model, no host contact
+  // fields guests can read). The right pane reuses exactly what that screen
+  // already renders for real: claim banner, header, address, check-in/out,
+  // when card, review prompt, message host, access instructions, arrival
+  // photos, neighbourhood partners, house rules, map. Three tabs
+  // (Upcoming/Completed/Cancelled) in the mock become the real two
+  // (Upcoming/Past) this screen already has — inventing a third status
+  // bucket the booking stream cannot produce would be the same mistake.
 
-            final DateTime today = DateTime.now();
-            // "Upcoming" means the stay has not finished AND was not called
-            // off. A cancelled trip next month belongs in Past — it is not
-            // something the guest is going on.
-            final upcoming = all
-                .where((b) =>
-                    !b.status.isCancelled &&
-                    b.status != BookingStatus.declined &&
-                    b.checkOut.isAfter(today))
-                .toList()
-              ..sort((a, b) => a.checkIn.compareTo(b.checkIn));
+  Widget _buildDesktop(BuildContext context) {
+    return Scaffold(
+      backgroundColor: GoOutsColors.background,
+      body: Column(
+        children: [
+          const DesktopTopNav(current: DesktopNavTab.stay),
+          Expanded(
+            child: DesktopCenter(
+              maxWidth: 1200,
+              child: _bookingsBody(context, builder: (context, upcoming, past) {
+                final List<StayBooking> list =
+                    _desktopTabIndex == 0 ? upcoming : past;
 
-            final past = all.where((b) => !upcoming.contains(b)).toList()
-              ..sort((a, b) => b.checkIn.compareTo(a.checkIn));
+                // Falls back to the first booking in the CURRENT list — not
+                // stored, just computed — whenever nothing is selected yet,
+                // or the previous selection isn't in this list any more
+                // (switched tabs, or that booking dropped out of Upcoming
+                // because it just finished). Never mutates state during
+                // build; _selectedBookingId only changes from a tap.
+                final String? effectiveId = (_selectedBookingId != null &&
+                        list.any((b) => b.id == _selectedBookingId))
+                    ? _selectedBookingId
+                    : (list.isEmpty ? null : list.first.id);
+                final StayBooking? selected = effectiveId == null
+                    ? null
+                    : list.firstWhere((b) => b.id == effectiveId,
+                        orElse: () => list.first);
 
-            return TabBarView(
-              children: [
-                _list(upcoming, emptyTitle: 'No trips booked yet',
-                    emptyBody: 'When you book somewhere, it appears here with '
-                        'everything you need for the stay.'),
-                _list(past, emptyTitle: 'Nothing here yet',
-                    emptyBody: 'Stays you have finished, and any you cancelled, '
-                        'are kept here.'),
-              ],
-            );
-          },
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 28),
+                    Row(
+                      children: [
+                        Text(
+                          'My Trips',
+                          style: GoogleFonts.inter(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            color: GoOutsColors.deepNavy,
+                          ),
+                        ),
+                        const Spacer(),
+                        _desktopTabButton('Upcoming (${upcoming.length})', 0),
+                        const SizedBox(width: 8),
+                        _desktopTabButton('Past (${past.length})', 1),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    Expanded(
+                      child: list.isEmpty
+                          ? _list(
+                              list,
+                              emptyTitle: _desktopTabIndex == 0
+                                  ? 'No trips booked yet'
+                                  : 'Nothing here yet',
+                              emptyBody: _desktopTabIndex == 0
+                                  ? 'When you book somewhere, it appears '
+                                      'here with everything you need for '
+                                      'the stay.'
+                                  : 'Stays you have finished, and any you '
+                                      'cancelled, are kept here.',
+                            )
+                          : Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                SizedBox(
+                                  width: 340,
+                                  child: ListView.separated(
+                                    padding: EdgeInsets.zero,
+                                    itemCount: list.length,
+                                    separatorBuilder: (_, __) =>
+                                        const SizedBox(height: 10),
+                                    itemBuilder: (context, i) =>
+                                        _desktopBookingCard(
+                                      list[i],
+                                      selected: list[i].id == effectiveId,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 24),
+                                Expanded(
+                                  child: selected == null
+                                      ? const SizedBox.shrink()
+                                      // ⚠ KEYED ON THE BOOKING ID. Without a
+                                      // key, Flutter would update the SAME
+                                      // State object in place when a
+                                      // different card is clicked — its
+                                      // _listing field would briefly show the
+                                      // PREVIOUS booking's property under the
+                                      // new booking's dates until the new
+                                      // listing finishes loading. The key
+                                      // forces a fresh State per booking, so
+                                      // the pane never shows a mismatched
+                                      // pair.
+                                      : TripDetailsScreen(
+                                          key: ValueKey(selected.id),
+                                          bookingId: selected.id,
+                                          embedded: true,
+                                        ),
+                                ),
+                              ],
+                            ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                );
+              }),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _desktopTabButton(String label, int index) {
+    final bool active = _desktopTabIndex == index;
+    return InkWell(
+      onTap: () => setState(() {
+        _desktopTabIndex = index;
+        // Reset rather than try to carry a selection across tabs — the two
+        // lists hold different bookings, and "first in the new list" is a
+        // clearer default than silently keeping an id that may not be there.
+        _selectedBookingId = null;
+      }),
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: active ? GoOutsColors.paleBlueTint : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+            color: active ? GoOutsColors.primaryBlue : GoOutsColors.bodyText,
+          ),
         ),
       ),
+    );
+  }
+
+  /// Compact left-column card for the desktop split view: thumbnail, status
+  /// chip, title, town, dates — the same facts _bookingCard shows, laid out
+  /// horizontally for a ~340px column instead of stacked for a full-width
+  /// mobile card. Selecting one updates _selectedBookingId in place; nothing
+  /// navigates on desktop.
+  Widget _desktopBookingCard(StayBooking b, {required bool selected}) {
+    final StayListing? listing = _listings[b.listingId];
+    final chip = _statusChip(b.status);
+    final List<StayPhoto> photos =
+        List<StayPhoto>.from(listing?.photos ?? const <StayPhoto>[])
+          ..sort((a, b2) => a.order.compareTo(b2.order));
+
+    return Material(
+      color: selected ? GoOutsColors.paleBlueTint : Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: () => setState(() => _selectedBookingId = b.id),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected
+                  ? GoOutsColors.primaryBlue
+                  : GoOutsColors.dividerGray,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: photos.isEmpty
+                    ? Container(
+                        width: 64,
+                        height: 64,
+                        color: GoOutsColors.paleBlueTint,
+                        child: const Icon(Icons.home_outlined,
+                            size: 24, color: GoOutsColors.primaryBlue),
+                      )
+                    : Image.network(
+                        photos.first.url,
+                        width: 64,
+                        height: 64,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          width: 64,
+                          height: 64,
+                          color: GoOutsColors.paleBlueTint,
+                          child: const Icon(Icons.home_outlined,
+                              size: 24, color: GoOutsColors.primaryBlue),
+                        ),
+                      ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: chip.colour.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        chip.label,
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: chip.colour,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      listing?.title ??
+                          'Booking ${stayBookingReference(b.id)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: GoOutsColors.deepNavy,
+                      ),
+                    ),
+                    if ((listing?.address.town ?? '').isNotEmpty)
+                      Text(
+                        listing!.address.town,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                            fontSize: 12, color: GoOutsColors.bodyText),
+                      ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _dateRange(b.checkIn, b.checkOut),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                          fontSize: 12, color: GoOutsColors.bodyText),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The real booking stream, filtered into Upcoming/Past exactly as before
+  /// — factored out of build() on 14 September 2026 so both _buildMobile
+  /// (TabBarView) and _buildDesktop (its own tab row + split pane) read the
+  /// same data through the same StreamBuilder instead of two copies of this
+  /// filtering logic drifting apart.
+  Widget _bookingsBody(
+    BuildContext context, {
+    required Widget Function(BuildContext context, List<StayBooking> upcoming,
+            List<StayBooking> past)
+        builder,
+  }) {
+    return StreamBuilder<List<StayBooking>>(
+      stream: StayBookingService.instance.myBookings(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return _error(snapshot.error.toString());
+        }
+
+        final List<StayBooking> all = snapshot.data ?? const <StayBooking>[];
+        _ensureListings(all);
+
+        final DateTime today = DateTime.now();
+        // "Upcoming" means the stay has not finished AND was not called
+        // off. A cancelled trip next month belongs in Past — it is not
+        // something the guest is going on.
+        final upcoming = all
+            .where((b) =>
+                !b.status.isCancelled &&
+                b.status != BookingStatus.declined &&
+                b.checkOut.isAfter(today))
+            .toList()
+          ..sort((a, b) => a.checkIn.compareTo(b.checkIn));
+
+        final past = all.where((b) => !upcoming.contains(b)).toList()
+          ..sort((a, b) => b.checkIn.compareTo(a.checkIn));
+
+        return builder(context, upcoming, past);
+      },
     );
   }
 

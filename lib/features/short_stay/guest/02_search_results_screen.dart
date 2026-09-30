@@ -20,8 +20,12 @@
 //    The mock card always claimed 18 partners. The real headline is null when
 //    there is nothing nearby to claim, and a null headline renders as nothing.
 //    Better a card with no badge than a badge with a made up number.
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../models/stay_listing.dart';
 import '../services/stay_availability_service.dart';
@@ -31,6 +35,8 @@ import '../services/stay_booking_service.dart';
 import '../services/stay_listing_service.dart';
 import '../stay_routes.dart';
 import '../theme/stay_colors.dart';
+import '../theme/stay_type.dart';
+import '../widgets/desktop_top_nav.dart';
 import '../widgets/stay_bottom_nav.dart';
 
 class SearchResultsScreen extends StatefulWidget {
@@ -53,11 +59,35 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   StayCashbackRate _rate = StayCashbackRate.unknown;
   String? _error;
 
+  // ── Desktop split view (kIsWeb && width >= 900). See _buildDesktopSplitBody
+  // near the bottom of this class.
+  //
+  // The marker/price-bubble painting below is adapted from
+  // 04_map_results_screen.dart almost verbatim rather than pulled into a
+  // shared widget: that logic lives on State and touches BuildContext
+  // (device pixel ratio, font readiness), so factoring it out would mean
+  // editing 04 as well as 02. Duplicated here instead, so 04 stays exactly
+  // as it was.
+  GoogleMapController? _splitMap;
+  Set<Marker> _splitMarkers = <Marker>{};
+  String? _splitSelectedId;
+  List<StayListing>? _splitMarkersFor;
+  final Map<String, BitmapDescriptor> _splitBubbles =
+      <String, BitmapDescriptor>{};
+
   @override
   void initState() {
     super.initState();
     _criteria = widget.criteria ?? const StaySearchCriteria();
     _load();
+  }
+
+  @override
+  void dispose() {
+    // A leaked map controller holds native resources, same reason as
+    // 04_map_results_screen.dart's dispose().
+    _splitMap?.dispose();
+    super.dispose();
   }
 
   /// cashbackRate swallows its own failures and returns `unknown`, so a
@@ -127,6 +157,23 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ── DESKTOP WEB SPLIT. Added 14 September 2026, same
+    //    kIsWeb-and-width-gated pattern as 01_short_stay_home_screen.dart:
+    //    two genuinely separate Scaffolds rather than one Scaffold whose
+    //    body swaps. A shared Scaffold would force the mobile AppBar and
+    //    StayBottomNav onto the desktop layout too, which is exactly the
+    //    "just centres the mobile column" treatment this replaces —
+    //    Airbnb/booking.com desktop has neither a phone-style app bar nor a
+    //    bottom tab bar. The mobile branch below is untouched.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+        return desktop ? _buildDesktopScaffold(context) : _buildMobileScaffold(context);
+      },
+    );
+  }
+
+  Widget _buildMobileScaffold(BuildContext context) {
     return Scaffold(
       backgroundColor: GoOutsColors.pageBackground,
       appBar: AppBar(
@@ -166,6 +213,761 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
             _datesNotAppliedBanner(),
           Expanded(child: _body()),
         ],
+      ),
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  DESKTOP WEB SPLIT — results list on the left, live map on the right.
+  //  Added 14 September 2026 from the Host Web / 02_desktop_split_search_map
+  //  Stitch reference. That file is a STYLE/LAYOUT reference only — every
+  //  listing below is `_page.listings`, the same real data the mobile list
+  //  reads, and the map pins are the real StayListing lat/lng, painted with
+  //  04_map_results_screen.dart's own bubble painter so a desktop guest sees
+  //  literally the same pins a phone guest would.
+  // ══════════════════════════════════════════════════════════════════════════
+
+  Widget _buildDesktopScaffold(BuildContext context) {
+    return Scaffold(
+      backgroundColor: GoOutsColors.pageBackground,
+      body: Column(
+        children: [
+          const DesktopTopNav(current: DesktopNavTab.stay),
+          _buildDesktopSearchBar(),
+          if (_criteria.hasDates && !_page.datesApplied && !_loading)
+            _datesNotAppliedBanner(),
+          Expanded(child: _buildDesktopSplitBody(context)),
+        ],
+      ),
+    );
+  }
+
+  /// The filter/search summary bar: location + dates + guests on the left,
+  /// Filters and Sort on the right, and any active filters as chips
+  /// underneath — all reading the same `_criteria` the mobile utility bar
+  /// reads, just laid out horizontally instead of as two icon buttons.
+  Widget _buildDesktopSearchBar() {
+    final List<String> chips = _activeFilterChips();
+    return Container(
+      color: Colors.white,
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: GoOutsColors.outlineVariant, width: 1),
+        ),
+      ),
+      child: DesktopCenter(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _criteria.town ?? 'Anywhere in the UK',
+                          style: GoogleFonts.inter(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: GoOutsColors.deepNavy,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _subtitle,
+                          style: GoogleFonts.inter(
+                            fontSize: 12.5,
+                            color: GoOutsColors.bodyText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _buildUtilityButton(Icons.tune, 'Filters', _openFiltersFlow),
+                  const SizedBox(width: 8),
+                  _buildUtilityButton(
+                      Icons.swap_vert, _criteria.sort.label, _pickSort),
+                ],
+              ),
+              if (chips.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    for (final String c in chips) _desktopFilterChip(c),
+                    TextButton(
+                      onPressed: _clearDesktopFilters,
+                      child: Text(
+                        'Clear all',
+                        style: GoogleFonts.inter(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: GoOutsColors.bodyText,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Same navigation the mobile "Filters" button uses (`_buildUtilityBar`),
+  /// duplicated rather than shared so the mobile method stays untouched.
+  Future<void> _openFiltersFlow() async {
+    final next = await Navigator.of(context)
+        .pushNamed(StayRoutes.filters, arguments: {'criteria': _criteria});
+    if (!mounted) return;
+    if (next is StaySearchCriteria) {
+      setState(() => _criteria = next);
+      _load();
+    }
+  }
+
+  /// Human labels for whichever fields of `_criteria` are actually set. Only
+  /// filters a guest chose appear — nothing here is invented.
+  List<String> _activeFilterChips() {
+    final List<String> chips = <String>[];
+    if (_criteria.minPricePence != null || _criteria.maxPricePence != null) {
+      final String lo = _criteria.minPricePence != null
+          ? '£${(_criteria.minPricePence! / 100).round()}'
+          : 'Any';
+      final String hi = _criteria.maxPricePence != null
+          ? '£${(_criteria.maxPricePence! / 100).round()}'
+          : 'Any';
+      chips.add('Price: $lo - $hi');
+    }
+    if (_criteria.propertyType != null) {
+      chips.add('Type: ${_criteria.propertyType}');
+    }
+    if (_criteria.minBedrooms != null) {
+      chips.add('${_criteria.minBedrooms}+ bedrooms');
+    }
+    if (_criteria.minPartnersHalfMile > 0) {
+      chips.add('${_criteria.minPartnersHalfMile}+ partners nearby');
+    }
+    chips.addAll(_criteria.amenities);
+    return chips;
+  }
+
+  Widget _desktopFilterChip(String label) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: GoOutsColors.paleBlueTint,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+              color: GoOutsColors.primaryBlue.withValues(alpha: 0.3)),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            color: GoOutsColors.primaryBlue,
+          ),
+        ),
+      );
+
+  /// Rebuilds `_criteria` from scratch rather than `copyWith`, per the
+  /// warning on StaySearchCriteria.copyWith: copyWith cannot clear a field
+  /// back to null, only a fresh construction can. Location, dates, guests
+  /// and sort are kept; every filter field is dropped.
+  void _clearDesktopFilters() {
+    setState(() {
+      _criteria = StaySearchCriteria(
+        town: _criteria.town,
+        checkIn: _criteria.checkIn,
+        checkOut: _criteria.checkOut,
+        guests: _criteria.guests,
+        sort: _criteria.sort,
+      );
+    });
+    _load();
+  }
+
+  /// The split row itself: list pane left, map pane right, held to a fixed
+  /// height (the viewport below the nav/search bars) via LayoutBuilder rather
+  /// than DesktopCenter, so the map genuinely fills the pane instead of
+  /// shrink-wrapping to its content — a GoogleMap with an unbounded height
+  /// either errors or collapses to nothing.
+  Widget _buildDesktopSplitBody(BuildContext context) {
+    _ensureSplitMarkers();
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double paneHeight = constraints.maxHeight;
+        final double laneWidth = constraints.maxWidth.clamp(0, 1400);
+        return Center(
+          child: SizedBox(
+            width: laneWidth,
+            height: paneHeight,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(32, 20, 32, 0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(flex: 55, child: _buildDesktopListPane()),
+                  const SizedBox(width: 24),
+                  Expanded(flex: 45, child: _buildDesktopMapPane()),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ── Left pane: real listings, 2-up grid ─────────────────────────────────
+
+  Widget _buildDesktopListPane() {
+    if (_loading) return _desktopSkeletons();
+    if (_error != null) {
+      return _message(
+        Icons.error_outline,
+        'Could not load places to stay',
+        _error!,
+        onRetry: _load,
+      );
+    }
+    if (_page.listings.isEmpty) {
+      return _message(
+        Icons.search_off,
+        'Nothing matches yet',
+        'Try widening the filters, or searching a different town.',
+      );
+    }
+    final int n = _page.listings.length;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.only(right: 8, bottom: 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            n == 1 ? '1 place to stay' : '$n places to stay',
+            style: GoogleFonts.inter(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: GoOutsColors.deepNavy,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 16,
+            runSpacing: 20,
+            children: [
+              for (final StayListing l in _page.listings)
+                SizedBox(width: 320, child: _buildDesktopListingCard(l)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _desktopSkeletons() {
+    Widget box(double h, double w, [double r = 8]) => Container(
+          height: h,
+          width: w,
+          decoration: BoxDecoration(
+            color: GoOutsColors.dividerGray,
+            borderRadius: BorderRadius.circular(r),
+          ),
+        );
+    Widget card() => Container(
+          width: 320,
+          decoration: BoxDecoration(
+            color: GoOutsColors.cardSurface,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              box(170, double.infinity, 12),
+              const SizedBox(height: 12),
+              box(14, 200),
+              const SizedBox(height: 8),
+              box(12, 120),
+              const SizedBox(height: 14),
+            ],
+          ),
+        );
+    return SingleChildScrollView(
+      padding: const EdgeInsets.only(right: 8),
+      child: Wrap(
+        spacing: 16,
+        runSpacing: 20,
+        children: List<Widget>.generate(4, (_) => card()),
+      ),
+    );
+  }
+
+  /// The card that appears in the left pane's grid. Same StayListing fields
+  /// as the mobile card (`_buildPropertyCard`) — title, station/centre
+  /// distance, the honest partner headline (null hides the badge, exactly
+  /// like mobile), price and cashback — restyled to the denser 2-column
+  /// grid the Stitch reference draws. Hovering highlights the matching pin
+  /// on the map; tapping goes to the real listing, same as mobile.
+  Widget _buildDesktopListingCard(StayListing l) {
+    final String cover = l.coverPhotoUrl ?? '';
+    final String? headline = l.locationContext?.partnerCounts.headline;
+    final StayLocationContext? ctx = l.locationContext;
+    final StayStation? station =
+        (ctx != null && ctx.stations.isNotEmpty) ? ctx.stations.first : null;
+    final bool highlighted = _splitSelectedId == l.id;
+
+    return MouseRegion(
+      onEnter: (_) => _hoverSplitListing(l),
+      child: InkWell(
+        onTap: () => Navigator.of(context)
+            .pushNamed(StayRoutes.listing, arguments: {'listingId': l.id}),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          decoration: BoxDecoration(
+            color: GoOutsColors.cardSurface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: highlighted
+                  ? GoOutsColors.primaryBlue
+                  : Colors.transparent,
+              width: 2,
+            ),
+            boxShadow: const <BoxShadow>[
+              BoxShadow(
+                color: GoOutsColors.cardShadow,
+                blurRadius: 10,
+                offset: Offset(0, 3),
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Stack(
+                children: <Widget>[
+                  cover.isEmpty
+                      ? Container(
+                          height: 170,
+                          width: double.infinity,
+                          color: GoOutsColors.dividerGray,
+                          child: const Icon(Icons.home_outlined,
+                              size: 36, color: GoOutsColors.outlineVariant),
+                        )
+                      : Image.network(
+                          cover,
+                          height: 170,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          cacheWidth: 640,
+                          errorBuilder: (_, __, ___) => Container(
+                            height: 170,
+                            color: GoOutsColors.dividerGray,
+                            child: const Icon(Icons.broken_image_outlined,
+                                color: GoOutsColors.outlineVariant),
+                          ),
+                        ),
+                  if (l.ratingCount > 0)
+                    Positioned(
+                      left: 10,
+                      top: 10,
+                      child: _photoChip(
+                        '${l.ratingAvg.toStringAsFixed(1)} (${l.ratingCount})',
+                        colour: Colors.black.withValues(alpha: 0.6),
+                        icon: Icons.star,
+                      ),
+                    ),
+                  Positioned(right: 10, top: 10, child: _saveButton(l)),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    if (station != null)
+                      Text(
+                        '${station.walkMi.toStringAsFixed(1)} miles from '
+                        '${station.name}, ${station.linesLabel}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                            fontSize: 11.5, color: GoOutsColors.tealSecondary,
+                            fontWeight: FontWeight.w600),
+                      )
+                    else if (ctx != null && ctx.centreName.isNotEmpty)
+                      Text(
+                        '${ctx.distanceToCentreMi.toStringAsFixed(1)} miles '
+                        'from ${ctx.centreName}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                            fontSize: 11.5, color: GoOutsColors.tealSecondary,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    const SizedBox(height: 4),
+                    Text(
+                      l.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                        color: GoOutsColors.deepNavy,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${l.maxGuests} guests · '
+                      '${l.bedrooms} ${l.bedrooms == 1 ? 'bedroom' : 'bedrooms'}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                          fontSize: 12, color: GoOutsColors.bodyText),
+                    ),
+                    if (headline != null) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: GoOutsColors.paleBlueTint,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            const Icon(Icons.verified_rounded,
+                                size: 12, color: GoOutsColors.primaryBlue),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                headline,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: GoOutsColors.primaryBlue,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: <Widget>[
+                        Text(
+                          l.nightlyRate.compact,
+                          style: GoogleFonts.inter(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: GoOutsColors.deepNavy),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'per night',
+                          style: GoogleFonts.inter(
+                              fontSize: 12, color: GoOutsColors.bodyText),
+                        ),
+                        const Spacer(),
+                        if (_rate.isKnown)
+                          Text(
+                            '${_rate.label} back',
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: GoOutsColors.primaryBlue,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Right pane: the real map, same technology and painting as
+  //    04_map_results_screen.dart ──────────────────────────────────────────
+
+  List<StayListing> get _splitPlottable => _page.listings
+      .where((StayListing l) => l.lat != null && l.lng != null)
+      .toList();
+
+  /// Schedules a marker rebuild the first time `_page.listings` changes
+  /// (a fresh search or a filter change), identified by reference rather
+  /// than value — `_page` is replaced wholesale by `_load()`, so a new
+  /// object means new results. Called from build(), but only ever
+  /// *schedules* work via a post-frame callback, never calls setState
+  /// synchronously during build.
+  void _ensureSplitMarkers() {
+    if (identical(_splitMarkersFor, _page.listings)) return;
+    _splitMarkersFor = _page.listings;
+    _splitSelectedId = null;
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _rebuildSplitMarkers(frame: true));
+  }
+
+  /// Adapted from 04_map_results_screen.dart's `_rebuildMarkers`. `frame`
+  /// additionally re-frames the camera over every pin — true only for a
+  /// fresh result set, false for a plain hover/selection change, so
+  /// hovering a card does not yank the map's zoom around.
+  Future<void> _rebuildSplitMarkers({bool frame = false}) async {
+    if (!mounted) return;
+    final List<StayListing> plottable = _splitPlottable;
+    if (plottable.isEmpty) {
+      if (_splitMarkers.isNotEmpty) setState(() => _splitMarkers = <Marker>{});
+      return;
+    }
+    _splitSelectedId ??= plottable.first.id;
+
+    // The bubbles are painted with Inter; wait for it, exactly as 04 does,
+    // or the canvas silently falls back to Roboto.
+    await GoogleFonts.pendingFonts(<TextStyle>[GoogleFonts.inter()]);
+    if (!mounted) return;
+
+    final double dpr = MediaQuery.devicePixelRatioOf(context);
+    final Set<Marker> next = <Marker>{};
+    for (final StayListing l in plottable) {
+      final bool on = l.id == _splitSelectedId;
+      final BitmapDescriptor icon =
+          await _splitPriceBubble(l.nightlyRate.compact, on, dpr);
+      if (!mounted) return;
+      next.add(
+        Marker(
+          markerId: MarkerId(l.id),
+          position: LatLng(l.lat!, l.lng!),
+          icon: icon,
+          zIndexInt: on ? 2 : 1,
+          anchor: const Offset(0.5, 1),
+          // Tapping a pin goes straight to the listing — there is no
+          // carousel here to select into first, unlike 04's map screen.
+          onTap: () => Navigator.of(context).pushNamed(
+            StayRoutes.listing,
+            arguments: <String, dynamic>{'listingId': l.id},
+          ),
+        ),
+      );
+    }
+    if (!mounted) return;
+    setState(() => _splitMarkers = next);
+    if (frame) await _frameSplitPins();
+  }
+
+  /// Hovering a card highlights its pin (fills it, brings it to front) and
+  /// pans the map to it, without navigating. Skipped entirely for listings
+  /// with no coordinates.
+  void _hoverSplitListing(StayListing l) {
+    if (_splitSelectedId == l.id) return;
+    setState(() => _splitSelectedId = l.id);
+    _rebuildSplitMarkers();
+    if (l.lat != null && l.lng != null) {
+      _splitMap?.animateCamera(CameraUpdate.newLatLng(LatLng(l.lat!, l.lng!)));
+    }
+  }
+
+  /// Adapted from 04_map_results_screen.dart's `_frameAllPins`: frame every
+  /// pin rather than guess a zoom, with the same single-pin and
+  /// minimum-span handling.
+  Future<void> _frameSplitPins() async {
+    final GoogleMapController? map = _splitMap;
+    final List<StayListing> p = _splitPlottable;
+    if (map == null || p.isEmpty) return;
+
+    if (p.length == 1) {
+      await map.animateCamera(
+        CameraUpdate.newLatLngZoom(LatLng(p.first.lat!, p.first.lng!), 14),
+      );
+      return;
+    }
+
+    double minLat = p.first.lat!;
+    double maxLat = p.first.lat!;
+    double minLng = p.first.lng!;
+    double maxLng = p.first.lng!;
+    for (final StayListing l in p) {
+      if (l.lat! < minLat) minLat = l.lat!;
+      if (l.lat! > maxLat) maxLat = l.lat!;
+      if (l.lng! < minLng) minLng = l.lng!;
+      if (l.lng! > maxLng) maxLng = l.lng!;
+    }
+
+    const double minSpan = 0.01; // roughly 1km
+    if (maxLat - minLat < minSpan) {
+      final double mid = (maxLat + minLat) / 2;
+      minLat = mid - minSpan / 2;
+      maxLat = mid + minSpan / 2;
+    }
+    if (maxLng - minLng < minSpan) {
+      final double mid = (maxLng + minLng) / 2;
+      minLng = mid - minSpan / 2;
+      maxLng = mid + minSpan / 2;
+    }
+
+    try {
+      await map.animateCamera(
+        CameraUpdate.newLatLngBounds(
+          LatLngBounds(
+            southwest: LatLng(minLat, minLng),
+            northeast: LatLng(maxLat, maxLng),
+          ),
+          48,
+        ),
+      );
+    } catch (_) {
+      // newLatLngBounds throws if the map has not laid out yet — same as 04.
+    }
+  }
+
+  /// Copied from 04_map_results_screen.dart's `_priceBubble`, unchanged
+  /// except for the cache map it reads/writes (`_splitBubbles` rather than
+  /// that screen's `_bubbles`), so the two screens cannot get out of sync
+  /// on how a price pin is drawn.
+  Future<BitmapDescriptor> _splitPriceBubble(
+      String label, bool selected, double dpr) async {
+    final String key = '$label|$selected|$dpr';
+    final BitmapDescriptor? cached = _splitBubbles[key];
+    if (cached != null) return cached;
+
+    const double padH = 12;
+    const double padV = 6;
+    const double tailH = 7;
+    const double tailW = 12;
+    const double radius = 16;
+
+    final TextPainter tp = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: StayType.price.on(
+          selected ? GoOutsColors.cardSurface : GoOutsColors.primaryBlue,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    final double w = tp.width + padH * 2;
+    final double h = tp.height + padV * 2;
+    final double totalH = h + tailH;
+
+    final ui.PictureRecorder recorder = ui.PictureRecorder();
+    final Canvas canvas = Canvas(recorder);
+    canvas.scale(dpr);
+
+    final Path shape = Path.combine(
+      ui.PathOperation.union,
+      Path()
+        ..addRRect(RRect.fromRectAndRadius(
+          Rect.fromLTWH(0, 0, w, h),
+          const Radius.circular(radius),
+        )),
+      Path()
+        ..moveTo(w / 2 - tailW / 2, h - 0.5)
+        ..lineTo(w / 2, totalH)
+        ..lineTo(w / 2 + tailW / 2, h - 0.5)
+        ..close(),
+    );
+
+    canvas.drawShadow(shape, Colors.black.withValues(alpha: 0.3), 2, false);
+    canvas.drawPath(
+      shape,
+      Paint()
+        ..isAntiAlias = true
+        ..color =
+            selected ? GoOutsColors.primaryBlue : GoOutsColors.cardSurface,
+    );
+    if (!selected) {
+      canvas.drawPath(
+        shape,
+        Paint()
+          ..isAntiAlias = true
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1
+          ..color = GoOutsColors.outlineVariant,
+      );
+    }
+    tp.paint(canvas, const Offset(padH, padV));
+
+    final ui.Picture picture = recorder.endRecording();
+    final ui.Image image =
+        await picture.toImage((w * dpr).ceil(), (totalH * dpr).ceil());
+    final data = await image.toByteData(format: ui.ImageByteFormat.png);
+
+    image.dispose();
+    picture.dispose();
+    tp.dispose();
+
+    if (data == null) return BitmapDescriptor.defaultMarker;
+
+    final BitmapDescriptor made = BitmapDescriptor.bytes(
+      data.buffer.asUint8List(),
+      imagePixelRatio: dpr,
+    );
+    _splitBubbles[key] = made;
+    return made;
+  }
+
+  Widget _buildDesktopMapPane() {
+    final List<StayListing> plottable = _splitPlottable;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        color: GoOutsColors.dividerGray,
+        child: plottable.isEmpty
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: <Widget>[
+                      const Icon(Icons.map_outlined,
+                          size: 40, color: GoOutsColors.outlineVariant),
+                      const SizedBox(height: 12),
+                      Text(
+                        _page.listings.isEmpty
+                            ? 'Nothing to show on the map'
+                            : 'These places have no map location yet',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.inter(
+                            fontSize: 13.5, color: GoOutsColors.bodyText),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            : GoogleMap(
+                initialCameraPosition: CameraPosition(
+                  target: LatLng(plottable.first.lat!, plottable.first.lng!),
+                  zoom: 12,
+                ),
+                markers: _splitMarkers,
+                myLocationEnabled: false,
+                myLocationButtonEnabled: false,
+                zoomControlsEnabled: true,
+                mapToolbarEnabled: false,
+                compassEnabled: false,
+                onMapCreated: (GoogleMapController c) {
+                  _splitMap = c;
+                  WidgetsBinding.instance
+                      .addPostFrameCallback((_) => _frameSplitPins());
+                },
+              ),
       ),
     );
   }
@@ -360,6 +1162,9 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     final chosen = await showModalBottomSheet<StaySort>(
       context: context,
       backgroundColor: Colors.white,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 560)
+          : null,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),

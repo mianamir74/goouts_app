@@ -21,6 +21,7 @@
 //
 // The payment card reports what the booking actually records, including
 // "no payment taken", rather than a PAID badge that was true of nobody.
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:google_fonts/google_fonts.dart';
@@ -123,9 +124,12 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
       // Watched, not fetched once: a host accepting, or a cancellation
       // completing on the next screen, changes this page underneath the guest.
       bottomNavigationBar: const StayBottomNav(current: StayTab.trips),
-      body: StreamBuilder<StayBooking?>(
-        stream: StayBookingService.instance.watch(widget.bookingId),
-        builder: (context, snapshot) {
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = StreamBuilder<StayBooking?>(
+            stream: StayBookingService.instance.watch(widget.bookingId),
+            builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -168,6 +172,15 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                 _paymentSummary(b),
                 const SizedBox(height: 32),
               ],
+            ),
+          );
+        },
+          );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: content,
             ),
           );
         },

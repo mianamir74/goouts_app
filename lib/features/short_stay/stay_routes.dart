@@ -33,6 +33,10 @@ import 'guest/30_message_host_screen.dart';
 import 'guest/27_edit_booking_screen.dart';
 import 'guest/28_cancel_booking_screen.dart';
 import 'guest/29_cancellation_confirmed_screen.dart';
+import 'guest/31_explore_cashback_screen.dart';
+import 'guest/32_about_us_screen.dart';
+import 'guest/33_partner_info_screen.dart';
+import 'guest/34_profile_screen.dart';
 import 'models/stay_booking_request.dart';
 // For the typed cast of args['listings'] on the map route.
 import 'models/stay_listing.dart';
@@ -88,6 +92,21 @@ class StayRoutes {
   // The guest half of stay_bookings/{id}/messages. The host half lives in
   // goouts_host at HostRoutes.guestThread and writes the same documents.
   static const messageHost          = '/stay/booking/messages';
+  // Added 14 September 2026 with the new shared desktop nav bar — see
+  // desktop_top_nav.dart. Both are reachable from every page's nav, not just
+  // the Short Stay home screen, so they live in this shared route table
+  // rather than being Short-Stay-home-only.
+  static const exploreCashback      = '/stay/explore-cashback';
+  static const aboutUs              = '/stay/about';
+  // Added with the real Explore Cashback build, replacing the 14 September
+  // 2026 stub. Reached only from within 31_explore_cashback_screen.dart's
+  // partner cards — lives here rather than its own route table for the same
+  // reason exploreCashback and aboutUs do.
+  static const partnerInfo          = '/stay/explore-cashback/partner';
+  // Added with the new web-native profile page (34_profile_screen.dart),
+  // deliberately separate from the consumer app's '/profile' route — see
+  // that file's header comment for why.
+  static const profile              = '/stay/profile';
 
   /// Every route this feature owns. Used by the guard below so a typo in a
   /// route name produces a clear error rather than a blank screen.
@@ -97,7 +116,7 @@ class StayRoutes {
     myBookings, trip, bookingDetails, editBooking, cancelBooking,
     cancellationDone, captureIntro, captureChecklist, cameraCapture, skipRoom,
     captureComplete, checkoutCapture, evidencePack, claim, contestClaim, review,
-    messageHost,
+    messageHost, exploreCashback, aboutUs, partnerInfo, profile,
   };
 
   static bool owns(String? name) => name != null && _all.contains(name);
@@ -144,6 +163,10 @@ class StayRoutes {
     // sends the next person looking for a bug that was fixed weeks ago.
     final listingId = id('listingId');
     final bookingId = id('bookingId');
+    // 31_explore_cashback_screen.dart pushes this with only the partner's
+    // real Firestore doc id — see this file's own "PASS IDS, NEVER OBJECTS"
+    // rule above. 33_partner_info_screen.dart loads the document itself.
+    final partnerId = id('partnerId');
 
     // ⚠ ARGUMENTS IN THIS APP ARE A MAP, NOT A BARE STRING.
     //
@@ -302,6 +325,10 @@ class StayRoutes {
           // nothing at all: every real listing sat at ratingAvg 0 while four
           // screens read reviews that only the demo seed could produce.
           review            => ReviewStayScreen(bookingId: bookingId),
+          exploreCashback   => const ExploreCashbackScreen(),
+          aboutUs           => const AboutUsScreen(),
+          profile           => const ProfileWebScreen(),
+          partnerInfo       => PartnerInfoWebScreen(partnerId: partnerId),
           _                 => const _StayRouteMissing(),
         };
 

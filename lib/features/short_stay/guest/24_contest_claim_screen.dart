@@ -30,6 +30,7 @@
 //  "You will not be charged" is not ours to say before an admin has looked.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -138,7 +139,10 @@ class _ContestClaimScreenState extends State<ContestClaimScreen> {
             style:
                 GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700)),
       ),
-      body: ListView(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = ListView(
         padding: const EdgeInsets.fromLTRB(20, 18, 20, 32),
         children: <Widget>[
           Text(
@@ -224,6 +228,15 @@ class _ContestClaimScreenState extends State<ContestClaimScreen> {
                 fontSize: 12, height: 1.45, color: GoOutsColors.textVariant),
           ),
         ],
+      );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: content,
+            ),
+          );
+        },
       ),
     );
   }

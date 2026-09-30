@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:geolocator/geolocator.dart';
@@ -57,6 +58,9 @@ class _NearbyScreenState extends State<NearbyScreen> {
       context: context,
       isDismissible: true,
       backgroundColor: Colors.transparent,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 480)
+          : null,
       builder: (_) => Container(
         decoration: const BoxDecoration(
           color: Colors.white,
@@ -798,9 +802,12 @@ class _NearbyScreenState extends State<NearbyScreen> {
           ),
         ],
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
             child: Row(
@@ -896,7 +903,16 @@ class _NearbyScreenState extends State<NearbyScreen> {
                         _venueCard(venues[index], categoryIcon),
                   ),
           ),
-        ],
+              ],
+            );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: content,
+            ),
+          );
+        },
       ),
       bottomNavigationBar: _buildBottomNav(),
     );

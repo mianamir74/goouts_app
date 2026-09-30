@@ -2,6 +2,7 @@ import 'dart:async';   // TimeoutException, for the top-up timeout below
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';   // FieldValue.increment
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/user_service.dart';
@@ -75,6 +76,9 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 560)
+          : null,
       builder: (_) => Padding(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -172,6 +176,12 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
                             color: Colors.grey[400],
                           ),
                           border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          errorBorder: InputBorder.none,
+                          disabledBorder: InputBorder.none,
+                          focusedErrorBorder: InputBorder.none,
+                          filled: false,
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 14),
                         ),
@@ -321,6 +331,9 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
       isDismissible: true,
       enableDrag: true,
       backgroundColor: Colors.transparent,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 480)
+          : null,
       builder: (_) => Container(
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
         decoration: BoxDecoration(
@@ -499,7 +512,10 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
         ),
         centerTitle: false,
       ),
-      body: Stack(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = Stack(
         children: [
           SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 110),
@@ -1013,6 +1029,15 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
             ),
           ),
         ],
+          );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: content,
+            ),
+          );
+        },
       ),
     );
   }

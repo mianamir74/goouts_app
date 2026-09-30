@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'goouts_sheet.dart';
@@ -11,6 +12,9 @@ void showPreAuthSupportSheet(BuildContext context) {
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
+    constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+        ? const BoxConstraints(maxWidth: 640)
+        : null,
     builder: (_) => const _PreAuthSupportSheet(),
   );
 }

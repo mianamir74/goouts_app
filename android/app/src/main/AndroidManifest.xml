@@ -45,22 +45,26 @@
             android:value="AIzaSyAymdUNNVULCvMaA6FLTqTw5cVRk9_sUBI"/>
 
         <!--
-            ML Kit face model.
+            ML Kit face + text (OCR) models — now LOAD-BEARING.
 
-            NOTE: this is belt-and-braces, not the thing that makes it work.
-            The google_mlkit_face_detection plugin depends on the BUNDLED
-            artifact (com.google.mlkit:face-detection), which ships the model
-            inside the app already — so face checks work offline and on first
-            launch with or without this line.
+            4 September 2026: switched both plugins from the bundled artifacts
+            (com.google.mlkit:face-detection, com.google.mlkit:text-recognition
+            — which shipped the models inside the APK, ~30-40MB across both
+            once every CPU architecture was counted) to the unbundled
+            Play-Services variants in android/app/build.gradle.kts. Those
+            download the model via Google Play Services instead of shipping
+            it, which is what actually shrank the app.
 
-            It is kept because it costs nothing and becomes load-bearing the
-            day anyone switches to the thin Play-Services variant
-            (play-services-mlkit-face-detection), which downloads the model on
-            first use unless this tells Play Services to fetch it at install.
+            This line is what makes that download happen automatically right
+            after install, in the background, rather than the first time a
+            user reaches KYC and blocking on it there. "face,ocr" pre-fetches
+            both models — remove either and Play Services falls back to
+            downloading on first use of that model instead, which still
+            works, just with a possible pause the first time.
         -->
         <meta-data
             android:name="com.google.mlkit.vision.DEPENDENCIES"
-            android:value="face" />
+            android:value="face,ocr" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

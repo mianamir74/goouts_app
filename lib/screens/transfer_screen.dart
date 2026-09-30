@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../widgets/goouts_sheet.dart';
@@ -138,7 +139,10 @@ class _TransferScreenState extends State<TransferScreen> {
           ),
         ],
       ),
-      body: Stack(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = Stack(
         children: [
           SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 120),
@@ -407,6 +411,10 @@ class _TransferScreenState extends State<TransferScreen> {
                                       border: InputBorder.none,
                                       enabledBorder: InputBorder.none,
                                       focusedBorder: InputBorder.none,
+                                      errorBorder: InputBorder.none,
+                                      disabledBorder: InputBorder.none,
+                                      focusedErrorBorder: InputBorder.none,
+                                      filled: false,
                                       contentPadding: const EdgeInsets.fromLTRB(10, 18, 0, 18),
                                       isDense: true,
                                     ),
@@ -495,6 +503,10 @@ class _TransferScreenState extends State<TransferScreen> {
                                       border: InputBorder.none,
                                       enabledBorder: InputBorder.none,
                                       focusedBorder: InputBorder.none,
+                                      errorBorder: InputBorder.none,
+                                      disabledBorder: InputBorder.none,
+                                      focusedErrorBorder: InputBorder.none,
+                                      filled: false,
                                       contentPadding: const EdgeInsets.fromLTRB(10, 18, 0, 18),
                                       isDense: true,
                                     ),
@@ -650,6 +662,15 @@ class _TransferScreenState extends State<TransferScreen> {
             ),
           ),
         ],
+      );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 680),
+              child: content,
+            ),
+          );
+        },
       ),
       bottomNavigationBar: _buildBottomNav(),
     );

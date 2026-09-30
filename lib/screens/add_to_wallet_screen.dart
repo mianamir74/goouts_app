@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/user_service.dart';
@@ -56,7 +57,26 @@ class _AddToWalletScreenState extends State<AddToWalletScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9FC),
-      body: SafeArea(
+      // ⚠ DESKTOP WEB CENTERING ADDED 14 September 2026. No kIsWeb treatment
+      // existed here - same fix as the other signup-chain screens.
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = _buildBody();
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: content,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    return SafeArea(
         child: Column(
           children: [
             _buildHeader(context),
@@ -89,7 +109,6 @@ class _AddToWalletScreenState extends State<AddToWalletScreen>
             ),
           ],
         ),
-      ),
     );
   }
 
@@ -491,12 +510,56 @@ class _AddToWalletScreenState extends State<AddToWalletScreen>
     );
   }
 
+  // ⚠ WEB CRASH FIX, 14 September 2026. Platform.isIOS/isAndroid come from
+  // dart:io, which throws UnsupportedError the moment either getter is read
+  // on web - there is no web implementation at all, unlike Platform.isIOS
+  // returning false. This is a real runtime crash on this screen for any
+  // web visitor, not just a layout issue. Neither Apple Wallet nor Google
+  // Pay's "add to phone wallet" is a real action a browser can perform
+  // anyway (this screen doesn't call a native wallet API either - it just
+  // flips a UI flag and writes cardAddedToWallet to Firestore), so web gets
+  // a plain Continue button that does the same thing instead.
   Widget _buildWalletButtons() {
+    if (kIsWeb) return _buildWebContinueButton();
     return Column(
       children: [
         if (Platform.isIOS) _buildAppleWalletButton(),
         if (Platform.isAndroid) _buildGooglePayButton(),
       ],
+    );
+  }
+
+  Widget _buildWebContinueButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 54,
+      child: ElevatedButton(
+        onPressed: _onWalletTapped,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF0392CA),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.check_circle_outline_rounded,
+                size: 20, color: Colors.white),
+            const SizedBox(width: 10),
+            Text(
+              'Continue',
+              style: GoogleFonts.inter(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

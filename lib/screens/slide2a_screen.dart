@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
 
 class Slide2aScreen extends StatelessWidget {
@@ -14,7 +15,10 @@ class Slide2aScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: _surface,
-      body: SafeArea(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -176,6 +180,15 @@ class Slide2aScreen extends StatelessWidget {
             ),
           ],
         ),
+      );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: content,
+            ),
+          );
+        },
       ),
     );
   }

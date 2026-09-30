@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -265,21 +266,36 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ⚠ DESKTOP WEB CENTERING ADDED 14 September 2026. No kIsWeb treatment
+    // existed here - same "full-bleed mobile scroll column" issue as
+    // home_screen.dart, fixed the same way.
     return Scaffold(
       backgroundColor: _bg,
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(child: _buildHeader()),
-            SliverToBoxAdapter(child: _buildSearchBar()),
-            SliverToBoxAdapter(child: const SizedBox(height: 20)),
-            SliverToBoxAdapter(child: _buildCategories()),
-            SliverToBoxAdapter(child: const SizedBox(height: 24)),
-            SliverToBoxAdapter(child: _buildNearYou()),
-            SliverToBoxAdapter(child: const SizedBox(height: 24)),
-            SliverToBoxAdapter(child: _buildTopCashback()),
-            SliverToBoxAdapter(child: const SizedBox(height: 24)),
-          ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+            final Widget scroll = CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(child: _buildHeader()),
+                SliverToBoxAdapter(child: _buildSearchBar()),
+                SliverToBoxAdapter(child: const SizedBox(height: 20)),
+                SliverToBoxAdapter(child: _buildCategories()),
+                SliverToBoxAdapter(child: const SizedBox(height: 24)),
+                SliverToBoxAdapter(child: _buildNearYou()),
+                SliverToBoxAdapter(child: const SizedBox(height: 24)),
+                SliverToBoxAdapter(child: _buildTopCashback()),
+                SliverToBoxAdapter(child: const SizedBox(height: 24)),
+              ],
+            );
+            if (!desktop) return scroll;
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: scroll,
+              ),
+            );
+          },
         ),
       ),
       bottomNavigationBar: _buildBottomNav(),
@@ -396,6 +412,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
               focusedBorder: InputBorder.none,
+              errorBorder: InputBorder.none,
+              disabledBorder: InputBorder.none,
+              focusedErrorBorder: InputBorder.none,
+              filled: false,
               contentPadding: const EdgeInsets.symmetric(vertical: 15),
             ),
             style: GoogleFonts.inter(fontSize: 14, color: _dark),

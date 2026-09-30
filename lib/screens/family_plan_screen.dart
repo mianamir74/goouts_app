@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
 import '../services/family_service.dart';
 import '../services/user_service.dart';
@@ -230,15 +231,18 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
             ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _loadAll,
-        color: _primary,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = RefreshIndicator(
+            onRefresh: _loadAll,
+            color: _primary,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
 
               // ── Incoming requests banner ──
               if (_incomingRequests.isNotEmpty) ...[
@@ -289,9 +293,18 @@ class _FamilyPlanScreenState extends State<FamilyPlanScreen> {
                 _buildProgressNote(remaining),
 
               const SizedBox(height: 30),
-            ],
-          ),
-        ),
+                ],
+              ),
+            ),
+          );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: content,
+            ),
+          );
+        },
       ),
     );
   }

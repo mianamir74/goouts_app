@@ -34,9 +34,12 @@
 // hold are decided by getStayQuote on the server, which is called on the next
 // screen. This bar therefore says "before fees" rather than "Total", because a
 // number that changes when you tap Continue is worse than no number at all.
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../widgets/desktop_top_nav.dart';
 import '../models/money.dart';
 import '../models/stay_booking_request.dart';
 import '../models/stay_listing.dart';
@@ -193,6 +196,62 @@ class _BookingDatesScreenState extends State<BookingDatesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+        return desktop ? _buildDesktop(context) : _buildMobile(context);
+      },
+    );
+  }
+
+  // ── Desktop web ──────────────────────────────────────────────────────────
+  //
+  // ADDED 9 September 2026, same LayoutBuilder-gated pattern as every other
+  // desktop screen this pass — see 05_listing_detail_screen.dart's own note
+  // for the full reasoning. The calendar and guest picker are unchanged;
+  // only the frame around them (top nav instead of AppBar, a 900px reading
+  // column instead of full-bleed mobile width) is new.
+  Widget _buildDesktop(BuildContext context) {
+    return Scaffold(
+      backgroundColor: GoOutsColors.background,
+      body: Column(
+        children: [
+          const DesktopTopNav(current: DesktopNavTab.stay),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _loadError != null
+                    ? _errorBody()
+                    : Stack(
+                        children: [
+                          SingleChildScrollView(
+                            child: DesktopCenter(
+                              maxWidth: 900,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 24),
+                                  _buildCalendarSection(),
+                                  _buildGuestsSection(),
+                                  _buildPreviewImage(),
+                                  const SizedBox(height: 140),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Align(
+                            alignment: Alignment.bottomCenter,
+                            child: _buildBottomBar(desktop: true),
+                          ),
+                        ],
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobile(BuildContext context) {
     return Scaffold(
       backgroundColor: GoOutsColors.background,
       appBar: AppBar(
@@ -679,74 +738,106 @@ class _BookingDatesScreenState extends State<BookingDatesScreen> {
 
   // ── Bottom bar ───────────────────────────────────────────────────────────
 
-  Widget _buildBottomBar() {
+  Widget _buildBottomBar({bool desktop = false}) {
     final bool ready = _nights > 0;
     final Pence estimate = Pence(
         (_listing?.nightlyRate.value ?? 0) * (_nights == 0 ? 1 : _nights));
 
+    final Widget row = Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                ready
+                    ? '${_shortDate(_checkIn!)} to '
+                        '${_shortDate(_checkOut!)}'
+                    : 'Select your dates',
+                style: GoogleFonts.inter(
+                    fontSize: 13.5, color: GoOutsColors.bodyText),
+              ),
+              Text(
+                ready
+                    ? '${estimate.compact} before fees'
+                    : '${_listing?.nightlyRate.compact ?? '—'} nightly',
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: GoOutsColors.deepNavy,
+                ),
+              ),
+            ],
+          ),
+        ),
+        ElevatedButton(
+          // Disabled until a full stay is chosen. Continuing with only an
+          // arrival date would send an invalid range to getStayQuote and
+          // fail on the next screen for no reason the guest can see.
+          onPressed: ready ? _continue : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: GoOutsColors.primaryBlue,
+            disabledBackgroundColor: GoOutsColors.dividerGray,
+            minimumSize: const Size(150, 56),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
+          ),
+          child: Text(
+            'Continue',
+            style: GoogleFonts.inter(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ],
+    );
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(
+          desktop ? 0 : 16, 16, desktop ? 0 : 16, desktop ? 20 : 32),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: GoOutsColors.dividerGray)),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  ready
-                      ? '${_shortDate(_checkIn!)} to '
-                          '${_shortDate(_checkOut!)}'
-                      : 'Select your dates',
-                  style: GoogleFonts.inter(
-                      fontSize: 13.5, color: GoOutsColors.bodyText),
-                ),
-                Text(
-                  ready
-                      ? '${estimate.compact} before fees'
-                      : '${_listing?.nightlyRate.compact ?? '—'} nightly',
-                  style: GoogleFonts.inter(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: GoOutsColors.deepNavy,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          ElevatedButton(
-            // Disabled until a full stay is chosen. Continuing with only an
-            // arrival date would send an invalid range to getStayQuote and
-            // fail on the next screen for no reason the guest can see.
-            onPressed: ready ? _continue : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: GoOutsColors.primaryBlue,
-              disabledBackgroundColor: GoOutsColors.dividerGray,
-              minimumSize: const Size(150, 56),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ),
-            child: Text(
-              'Continue',
-              style: GoogleFonts.inter(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ],
-      ),
+      child: desktop ? DesktopCenter(maxWidth: 900, child: row) : row,
     );
+  }
+
+  // ⚠ ADDED 9 September 2026, building the web version of this app.
+  //
+  // getStayQuote (called by CheckoutScreen the moment it opens, to price the
+  // stay) has ALWAYS required a signed-in caller server side — see
+  // stay_booking.js's own req.auth check. That was never a problem before
+  // this app had a way to reach checkout signed out: the phone app's launch
+  // flow (SplashScreen -> signup/login) makes that structurally impossible.
+  //
+  // The web entry point deliberately drops a visitor into Short Stay
+  // browsing without that wall, so the checkout screen's own price-loading
+  // call (not just the final "confirm booking" tap, which already had its
+  // own guard) needed a matching gate. Caught first, without it: an
+  // anonymous web guest would tap Continue, land on checkout, and see
+  // "We could not price this stay" - a real server rejection, dressed as a
+  // generic failure, when what actually happened was nobody asked them to
+  // sign in yet.
+  bool _requireSignedIn() {
+    if (FirebaseAuth.instance.currentUser != null) return true;
+    Navigator.of(context).pushNamed(
+      '/login',
+      arguments: <String, dynamic>{
+        'returnMessage': 'Sign in to continue with your booking.',
+      },
+    );
+    return false;
   }
 
   void _continue() {
     if (_nights <= 0) return;
+    if (!_requireSignedIn()) return;
     Navigator.of(context).pushNamed(
       StayRoutes.checkout,
       arguments: <String, dynamic>{

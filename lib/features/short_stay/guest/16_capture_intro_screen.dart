@@ -9,6 +9,7 @@
 // It also takes a `kind`, because the same explanation serves arrival and
 // departure. Departure is where guests are most likely to skip, being on their
 // way out of the door, and it is the set that decides a claim.
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/stay_booking.dart';
@@ -99,7 +100,10 @@ class _DepositProtectionScreenState extends State<DepositProtectionScreen> {
         ),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = SingleChildScrollView(
         child: Column(
           children: [
             _buildHeroImage(),
@@ -144,6 +148,15 @@ class _DepositProtectionScreenState extends State<DepositProtectionScreen> {
             ),
           ],
         ),
+      );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: content,
+            ),
+          );
+        },
       ),
     );
   }
@@ -243,17 +256,51 @@ class _DepositProtectionScreenState extends State<DepositProtectionScreen> {
     );
   }
 
+  // ⚠ ADDED 21 September 2026. This button used to navigate unconditionally.
+  // Everything past it — CaptureFlowScreen, CameraCaptureScreen,
+  // stay_evidence_service.dart — goes through dart:io File and a
+  // path_provider temp file, neither of which exist in a browser. A guest
+  // on web who tapped Start would not get a clean error; the capture flow
+  // would misbehave or throw partway through taking a photo. The host side
+  // of this exact flow (host_16_pre_arrival_capture_screen.dart) was already
+  // gated behind kIsWeb for the same reason — this was the missing guest
+  // counterpart. Evidence photos are dispute-critical, so this stays a real
+  // camera flow on the phone rather than a hasty web port.
+  void _handleStart(BuildContext context) {
+    if (kIsWeb) {
+      showDialog<void>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Use your phone for this'),
+          content: Text(
+            'Room photos are captured in the GoOuts app on your phone, so '
+            'they can be relied on if a claim is ever made. Open this '
+            'booking in the app to photograph ${widget.kind == CaptureKind.guestCheckOut ? 'before you check out' : 'the rooms'}.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Got it'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+    Navigator.of(context).pushReplacementNamed(
+      StayRoutes.captureChecklist,
+      arguments: <String, dynamic>{
+        'bookingId': widget.bookingId,
+        'captureKind': widget.kind.wire,
+      },
+    );
+  }
+
   Widget _buildStartButton(BuildContext context) {
     return ElevatedButton(
       // pushReplacement: the intro is an explanation, not a step. Coming back
       // from the checklist should return to the trip, not re-read the pitch.
-      onPressed: () => Navigator.of(context).pushReplacementNamed(
-        StayRoutes.captureChecklist,
-        arguments: <String, dynamic>{
-          'bookingId': widget.bookingId,
-          'captureKind': widget.kind.wire,
-        },
-      ),
+      onPressed: () => _handleStart(context),
       style: ElevatedButton.styleFrom(
         // ⚠ WAS A HARDCODED const Color(0xFF00668F). That is not in
         // stay_colors.dart and appears nowhere else in the feature — a fourth

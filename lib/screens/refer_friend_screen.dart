@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -91,7 +92,10 @@ class _ReferFriendScreenState extends State<ReferFriendScreen> {
                 fontSize: 16, fontWeight: FontWeight.w700, color: _dark)),
         centerTitle: true,
       ),
-      body: _loading
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = _loading
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF0392CA)))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(20),
@@ -119,7 +123,16 @@ class _ReferFriendScreenState extends State<ReferFriendScreen> {
                   const SizedBox(height: 32),
                 ],
               ),
+            );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: content,
             ),
+          );
+        },
+      ),
     );
   }
 

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -31,7 +32,26 @@ class _LinkCardDetailsScreenState extends State<LinkCardDetailsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9FC),
-      body: SafeArea(
+      // ⚠ DESKTOP WEB CENTERING ADDED 14 September 2026. No kIsWeb treatment
+      // existed here - same fix as the other signup-chain screens.
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = _buildBody();
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: content,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    return SafeArea(
         child: Column(
           children: [
             _buildHeader(context),
@@ -113,7 +133,6 @@ class _LinkCardDetailsScreenState extends State<LinkCardDetailsScreen> {
             _buildBottomSection(),
           ],
         ),
-      ),
     );
   }
 

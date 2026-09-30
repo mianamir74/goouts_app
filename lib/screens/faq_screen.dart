@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
 import 'short_stay_faq_screen.dart';
 
@@ -83,11 +84,14 @@ class _FaqScreenState extends State<FaqScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
             const SizedBox(height: 8),
 
             Text(
@@ -132,6 +136,12 @@ class _FaqScreenState extends State<FaqScreen> {
                       decoration: InputDecoration(
                         isDense: true,
                         border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        errorBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
+                        focusedErrorBorder: InputBorder.none,
+                        filled: false,
                         hintText: 'Search questions and answers',
                         hintStyle: GoogleFonts.inter(
                             fontSize: 14, color: Colors.grey[400]),
@@ -553,8 +563,17 @@ class _FaqScreenState extends State<FaqScreen> {
             ),
 
             const SizedBox(height: 24),
-          ],
-        ),
+              ],
+            ),
+          );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: content,
+            ),
+          );
+        },
       ),
       bottomNavigationBar: _buildBottomNav(context),
     );

@@ -1,5 +1,25 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
+// ⚠ ADDED 21 September 2026. Every showModalBottomSheet call in this file
+// (and in the ~25 other files that call showModalBottomSheet directly rather
+// than through GoOutsSheet) rendered full-bleed edge-to-edge with no
+// `constraints:` set. On phone that is correct — a sheet should span the
+// screen. On a wide desktop browser it meant a 480px-wide confirmation
+// dialog's content stretched across a 1600px+ viewport: exactly the "still
+// showing the mobile app" look this file exists to prevent everywhere else
+// (every short_stay guest screen already gates on kIsWeb + 900px width; this
+// helper had not been given the same treatment). Flutter centres a modal
+// bottom sheet automatically when it is narrower than the viewport, so a
+// maxWidth constraint on web is enough — no extra centering logic needed.
+const double _kSheetDesktopMaxWidth = 480;
+BoxConstraints? _sheetConstraints(BuildContext context) {
+  final bool desktop = kIsWeb && MediaQuery.of(context).size.width >= 900;
+  return desktop
+      ? const BoxConstraints(maxWidth: _kSheetDesktopMaxWidth)
+      : null;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Usage:
@@ -113,6 +133,7 @@ class GoOutsSheet {
       isDismissible: true,
       enableDrag: true,
       isScrollControlled: true,
+      constraints: _sheetConstraints(context),
       builder: (_) => _GoOutsConfirmSheet(
         title: title,
         message: message,
@@ -142,6 +163,7 @@ class GoOutsSheet {
       isDismissible: isDismissible,
       enableDrag: isDismissible,
       isScrollControlled: true,
+      constraints: _sheetConstraints(context),
       builder: (_) => _GoOutsSheetContent(
         type: type,
         title: title,

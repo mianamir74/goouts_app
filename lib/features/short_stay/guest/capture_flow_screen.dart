@@ -37,6 +37,7 @@
 //     The screen degrades to correct rather than to zero.
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../models/stay_booking.dart';
@@ -274,6 +275,13 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      // This screen is now unreachable on web (16_capture_intro_screen.dart
+      // gates the Start button behind kIsWeb), but the constraint costs
+      // nothing and matches the pattern applied everywhere else in case this
+      // is ever reached by a route other than the Start button.
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 480)
+          : null,
       builder: (_) => SkipRoomSheet(room: room),
     );
 

@@ -37,9 +37,11 @@
 //
 // Same for reviews: a listing with none shows the section with an honest
 // "No reviews yet" instead of a fabricated one.
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../widgets/desktop_top_nav.dart';
 import '../models/money.dart';
 import '../models/stay_amenities.dart';
 // Days out, shown BEFORE booking as of 29 August 2026. Until today the whole
@@ -81,6 +83,18 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
   /// The guest's own rate. Cached in the service, so this costs one call the
   /// first time Short Stay is opened and nothing after that.
   StayCashbackRate _rate = StayCashbackRate.unknown;
+
+  // ⚠ ADDED 30 September 2026, per Mian — "how do the 4 or 5 pictures
+  // display, in demo listing it is only showing 1". The gallery below was
+  // already a swipeable PageView over every photo in listing.photos, but it
+  // had no dots or any other hint that there was more than one photo to see
+  // — so even a listing with several photos read as having just one. This
+  // tracks which page the gallery is on so dots can be drawn under it.
+  //
+  // A ValueNotifier, not setState: setState here would rebuild the WHOLE
+  // listing page — map, reviews, days out — on every swipe. Only the dots
+  // listen to this.
+  final ValueNotifier<int> _photoPage = ValueNotifier<int>(0);
 
   // ── ⚠ DAYS OUT WERE INVISIBLE UNTIL AFTER YOU BOOKED. 29 August 2026. ─────
   //
@@ -128,6 +142,12 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
       // screen somebody is trying to book from.
       return null;
     });
+  }
+
+  @override
+  void dispose() {
+    _photoPage.dispose();
+    super.dispose();
   }
 
   @override
@@ -188,70 +208,231 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
             );
           }
 
-          return Stack(
+          // ── DESKTOP WEB SPLIT. Added 9 September 2026, same pattern as
+          //    01_short_stay_home_screen.dart and food_delivery_screen.dart:
+          //    a genuinely separate desktop layout gated on kIsWeb + width,
+          //    the mobile layout below is untouched.
+          final bool desktop =
+              kIsWeb && MediaQuery.of(context).size.width >= 900;
+          return desktop
+              ? _buildDesktopBody(context, listing)
+              : _buildMobileBody(context, listing);
+        },
+      ),
+    );
+  }
+
+  // ⚠ ADDED 24 September 2026, per Mian — "listing is not showing properly".
+  // Reproduced live: a guest opens a real listing and sees only the price
+  // and Check availability button, nothing else — no title, no photos, no
+  // description, nothing. There was no visible error anywhere: not in the
+  // browser console, not on screen. This screen builds ~15 sections as
+  // direct synchronous calls inside one Column's children list
+  // (_buildHeader(listing), _buildAboutSection(listing), etc.) — if ANY ONE
+  // of them throws for something specific to one listing's data (a field
+  // shaped differently than the others, for instance), that single
+  // exception takes the WHOLE Column down with it, and a release web build
+  // shows nothing at all where debug mode would show Flutter's red error
+  // screen. That silence is exactly why this was hard to pin down from the
+  // live site.
+  //
+  // This wraps every section in its own guard. One section failing now
+  // costs that section, not the entire page — everything else a guest
+  // could still read and still book from keeps working. It also does the
+  // one thing that was missing before: logs the label and the real error to
+  // the browser console (debugPrint, not swallowed), so if this happens
+  // again the exact section and exception are visible in DevTools instead
+  // of a page that just looks empty.
+  Widget _safe(String label, Widget Function() build) {
+    try {
+      return build();
+    } catch (e, st) {
+      debugPrint('ListingDetailScreen: "$label" section failed to build: $e');
+      debugPrintStack(stackTrace: st, label: 'ListingDetailScreen/$label');
+      return const SizedBox.shrink();
+    }
+  }
+
+  Widget _buildMobileBody(BuildContext context, StayListing listing) {
+    return Stack(
+      children: [
+        SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _safe('photoGallery', () => _buildPhotoGallery(listing)),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _safe('header', () => _buildHeader(listing)),
+                    // Stitch puts the host directly under the title,
+                    // before the property facts. Hides itself when the
+                    // listing carries no host name.
+                    _safe('hostRow', () => _buildHostRow(listing)),
+                    const SizedBox(height: 16),
+                    _safe('factsRow', () => _buildFactsRow(listing)),
+                    if (_rate.isKnown) ...[
+                      const SizedBox(height: 16),
+                      _safe('cashbackRow', () => _buildCashbackRow(listing)),
+                    ],
+                    const Divider(height: 32),
+                    _safe('about', () => _buildAboutSection(listing)),
+                    if (listing.amenities.isNotEmpty) ...[
+                      const Divider(height: 32),
+                      _safe('amenities',
+                          () => _buildAmenitiesSection(context, listing)),
+                    ],
+                    // Hidden entirely until the location engine has run.
+                    if (listing.locationContext != null) ...[
+                      const Divider(height: 32),
+                      _safe(
+                          'gettingAround',
+                          () => _buildGettingAroundSection(
+                              listing.locationContext!)),
+                      const SizedBox(height: 20),
+                      _safe(
+                          'partnerHighlight',
+                          () => _buildPartnerHighlightCard(
+                              listing.locationContext!)),
+                    ],
+                    // ⚠ AFTER GETTING AROUND, BEFORE REVIEWS. Transport
+                    // then "and here is where you would go" is the order
+                    // somebody actually thinks in when planning a trip.
+                    // Reviews are about the property; this is about the
+                    // days either side of it.
+                    _safe('daysOut', () => _buildDaysOutSection(listing)),
+                    const Divider(height: 32),
+                    _safe('reviews', () => _buildReviewsSection(listing)),
+                    // ⚠ ADDED 29 August 2026. It was not on this screen
+                    // at all. See the note on the method.
+                    _safe('cancellation',
+                        () => _buildCancellationSection(listing)),
+                    _safe('houseRules', () => _buildHouseRules(listing)),
+                    _safe('whereYoullBe', () => _buildWhereYoullBe(listing)),
+                    const SizedBox(height: 100), // Space for bottom bar
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        _buildTopButtons(context),
+        _buildBottomBar(context, listing),
+      ],
+    );
+  }
+
+  // ── Desktop web ──────────────────────────────────────────────────────────
+  //
+  // Same content, same section methods, wrapped with a top nav (replacing the
+  // mobile back-arrow overlay) and held to a centred 1100px reading column —
+  // narrower than the 1400px home pages, because this is a page of prose and
+  // photos, not a grid; a full 1400px width would stretch text into
+  // unreadably long lines. The sticky booking bar stays full-width along the
+  // bottom, its content centred to the same column, matching the "GoOuts is
+  // as polished as Airbnb/booking.com" instruction this whole pass is for.
+  Widget _buildDesktopBody(BuildContext context, StayListing listing) {
+    return Column(
+      children: [
+        const DesktopTopNav(current: DesktopNavTab.stay),
+        Expanded(
+          child: Stack(
             children: [
               SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildPhotoGallery(listing),
-                    Padding(
-                      padding: const EdgeInsets.all(16),
+                    _safe('photoGallery', () => _buildPhotoGallery(listing)),
+                    const SizedBox(height: 8),
+                    DesktopCenter(
+                      maxWidth: 1100,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildHeader(listing),
-                          // Stitch puts the host directly under the title,
-                          // before the property facts. Hides itself when the
-                          // listing carries no host name.
-                          _buildHostRow(listing),
+                          _safe('header', () => _buildHeader(listing)),
+                          _safe('hostRow', () => _buildHostRow(listing)),
                           const SizedBox(height: 16),
-                          _buildFactsRow(listing),
+                          _safe('factsRow', () => _buildFactsRow(listing)),
                           if (_rate.isKnown) ...[
                             const SizedBox(height: 16),
-                            _buildCashbackRow(listing),
+                            _safe('cashbackRow',
+                                () => _buildCashbackRow(listing)),
                           ],
                           const Divider(height: 32),
-                          _buildAboutSection(listing),
+                          _safe('about', () => _buildAboutSection(listing)),
                           if (listing.amenities.isNotEmpty) ...[
                             const Divider(height: 32),
-                            _buildAmenitiesSection(context, listing),
+                            _safe(
+                                'amenities',
+                                () =>
+                                    _buildAmenitiesSection(context, listing)),
                           ],
-                          // Hidden entirely until the location engine has run.
                           if (listing.locationContext != null) ...[
                             const Divider(height: 32),
-                            _buildGettingAroundSection(
-                                listing.locationContext!),
+                            _safe(
+                                'gettingAround',
+                                () => _buildGettingAroundSection(
+                                    listing.locationContext!)),
                             const SizedBox(height: 20),
-                            _buildPartnerHighlightCard(
-                                listing.locationContext!),
+                            _safe(
+                                'partnerHighlight',
+                                () => _buildPartnerHighlightCard(
+                                    listing.locationContext!)),
                           ],
-                          // ⚠ AFTER GETTING AROUND, BEFORE REVIEWS. Transport
-                          // then "and here is where you would go" is the order
-                          // somebody actually thinks in when planning a trip.
-                          // Reviews are about the property; this is about the
-                          // days either side of it.
-                          _buildDaysOutSection(listing),
+                          _safe('daysOut', () => _buildDaysOutSection(listing)),
                           const Divider(height: 32),
-                          _buildReviewsSection(listing),
-                          // ⚠ ADDED 29 August 2026. It was not on this screen
-                          // at all. See the note on the method.
-                          _buildCancellationSection(listing),
-                          _buildHouseRules(listing),
-                          _buildWhereYoullBe(listing),
-                          const SizedBox(height: 100), // Space for bottom bar
+                          _safe('reviews', () => _buildReviewsSection(listing)),
+                          _safe('cancellation',
+                              () => _buildCancellationSection(listing)),
+                          _safe('houseRules', () => _buildHouseRules(listing)),
+                          _safe('whereYoullBe',
+                              () => _buildWhereYoullBe(listing)),
+                          const SizedBox(height: 120),
                         ],
                       ),
                     ),
                   ],
                 ),
               ),
-              _buildTopButtons(context),
-              _buildBottomBar(context, listing),
+              // Save (heart) button only — the back-arrow is redundant with
+              // the nav bar above, so it is dropped rather than duplicated.
+              Positioned(
+                top: 20,
+                right: 0,
+                child: DesktopCenter(
+                  maxWidth: 1100,
+                  child: Align(
+                    alignment: Alignment.topRight,
+                    child: StreamBuilder<bool>(
+                      stream: _service.watchSaved(widget.listingId),
+                      builder: (context, snap) {
+                        final bool saved = snap.data ?? false;
+                        return CircleAvatar(
+                          backgroundColor: Colors.white,
+                          child: IconButton(
+                            tooltip: saved ? 'Saved' : 'Save this property',
+                            icon: Icon(
+                              saved ? Icons.favorite : Icons.favorite_border,
+                              color: saved
+                                  ? GoOutsColors.error
+                                  : GoOutsColors.primaryBlue,
+                            ),
+                            onPressed: () =>
+                                _service.setSaved(widget.listingId, !saved),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+              _buildBottomBar(context, listing, desktop: true),
             ],
-          );
-        },
-      ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -278,27 +459,62 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
     return SizedBox(
       height: 300,
       width: double.infinity,
-      child: PageView.builder(
-        itemCount: photos.length,
-        itemBuilder: (context, i) => Image.network(
-          photos[i].url,
-          fit: BoxFit.cover,
-          // A photo that fails to load must not leave a broken-image glyph
-          // across the top of the page.
-          errorBuilder: (_, __, ___) => Container(
-            color: GoOutsColors.paleBlueTint,
-            child: const Center(
-              child: Icon(Icons.image_not_supported_outlined,
-                  size: 48, color: GoOutsColors.primaryBlue),
+      child: Stack(
+        alignment: Alignment.bottomCenter,
+        children: [
+          PageView.builder(
+            itemCount: photos.length,
+            onPageChanged: (i) => _photoPage.value = i,
+            itemBuilder: (context, i) => Image.network(
+              photos[i].url,
+              fit: BoxFit.cover,
+              // A photo that fails to load must not leave a broken-image glyph
+              // across the top of the page.
+              errorBuilder: (_, __, ___) => Container(
+                color: GoOutsColors.paleBlueTint,
+                child: const Center(
+                  child: Icon(Icons.image_not_supported_outlined,
+                      size: 48, color: GoOutsColors.primaryBlue),
+                ),
+              ),
+              loadingBuilder: (context, child, progress) => progress == null
+                  ? child
+                  : Container(
+                      color: GoOutsColors.paleBlueTint,
+                      child: const Center(child: CircularProgressIndicator()),
+                    ),
             ),
           ),
-          loadingBuilder: (context, child, progress) => progress == null
-              ? child
-              : Container(
-                  color: GoOutsColors.paleBlueTint,
-                  child: const Center(child: CircularProgressIndicator()),
+          // ⚠ ADDED 30 September 2026. Without this, a multi-photo listing
+          // looked identical to a single-photo one — nothing on screen hinted
+          // that swiping would reveal more. Only shown when there IS more
+          // than one photo, so single-photo listings are unchanged.
+          if (photos.length > 1)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: ValueListenableBuilder<int>(
+                valueListenable: _photoPage,
+                builder: (context, page, _) => Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: List.generate(photos.length, (i) {
+                    final bool active = i == page;
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.symmetric(horizontal: 3),
+                      width: active ? 18 : 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: active
+                            ? Colors.white
+                            : Colors.white.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    );
+                  }),
                 ),
-        ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -1543,13 +1759,57 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
   // Was "£112 nightly / 12 to 14 July" with an empty onPressed. The price is
   // now the property's own; the dates line is gone because no dates have been
   // chosen at this point — choosing them is what the button is for.
-  Widget _buildBottomBar(BuildContext context, StayListing listing) {
+  Widget _buildBottomBar(BuildContext context, StayListing listing,
+      {bool desktop = false}) {
     final Pence rate = listing.nightlyRate;
+
+    final Widget row = Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${rate.compact} nightly',
+              style: GoogleFonts.inter(
+                  fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+            if (!listing.cleaningFee.isZero)
+              Text(
+                '${listing.cleaningFee.compact} cleaning fee',
+                style: GoogleFonts.inter(
+                    fontSize: 14, color: GoOutsColors.bodyText),
+              ),
+          ],
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.of(context).pushNamed(
+            StayRoutes.bookingDates,
+            arguments: <String, dynamic>{'listingId': listing.id},
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: GoOutsColors.primaryBlue,
+            minimumSize: const Size(180, 52),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
+          ),
+          child: Text(
+            'Check availability',
+            style: GoogleFonts.inter(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.white),
+          ),
+        ),
+      ],
+    );
 
     return Align(
       alignment: Alignment.bottomCenter,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+        padding: EdgeInsets.symmetric(
+            horizontal: desktop ? 0 : 16, vertical: 20),
         decoration: BoxDecoration(
           color: Colors.white,
           border:
@@ -1557,47 +1817,11 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
         ),
         child: SafeArea(
           top: false,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${rate.compact} nightly',
-                    style: GoogleFonts.inter(
-                        fontSize: 16, fontWeight: FontWeight.w700),
-                  ),
-                  if (!listing.cleaningFee.isZero)
-                    Text(
-                      '${listing.cleaningFee.compact} cleaning fee',
-                      style: GoogleFonts.inter(
-                          fontSize: 14, color: GoOutsColors.bodyText),
-                    ),
-                ],
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.of(context).pushNamed(
-                  StayRoutes.bookingDates,
-                  arguments: <String, dynamic>{'listingId': listing.id},
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: GoOutsColors.primaryBlue,
-                  minimumSize: const Size(180, 52),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-                child: Text(
-                  'Check availability',
-                  style: GoogleFonts.inter(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white),
-                ),
-              ),
-            ],
-          ),
+          // ⚠ Desktop keeps the bar edge-to-edge (a sticky footer, like
+          // booking.com's) but centres its CONTENT to the reading column so
+          // the price and button line up with the text above them, not with
+          // the browser's own edges.
+          child: desktop ? DesktopCenter(maxWidth: 1100, child: row) : row,
         ),
       ),
     );

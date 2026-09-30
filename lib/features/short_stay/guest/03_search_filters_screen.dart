@@ -20,6 +20,7 @@
 // pale page. Ours was one flat column, which is why it read as a settings list
 // rather than as a filter sheet. Cards, and only cards, are the difference.
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../models/stay_amenities.dart';
 import '../models/stay_property_types.dart';
@@ -222,7 +223,10 @@ class _SearchFiltersSheetState extends State<SearchFiltersSheet> {
           ),
         ],
       ),
-      body: ListView(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = ListView(
         padding: const EdgeInsets.fromLTRB(
             StaySpacing.page, StaySpacing.page, StaySpacing.page, 24),
         children: <Widget>[
@@ -236,6 +240,15 @@ class _SearchFiltersSheetState extends State<SearchFiltersSheet> {
           const SizedBox(height: StaySpacing.inline),
           _amenitiesCard(),
         ],
+      );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: content,
+            ),
+          );
+        },
       ),
       bottomNavigationBar: _applyBar(),
     );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
 import '../services/support_ticket_service.dart';
 import 'support_ticket_chat_screen.dart';
@@ -68,7 +69,10 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
                 fontSize: 18, fontWeight: FontWeight.w700, color: _primary)),
         centerTitle: false,
       ),
-      body: _loading
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = _loading
           ? const Center(
               child: CircularProgressIndicator(color: _primary, strokeWidth: 2.5))
           : RefreshIndicator(
@@ -182,7 +186,16 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
                   ],
                 ),
               ),
+            );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: content,
             ),
+          );
+        },
+      ),
       bottomNavigationBar: _buildBottomNav(context),
     );
   }

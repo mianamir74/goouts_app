@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
 import '../services/support_ticket_service.dart';
 import '../services/self_service_service.dart';
@@ -274,6 +275,9 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 480)
+          : null,
       builder: (_) => Container(
         decoration: const BoxDecoration(
           color: Colors.white,
@@ -363,6 +367,9 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 640)
+          : null,
       builder: (_) => StatefulBuilder(
         builder: (ctx, setSheet) => DraggableScrollableSheet(
           initialChildSize: 0.75,
@@ -506,6 +513,9 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 560)
+          : null,
       builder: (_) => StatefulBuilder(
         builder: (ctx, setSheet) => Padding(
           padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
@@ -588,6 +598,12 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                       hintStyle: GoogleFonts.inter(
                           fontSize: 14, color: Colors.grey[400]),
                       border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      errorBorder: InputBorder.none,
+                      disabledBorder: InputBorder.none,
+                      focusedErrorBorder: InputBorder.none,
+                      filled: false,
                       contentPadding: const EdgeInsets.all(14),
                     ),
                     style: GoogleFonts.inter(fontSize: 14, color: _dark),
@@ -1417,11 +1433,14 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
             const SizedBox(height: 4),
 
             // Badge
@@ -1762,8 +1781,17 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
             ),
 
             const SizedBox(height: 24),
-          ],
-        ),
+              ],
+            ),
+          );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: content,
+            ),
+          );
+        },
       ),
       bottomNavigationBar: _buildBottomNav(),
     );

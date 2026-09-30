@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -7,6 +8,7 @@ import 'package:intl/intl.dart';
 import '../widgets/live_tracking_map.dart';
 import '../widgets/goouts_sheet.dart';
 import '../widgets/food_bottom_nav.dart';
+import '../widgets/delivery_time_picker.dart' show deliveryTimeLabel;
 
 class FoodOrderTrackingScreen extends StatefulWidget {
   const FoodOrderTrackingScreen({super.key});
@@ -143,13 +145,12 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
       _recalcCancel();
       // Auto-open delivery confirmation when delivery completes.
       //
-      // ⚠ WAS A BOTTOM SHEET (_showRatingSheet, still below, now unused by
-      // this trigger but left in place rather than deleted — nothing else
-      // references it and removing a working, already-audited callable call
-      // for the sake of tidiness is how the next person loses a reference
-      // implementation). DeliveryConfirmationScreen is a full route now, so
-      // this pushes rather than opening a sheet. Same _ratingShown guard,
-      // same one-time trigger.
+      // WAS a bottom sheet (_showRatingSheet). DeliveryConfirmationScreen is
+      // a full route now, so this pushes rather than opening a sheet.
+      // _showRatingSheet and its low-rating complaint trigger were deleted
+      // 4 September 2026 once DeliveryConfirmationScreen carried both
+      // forward — see widgets/food_complaint_sheet.dart. Same _ratingShown
+      // guard, same one-time trigger.
       final newStatus = _order?['status'] as String?;
       if (!_ratingShown && newStatus == 'delivered' && prevStatus != 'delivered') {
         _ratingShown = true;
@@ -213,8 +214,12 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
       return;
     }
 
-    // Pending — always free, no countdown
-    if (status == 'pending') {
+    // Pending, or a future slot the kitchen hasn't started on yet — always
+    // free, no countdown. ⚠ 'scheduled' explicitly listed, not just falling
+    // through: without this it silently inherited whatever _cancelAllowed
+    // was already set to (its initial `false`), which would have shown a
+    // scheduled order as not cancellable in-app at all.
+    if (status == 'pending' || status == 'scheduled') {
       if (mounted) setState(() { _cancelAllowed = true; _cancelFree = true; _cancelFee = 0; _cancelFreeRemaining = null; });
       return;
     }
@@ -369,6 +374,9 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
       context: this.context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      constraints: kIsWeb && MediaQuery.of(this.context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 560)
+          : null,
       builder: (sheetContext) => Container(
         decoration: const BoxDecoration(
           color: Colors.white,
@@ -474,457 +482,6 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
       ]),
     ),
   );
-
-  // ── Rating + Tip sheet ────────────────────────────────────────────────────
-  //
-  // Suppressed 4 September 2026, not deleted. _subscribeToOrder now opens
-  // DeliveryConfirmationScreen instead of this sheet — see the note there.
-  // Kept because _showComplaintSheet below, the auto-prompt on a rating of
-  // 3 stars or under with real categories (missing items, wrong items, cold
-  // food and so on), only has this as a caller. The confirmation screen does
-  // not yet trigger it; wiring that through is follow-up work, not a reason
-  // to delete a working complaint flow in the meantime.
-  // ignore: unused_element
-  void _showRatingSheet() {
-    int selectedStars  = 5;
-    int selectedTipIdx = 1; // default £1.00
-    bool submitting    = false;
-
-    final tipOptions = [
-      {'label': 'No tip',  'amount': 0.0},
-      {'label': '£1.00',   'amount': 1.0},
-      {'label': '£2.00',   'amount': 2.0},
-      {'label': '£3.00',   'amount': 3.0},
-      {'label': 'Custom',  'amount': -1.0},
-    ];
-
-    final customCtrl = TextEditingController();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      isDismissible: false,
-      enableDrag: false,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheet) {
-          final driverName = (_order?['driverName'] as String?) ?? 'Your Driver';
-
-          Future<void> submit() async {
-            setSheet(() => submitting = true);
-            try {
-              double tipAmount = 0.0;
-              if (selectedTipIdx == tipOptions.length - 1) {
-                tipAmount = double.tryParse(customCtrl.text) ?? 0.0;
-              } else {
-                tipAmount = (tipOptions[selectedTipIdx]['amount'] as double);
-              }
-
-              // ── ⚠ THE RATING AND THE TIP GO THROUGH A CALLABLE NOW ─────
-              //
-              //  This used to write driverRating and driverTip onto the order
-              //  directly, and then increment `pendingTips` on the DRIVER's
-              //  own document from the customer's phone.
-              //
-              //  ⚠ THAT SECOND WRITE HAS ALWAYS BEEN REFUSED. food_drivers
-              //  requires ownsDoc(driverId), so a customer could never write
-              //  there — meaning no driver has ever received a tip through
-              //  this screen, silently, while the customer was told it was
-              //  sent. The bug was as much "the feature does not work" as
-              //  "the feature is insecure".
-              //
-              //  ⚠ AND THE TWO WRITES WERE SEPARATE, so even with permission
-              //  the rating could land while the tip did not. rateFoodDelivery
-              //  does both in one transaction, or neither.
-              await FirebaseFunctions.instanceFor(region: 'europe-west1')
-                  .httpsCallable('rateFoodDelivery')
-                  .call<Map<String, dynamic>>({
-                'orderId': _orderId,
-                'stars': selectedStars,
-                'tip': tipAmount,
-              });
-
-              if (ctx.mounted) {
-                Navigator.pop(ctx);
-                // If rating is 3 or below, show complaint form
-                if (selectedStars <= 3 && mounted) {
-                  Future.delayed(const Duration(milliseconds: 300), () {
-                    if (mounted) _showComplaintSheet(selectedStars);
-                  });
-                }
-              }
-            } catch (_) {
-              setSheet(() => submitting = false);
-            }
-          }
-
-          return Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(ctx).viewInsets.bottom),
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Handle
-                  Center(
-                    child: Container(
-                      width: 40, height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(2)),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Celebration icon
-                  Container(
-                    width: 64, height: 64,
-                    decoration: BoxDecoration(
-                      color: _green.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.celebration_rounded,
-                        color: _green, size: 32),
-                  ),
-                  const SizedBox(height: 14),
-
-                  Text('Order Delivered!',
-                    style: GoogleFonts.inter(
-                        fontSize: 20, fontWeight: FontWeight.w800,
-                        color: _navy)),
-                  const SizedBox(height: 6),
-                  Text('How was $driverName?',
-                    style: GoogleFonts.inter(
-                        fontSize: 14, color: Colors.grey[600])),
-                  const SizedBox(height: 20),
-
-                  // Star rating
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(5, (i) => GestureDetector(
-                      onTap: () => setSheet(() => selectedStars = i + 1),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 6),
-                        child: Icon(
-                          i < selectedStars
-                              ? Icons.star_rounded
-                              : Icons.star_outline_rounded,
-                          color: _amber,
-                          size: 40,
-                        ),
-                      ),
-                    )),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    selectedStars == 5 ? 'Excellent!' :
-                    selectedStars == 4 ? 'Great' :
-                    selectedStars == 3 ? 'Good' :
-                    selectedStars == 2 ? 'Could be better' : 'Poor',
-                    style: GoogleFonts.inter(
-                        fontSize: 13, color: _amber,
-                        fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Tip section
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text('Leave a tip?',
-                      style: GoogleFonts.inter(
-                          fontSize: 14, fontWeight: FontWeight.w700,
-                          color: _navy)),
-                  ),
-                  const SizedBox(height: 4),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text('100% goes directly to your driver.',
-                      style: GoogleFonts.inter(
-                          fontSize: 12, color: Colors.grey[500])),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Tip pills
-                  Row(
-                    children: List.generate(tipOptions.length, (i) {
-                      final selected = selectedTipIdx == i;
-                      return Expanded(
-                        child: GestureDetector(
-                          onTap: () => setSheet(() => selectedTipIdx = i),
-                          child: Container(
-                            margin: EdgeInsets.only(right: i < tipOptions.length - 1 ? 8 : 0),
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            decoration: BoxDecoration(
-                              color: selected ? _primary : Colors.white,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                  color: selected ? _primary : Colors.grey.shade300),
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              tipOptions[i]['label'] as String,
-                              style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: selected ? Colors.white : _navy),
-                            ),
-                          ),
-                        ),
-                      );
-                    }),
-                  ),
-
-                  // Custom tip input
-                  if (selectedTipIdx == tipOptions.length - 1) ...[
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: customCtrl,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      style: GoogleFonts.inter(fontSize: 14),
-                      decoration: InputDecoration(
-                        prefixText: '£',
-                        hintText: '0.00',
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: _primary, width: 1.5),
-                        ),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 24),
-
-                  // Submit button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: submitting ? null : submit,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _green,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14)),
-                        elevation: 0,
-                      ),
-                      child: submitting
-                          ? const SizedBox(width: 20, height: 20,
-                              child: CircularProgressIndicator(
-                                  color: Colors.white, strokeWidth: 2))
-                          : Text('Submit & Done',
-                              style: GoogleFonts.inter(
-                                  fontSize: 15, fontWeight: FontWeight.w700)),
-                    ),
-                  ),
-
-                  // Skip
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: Text('Skip',
-                      style: GoogleFonts.inter(
-                          color: Colors.grey[400], fontSize: 13)),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-
-  // ── Complaint sheet — shown automatically after rating ≤ 3 ────────────────
-  void _showComplaintSheet(int stars) {
-    final categories = [
-      'Late delivery',
-      'Wrong items',
-      'Missing items',
-      'Poor packaging',
-      'Cold food',
-      'Driver behaviour',
-      'Food quality',
-      'Other',
-    ];
-    final selected   = <String>{};
-    final noteCtrl   = TextEditingController();
-    bool submitting  = false;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheet) {
-          Future<void> submitComplaint() async {
-            if (selected.isEmpty) return;
-            setSheet(() => submitting = true);
-            try {
-              await _db.collection('food_complaints').add({
-                'orderId'      : _orderId,
-                'restaurantId' : _restaurantId,
-                'restaurantName': _restaurantName,
-                'customerId'   : _order?['userId'],
-                'driverId'     : _order?['driverId'],
-                'driverRating' : stars,
-                'categories'   : selected.toList(),
-                'note'         : noteCtrl.text.trim(),
-                'status'       : 'open',
-                'createdAt'    : FieldValue.serverTimestamp(),
-              });
-              if (ctx.mounted) Navigator.pop(ctx);
-              if (mounted) {
-                GoOutsSheet.info(context,
-                  title: 'Complaint submitted — our',
-                  message: 'Complaint submitted — our team will review it.',
-                );
-              }
-            } catch (_) {
-              setSheet(() => submitting = false);
-            }
-          }
-
-          return Padding(
-            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40, height: 4,
-                      decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(2)),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Header
-                  Row(children: [
-                    Container(
-                      width: 44, height: 44,
-                      decoration: BoxDecoration(
-                        color: _red.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.sentiment_dissatisfied_rounded,
-                          color: _red, size: 24),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('What went wrong?',
-                          style: GoogleFonts.inter(
-                              fontSize: 18, fontWeight: FontWeight.w800, color: _navy)),
-                      Text('Help us improve your experience.',
-                          style: GoogleFonts.inter(fontSize: 13, color: Colors.grey[500])),
-                    ])),
-                  ]),
-                  const SizedBox(height: 20),
-
-                  // Category chips
-                  Wrap(
-                    spacing: 8, runSpacing: 8,
-                    children: categories.map((cat) {
-                      final isSelected = selected.contains(cat);
-                      return GestureDetector(
-                        onTap: () => setSheet(() {
-                          if (isSelected) {
-                            selected.remove(cat);
-                          } else {
-                            selected.add(cat);
-                          }
-                        }),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: isSelected ? _red.withValues(alpha: 0.1) : Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                                color: isSelected ? _red : Colors.grey.shade300,
-                                width: isSelected ? 1.5 : 1),
-                          ),
-                          child: Text(cat,
-                              style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-                                  color: isSelected ? _red : Colors.black54)),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Note field
-                  TextField(
-                    controller: noteCtrl,
-                    maxLines: 3,
-                    textCapitalization: TextCapitalization.sentences,
-                    style: GoogleFonts.inter(fontSize: 14),
-                    decoration: InputDecoration(
-                      hintText: 'Add more details (optional)…',
-                      hintStyle: GoogleFonts.inter(color: Colors.grey[400], fontSize: 13),
-                      filled: true,
-                      fillColor: const Color(0xFFF2F4F7),
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 12),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Submit
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: (submitting || selected.isEmpty) ? null : submitComplaint,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _red,
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: Colors.grey.shade200,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14)),
-                        elevation: 0,
-                      ),
-                      child: submitting
-                          ? const SizedBox(width: 20, height: 20,
-                              child: CircularProgressIndicator(
-                                  color: Colors.white, strokeWidth: 2))
-                          : Text(
-                              selected.isEmpty
-                                  ? 'Select at least one issue'
-                                  : 'Submit Complaint',
-                              style: GoogleFonts.inter(
-                                  fontSize: 15, fontWeight: FontWeight.w700)),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: Text('Skip for now',
-                        style: GoogleFonts.inter(
-                            color: Colors.grey[400], fontSize: 13)),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
 
   @override
   void dispose() {
@@ -1188,12 +745,16 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
             // Status card
-            if (!isCancelled) _buildStatusStepper(status),
+            if (!isCancelled && status == 'scheduled') _buildScheduledCard(order),
+            if (!isCancelled && status != 'scheduled') _buildStatusStepper(status),
             if (isCancelled)  _buildCancelledCard(status),
 
             // Live tracking map — shown when driver is en route
@@ -1245,13 +806,83 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
             _buildDeliveryInfo(order),
 
             const SizedBox(height: 32),
-          ],
-        ),
+              ],
+            ),
+          );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: content,
+            ),
+          );
+        },
       ),
     );
   }
 
   // ── Status stepper ─────────────────────────────────────────────────────────
+  // ── Scheduled order card ─────────────────────────────────────────────────
+  //
+  // ⚠ ADDED 10 September 2026. status stays 'scheduled' (not 'pending')
+  // until releaseScheduledFoodOrders (food_dispatch.js) flips it, shortly
+  // before the chosen time — see that function's own header. Nothing to
+  // poll here: this screen already listens to the order document live via
+  // _subscribeToOrder, so the moment the sweep changes the status, this
+  // Firestore listener fires, `status` stops being 'scheduled', and the
+  // screen switches itself over to the normal _buildStatusStepper with no
+  // extra code. Shown instead of that stepper, not alongside it — there is
+  // no live kitchen progress to show yet.
+  Widget _buildScheduledCard(Map<String, dynamic> order) {
+    final Timestamp? ts = order['scheduledFor'] as Timestamp?;
+    final DateTime? when = ts?.toDate();
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2)),
+        ],
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        children: [
+          Container(
+            width: 46, height: 46,
+            decoration: BoxDecoration(
+              color: _primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.event_rounded, color: _primary, size: 24),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Scheduled for ${when != null ? deliveryTimeLabel(context, when) : 'later'}',
+                    style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                        color: _navy)),
+                const SizedBox(height: 4),
+                Text(
+                  "We've got it — the restaurant will start preparing your "
+                  'order nearer the time so it arrives fresh.',
+                  style: GoogleFonts.inter(
+                      fontSize: 12.5, color: Colors.grey[600], height: 1.4),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStatusStepper(String status) {
     final currentIdx = _stepIndex(status);
 
@@ -1771,6 +1402,9 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 640)
+          : null,
       builder: (_) => StatefulBuilder(
         builder: (ctx, ss) {
           final pickerTotal = _pickerQty.entries

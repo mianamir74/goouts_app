@@ -6,6 +6,7 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'firebase_options.dart';
 import 'theme/app_theme.dart';
 import 'features/short_stay/stay_routes.dart';
+import 'features/short_stay/guest/01_short_stay_home_screen.dart';
 
 import 'screens/splash_screen.dart';
 import 'screens/slide1_screen.dart';
@@ -50,7 +51,6 @@ import 'screens/kyc_screen.dart';
 import 'screens/payment_review_screen.dart';
 import 'screens/biometric_lock_screen.dart';
 import 'screens/food_delivery_screen.dart';
-import 'screens/food_address_picker_screen.dart';
 import 'screens/food_menu_screen.dart';
 import 'screens/checkout_screen.dart';
 import 'screens/food_order_tracking_screen.dart';
@@ -58,6 +58,7 @@ import 'screens/delivery_confirmation_screen.dart';
 import 'screens/food_delivery_chat_screen.dart';
 import 'screens/food_order_history_screen.dart';
 import 'screens/refer_friend_screen.dart';
+import 'screens/become_a_partner_screen.dart';
 import 'screens/family_plan_screen.dart';
 import 'screens/goouts_plus_unlocked_screen.dart';
 import 'screens/family_cashback_intro_screen.dart';
@@ -95,18 +96,34 @@ void main() async {
   );
 
   // ── Crashlytics ─────────────────────────────────────────────────────────────
-  // Pass all uncaught Flutter errors to Crashlytics
-  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
-  // Pass all uncaught async errors to Crashlytics
-  PlatformDispatcher.instance.onError = (error, stack) {
-    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-    return true;
-  };
-  // Disable Crashlytics in debug mode so we see errors in console instead
-  await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(!kDebugMode);
+  // ⚠ GATED BEHIND !kIsWeb, added 9 September 2026 building the web version
+  // of this app. Firebase Crashlytics has no web SDK at all — it is a mobile-
+  // only Firebase product. Calling FirebaseCrashlytics.instance on web throws
+  // before a single frame renders, taking the whole app down at startup. Not
+  // worked around with a try/catch: the crash happens while assigning
+  // FlutterError.onError, before there is anything to catch with.
+  if (!kIsWeb) {
+    // Pass all uncaught Flutter errors to Crashlytics
+    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+    // Pass all uncaught async errors to Crashlytics
+    PlatformDispatcher.instance.onError = (error, stack) {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      return true;
+    };
+    // Disable Crashlytics in debug mode so we see errors in console instead
+    await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(!kDebugMode);
+  }
 
-  // Initialise push notifications
-  await UserFcmService.instance.initialize();
+  // ⚠ GATED BEHIND !kIsWeb for the same reason. Web push needs a VAPID key
+  // (Firebase console → Cloud Messaging → Web configuration) and a
+  // firebase-messaging-sw.js service worker in web/, neither of which exist
+  // yet — getToken() would throw on web without them. Booking/ordering do
+  // not depend on push notifications, so this is deferred rather than
+  // blocking the web launch; add web push as its own follow-up.
+  if (!kIsWeb) {
+    // Initialise push notifications
+    await UserFcmService.instance.initialize();
+  }
   // Load persisted delivery address
   await DeliveryAddressService().init();
   // Auto-seeds merchants collection once — skips if already done
@@ -243,7 +260,23 @@ class _GoOutsAppState extends State<GoOutsApp> {
       title: 'GoOuts',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: const SplashScreen(),
+
+      // ⚠ WEB LANDS ON SHORT STAY BROWSING, NOT THE SPLASH/ONBOARDING WALL.
+      // Added 9 September 2026 building the web version of this app. On
+      // phone, SplashScreen's own auth check is the right first screen —
+      // it decides between onboarding, login, and the wallet home. A
+      // website visitor is not installing an app; they are here to look at
+      // a stay (or, later, a menu) and the whole point of doing this on
+      // web is not making them sit through a mobile onboarding slideshow
+      // and a signup wall before they can even see a listing.
+      //
+      // ShortStayHomeScreen itself needs no signed-in user to render or
+      // search — verified 9 September 2026, no FirebaseAuth reference in
+      // that file. The one place a booking actually gets written,
+      // 12_checkout_screen.dart, now has its own sign-in gate
+      // (_requireSignedIn) for exactly this reason: browsing is open,
+      // booking is not.
+      home: kIsWeb ? const ShortStayHomeScreen() : const SplashScreen(),
 
       // Short Stay, added 4 August 2026. Until this line existed the whole
       // feature — 41 files, about 11,000 lines — was unreachable from the app.
@@ -326,7 +359,10 @@ class _GoOutsAppState extends State<GoOutsApp> {
         '/payment-review': (context) => const PaymentReviewScreen(),
         '/biometric-lock': (context) => const BiometricLockScreen(nextRoute: '/home'),
         '/food-delivery': (context) => const FoodDeliveryScreen(),
-        '/food-address-picker': (context) => const FoodAddressPickerScreen(),
+        // ⚠ '/food-address-picker' REMOVED 10 September 2026 — replaced by
+        // an inline DeliveryAddressField (widgets/delivery_address_search_
+        // field.dart) directly on food_delivery_screen.dart. No page to
+        // route to any more.
         '/food-menu': (context) => const FoodMenuScreen(),
         // Task #73 — was a placeholder. checkout_screen.dart was already
         // fully built and already carries the createFoodOrder security fix
@@ -338,6 +374,7 @@ class _GoOutsAppState extends State<GoOutsApp> {
         '/food-delivery-chat': (context) => const FoodDeliveryChatScreen(),
         '/food-order-history': (context) => const FoodOrderHistoryScreen(),
         '/refer-friend': (context) => const ReferFriendScreen(),
+        '/become-a-partner': (context) => const BecomeAPartnerScreen(),
       },
     );
   }

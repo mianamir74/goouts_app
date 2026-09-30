@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
 
 class TwoFaScreen extends StatefulWidget {
@@ -37,7 +38,10 @@ class _TwoFaScreenState extends State<TwoFaScreen> {
         ),
         centerTitle: true,
       ),
-      body: Stack(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = Stack(
         children: [
           SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(20, 32, 20, 110),
@@ -172,6 +176,15 @@ class _TwoFaScreenState extends State<TwoFaScreen> {
             ),
           ),
         ],
+      );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: content,
+            ),
+          );
+        },
       ),
     );
   }

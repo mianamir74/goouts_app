@@ -32,6 +32,7 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
 
 class ShortStayFaqScreen extends StatefulWidget {
@@ -83,7 +84,10 @@ class _ShortStayFaqScreenState extends State<ShortStayFaqScreen> {
             style: GoogleFonts.inter(
                 fontSize: 18, fontWeight: FontWeight.w800, color: _primary)),
       ),
-      body: StreamBuilder<QuerySnapshot>(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = StreamBuilder<QuerySnapshot>(
         // No where, no orderBy. The collection is small and fixed, and a
         // filter plus a sort would need a composite index — the exact thing
         // that made the main FAQ screen report "No FAQs available" while the
@@ -169,6 +173,15 @@ class _ShortStayFaqScreenState extends State<ShortStayFaqScreen> {
             ],
           );
         },
+      );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: content,
+            ),
+          );
+        },
       ),
     );
   }
@@ -188,6 +201,12 @@ class _ShortStayFaqScreenState extends State<ShortStayFaqScreen> {
                 GoogleFonts.inter(fontSize: 14, color: Colors.grey[400]),
             prefixIcon: Icon(Icons.search_rounded, color: Colors.grey[400]),
             border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            errorBorder: InputBorder.none,
+            disabledBorder: InputBorder.none,
+            focusedErrorBorder: InputBorder.none,
+            filled: false,
             contentPadding: const EdgeInsets.symmetric(vertical: 14),
           ),
         ),

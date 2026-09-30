@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
@@ -182,9 +183,6 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final grouped = _grouped;
-    final months = grouped.keys.toList();
-
     return Scaffold(
       backgroundColor: _bg,
       appBar: AppBar(
@@ -213,7 +211,32 @@ class _ActivityScreenState extends State<ActivityScreen> {
           ),
         ],
       ),
-      body: _loadingData
+      // ⚠ DESKTOP WEB CENTERING ADDED 14 September 2026. No kIsWeb layout
+      // treatment existed here - same "full-bleed mobile column" issue as
+      // the other root tabs. This screen has real tabular/chart content
+      // (stats strip, chart, transaction list) so it gets a wider cap
+      // (720) than the simpler list-based tabs.
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = _buildBody();
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: content,
+            ),
+          );
+        },
+      ),
+      bottomNavigationBar: _buildBottomNav(),
+    );
+  }
+
+  Widget _buildBody() {
+    final grouped = _grouped;
+    final months = grouped.keys.toList();
+    return _loadingData
           ? _buildShimmer()
           : _hasError
               ? Center(
@@ -486,9 +509,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   ),
           ),
         ],
-      ),
-      bottomNavigationBar: _buildBottomNav(),
-    );
+      );
   }
 
   // ── Shimmer placeholder ──────────────────────────────────
@@ -641,6 +662,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 560)
+          : null,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) => Container(
           decoration: const BoxDecoration(
@@ -1075,6 +1099,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
               focusedBorder: InputBorder.none,
+              errorBorder: InputBorder.none,
+              disabledBorder: InputBorder.none,
+              focusedErrorBorder: InputBorder.none,
+              filled: false,
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             ),
@@ -1464,6 +1492,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 560)
+          : null,
       builder: (_) => Container(
         decoration: const BoxDecoration(
           color: Colors.white,
@@ -1864,6 +1895,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 560)
+          : null,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) {
           Future<void> handleSubmit() async {
@@ -2067,6 +2101,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                filled: false,
                 contentPadding: const EdgeInsets.all(16),
               ),
             ),

@@ -34,6 +34,7 @@
 // told what actually happened — waiting on the host, or both now visible —
 // rather than a flat "thank you" that implies their words are live.
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../models/stay_booking.dart';
@@ -201,9 +202,21 @@ class _ReviewStayScreenState extends State<ReviewStayScreen> {
       // through filling in is a way to lose the form, and there is a Profile
       // tab two centimetres below it doing the same job properly.
       bottomNavigationBar: const StayBottomNav(current: StayTab.trips),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _body(),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _body();
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: content,
+            ),
+          );
+        },
+      ),
     );
   }
 

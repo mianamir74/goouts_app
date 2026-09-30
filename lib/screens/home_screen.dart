@@ -1,4 +1,5 @@
-import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
@@ -76,6 +77,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final picker = ImagePicker();
     await showModalBottomSheet(
       context: context,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 480)
+          : null,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => SafeArea(
@@ -97,7 +101,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Navigator.pop(context);
                 final picked = await picker.pickImage(
                     source: ImageSource.camera, imageQuality: 80);
-                if (picked != null) _uploadPhoto(File(picked.path));
+                if (picked != null) _uploadPhoto(await picked.readAsBytes());
               },
             ),
             ListTile(
@@ -107,7 +111,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Navigator.pop(context);
                 final picked = await picker.pickImage(
                     source: ImageSource.gallery, imageQuality: 80);
-                if (picked != null) _uploadPhoto(File(picked.path));
+                if (picked != null) _uploadPhoto(await picked.readAsBytes());
               },
             ),
             const SizedBox(height: 8),
@@ -117,7 +121,13 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _uploadPhoto(File file) async {
+  // ⚠ WEB CRASH FIX, 14 September 2026. This took a dart:io File - File()
+  // throws UnsupportedError the instant it's constructed on web, same class
+  // of bug already fixed in kyc_screen.dart/create_profile_screen.dart/
+  // profile_screen.dart. Switched to Uint8List bytes end to end, which is
+  // the same fix and needs no kIsWeb branch - bytes work identically on
+  // both platforms.
+  Future<void> _uploadPhoto(Uint8List bytes) async {
     setState(() => _uploadingPhoto = true);
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -128,7 +138,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final ref = FirebaseStorage.instance
           .ref()
           .child('users/$uid/profile_photo.jpg');
-      await ref.putFile(file);
+      await ref.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
       final url = await ref.getDownloadURL();
       await FirebaseFirestore.instance
           .collection('users')
@@ -247,20 +257,42 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ⚠ DESKTOP WEB FIX ADDED 14 September 2026. No kIsWeb treatment existed
+    // here at all. The Virtual Card banner sizes itself with AspectRatio off
+    // the FULL available width (see _buildVirtualCard below) - on a real
+    // desktop browser window that produces a card several hundred pixels
+    // tall, which reads as "the page is just one giant blue banner with
+    // nothing else on it" even though the services/offers/trending sections
+    // are still there, just pushed far down. Capping the whole scroll
+    // column to a sane content width on desktop fixes the card AND every
+    // other section at once, the same pattern used on every other screen
+    // fixed today.
     return PromoOverlayWrapper(
       child: Scaffold(
         backgroundColor: const Color(0xFFF2F4F7),
         body: SafeArea(
-          child: CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(child: _buildHeader()),
-              SliverToBoxAdapter(child: _buildGreeting()),
-              SliverToBoxAdapter(child: _buildVirtualCard()),
-              SliverToBoxAdapter(child: _buildServices()),
-              SliverToBoxAdapter(child: _buildSpecialOffers()),
-              SliverToBoxAdapter(child: _buildTrending()),
-              const SliverToBoxAdapter(child: SizedBox(height: 24)),
-            ],
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+              final Widget scroll = CustomScrollView(
+                slivers: [
+                  SliverToBoxAdapter(child: _buildHeader()),
+                  SliverToBoxAdapter(child: _buildGreeting()),
+                  SliverToBoxAdapter(child: _buildVirtualCard()),
+                  SliverToBoxAdapter(child: _buildServices()),
+                  SliverToBoxAdapter(child: _buildSpecialOffers()),
+                  SliverToBoxAdapter(child: _buildTrending()),
+                  const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                ],
+              );
+              if (!desktop) return scroll;
+              return Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 520),
+                  child: scroll,
+                ),
+              );
+            },
           ),
         ),
         bottomNavigationBar: _buildBottomNav(),

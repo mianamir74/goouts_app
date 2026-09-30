@@ -31,6 +31,7 @@
 //  partners nearby for lunch" does not.
 // ─────────────────────────────────────────────────────────────────────────────
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -176,7 +177,10 @@ class _DaysOutScreenState extends State<DaysOutScreen> {
       bottomNavigationBar: StayBottomNav(
         current: widget.fromListing ? StayTab.search : StayTab.trips,
       ),
-      body: _loading
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = _loading
           ? const Center(child: CircularProgressIndicator())
           : clusters.isEmpty
               ? _empty()
@@ -204,7 +208,16 @@ class _DaysOutScreenState extends State<DaysOutScreen> {
                     const SizedBox(height: 8),
                     _attributionLine(),
                   ],
-                ),
+                );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: content,
+            ),
+          );
+        },
+      ),
     );
   }
 

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -311,7 +312,33 @@ class _OtpScreenState extends State<OtpScreen>
         ),
         centerTitle: false,
       ),
-      body: SafeArea(
+      // ⚠ DESKTOP WEB CENTERING ADDED 14 September 2026. This screen had no
+      // kIsWeb treatment at all - the six OTP boxes used
+      // MainAxisAlignment.spaceBetween, so on a wide desktop window they
+      // spread out edge to edge with large gaps, and the Verify button
+      // stretched full browser width. Rather than a bespoke split panel like
+      // login/signup got (there is nothing to put in a left brand panel
+      // here - it is a mid-flow step), this just centers the exact same
+      // mobile-styled content in a fixed-width column on desktop, the same
+      // way a Stripe/Typeform-style wizard step would.
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = _buildBody();
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: content,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    return SafeArea(
         top: false,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -577,7 +604,6 @@ class _OtpScreenState extends State<OtpScreen>
             ],
           ),
         ),
-      ),
     );
   }
 }

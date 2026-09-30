@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
 import '../data/goouts_services.dart';
 import '../features/short_stay/stay_routes.dart';
@@ -80,7 +81,10 @@ class _ServicesScreenState extends State<ServicesScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -99,6 +103,15 @@ class _ServicesScreenState extends State<ServicesScreen> {
             const SizedBox(height: 24),
           ],
         ),
+      );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: content,
+            ),
+          );
+        },
       ),
       bottomNavigationBar: _buildBottomNav(),
     );
@@ -498,14 +511,36 @@ class _ServicesScreenState extends State<ServicesScreen> {
                             width: 60,
                             height: 60,
                             decoration: BoxDecoration(
-                              color: isNew
-                                  ? const Color(0xFFFEF3C7)
-                                  : const Color(0xFFE8F4FB),
-                              borderRadius: BorderRadius.circular(14),
+                              // Each service/category carries its own brand
+                              // colour (see data/goouts_services.dart) but the
+                              // tile used to ignore it and paint every single
+                              // one of the 10 icons the same flat blue (or,
+                              // for the 2 "NEW" ones, the same flat amber) —
+                              // that is why the grid read as repetitive and
+                              // washed out. Now every tile is tinted from its
+                              // own colour, so Cafes, Pubs, Clubs, Bars etc.
+                              // are each visually distinct at a glance, with a
+                              // soft matching glow instead of a flat fill.
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  s.color.withValues(alpha: 0.16),
+                                  s.color.withValues(alpha: 0.08),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                  color: s.color.withValues(alpha: 0.18),
+                                  width: 1),
+                              boxShadow: [
+                                BoxShadow(
+                                    color: s.color.withValues(alpha: 0.18),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 3)),
+                              ],
                             ),
-                            child: Icon(s.icon,
-                                color: isNew ? const Color(0xFFEA580C) : _primary,
-                                size: 26),
+                            child: Icon(s.icon, color: s.color, size: 27),
                           ),
                           if (isNew)
                             Positioned(

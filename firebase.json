@@ -25,6 +25,55 @@
   "database": {
     "rules": "database.rules.json"
   },
+  "hosting": {
+    "//": "Added 9 September 2026 for the web version of this app (Short",
+    "//2": "Stay booking first, food ordering next). This is the SAME app,",
+    "//3": "compiled with `flutter build web` into build/web, not a",
+    "//4": "separate codebase to maintain.",
+    "site": "goouts-book",
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*"
+    ],
+    "headers": [
+      {
+        "//": "Broad no-cache FIRST, same reasoning as goouts_website's",
+        "//2": "firebase.json: '**' matches every path including '/', so a",
+        "//3": "site update is never served stale from cache. Flutter's own",
+        "//4": "web output does not hash main.dart.js's filename between",
+        "//5": "builds, so hard-caching it here would risk an old cached JS",
+        "//6": "file paired with a new index.html after a real deploy.",
+        "source": "**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          },
+          {
+            "key": "Strict-Transport-Security",
+            "value": "max-age=31536000; includeSubDomains; preload"
+          }
+        ]
+      },
+      {
+        "//": "Only genuinely static image assets are cached hard.",
+        "source": "assets/**/*.@(jpg|jpeg|png|webp|gif|svg|ico)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=31536000"
+          }
+        ]
+      }
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
   "functions": [
     {
       "source": "functions",

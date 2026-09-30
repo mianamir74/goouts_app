@@ -23,6 +23,7 @@
 // promising "a confirmation email is on its way". No cancellation email is
 // sent by anything in this product. That banner is gone rather than reworded,
 // because the honest version of it would say nothing useful.
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -75,9 +76,12 @@ class _CancellationConfirmedScreenState
           ),
         ),
       ),
-      body: StreamBuilder<StayBooking?>(
-        stream: StayBookingService.instance.watch(widget.bookingId),
-        builder: (context, snapshot) {
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = StreamBuilder<StayBooking?>(
+            stream: StayBookingService.instance.watch(widget.bookingId),
+            builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -103,6 +107,15 @@ class _CancellationConfirmedScreenState
               const SizedBox(height: 24),
               _actions(),
             ],
+          );
+        },
+          );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: content,
+            ),
           );
         },
       ),

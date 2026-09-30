@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
 import 'support_ticket_chat_screen.dart';
 import 'user_message_detail_screen.dart';
@@ -178,9 +179,12 @@ class _MessageCenterScreenState extends State<MessageCenterScreen> {
     return Scaffold(
       backgroundColor: _surfaceColor,
       appBar: _buildAppBar(),
-      body: SafeArea(
-        child: Column(
-          children: [
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = SafeArea(
+            child: Column(
+              children: [
             // Search bar (shown when search tapped)
             if (_showSearch) _buildSearchBar(),
 
@@ -189,8 +193,17 @@ class _MessageCenterScreenState extends State<MessageCenterScreen> {
 
             // Message list
             Expanded(child: _buildList()),
-          ],
-        ),
+              ],
+            ),
+          );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: content,
+            ),
+          );
+        },
       ),
       bottomNavigationBar: _buildBottomNav(context),
     );

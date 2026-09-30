@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -455,7 +456,31 @@ class _CreateProfileExpandedScreenState
           ),
         ],
       ),
-      body: Form(
+      // ⚠ DESKTOP WEB CENTERING ADDED 14 September 2026. No kIsWeb treatment
+      // existed here - this long registration form (name, email, DOB, PIN,
+      // address, country, terms, referral code) had no max-width constraint
+      // at all, so on desktop every field and label stretched to full
+      // browser width. Same fix as otp_screen.dart / create_profile_screen.dart:
+      // the existing mobile-styled Form is kept exactly as-is and just
+      // centered in a fixed-width column on desktop.
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = _buildBody();
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: content,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    return Form(
         key: _formKey,
         autovalidateMode: _autoValidate
             ? AutovalidateMode.onUserInteraction
@@ -1273,7 +1298,6 @@ class _CreateProfileExpandedScreenState
             ],
           ),
         ),
-      ),
     );
   }
 
@@ -1285,6 +1309,9 @@ class _CreateProfileExpandedScreenState
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 640)
+          : null,
       builder: (_) => DraggableScrollableSheet(
         initialChildSize: 0.85,
         maxChildSize: 0.95,
@@ -1380,7 +1407,7 @@ class _CreateProfileExpandedScreenState
 
   static const String _termsContent = '''
 GOOUTS LIMITED — TERMS & CONDITIONS OF SERVICE
-Last Updated: May 2026 | Version 3.1
+Last Updated: September 2026 | Version 3.2
 Registered in England & Wales
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1560,7 +1587,7 @@ PART 6 — CASHBACK & REWARDS (GENERAL)
 
 6.6 CASHBACK REDEMPTION — NO CASH WITHDRAWAL
 
-GoOuts Cashback — including any Wallet balance credited from Cashback earnings or a Cashback Advance — is a loyalty reward for use exclusively at participating GoOuts Partner businesses. Cashback cannot be withdrawn as cash, transferred to a bank account, converted to currency, sent to a third party, or paid out in any form other than redemption at a GoOuts Partner. This restriction applies to all Cashback balances, including Escrow Cashback and any Advance amounts credited under Part 5. GoOuts does not offer a cash-out or withdrawal feature.
+GoOuts Cashback — including any Wallet balance credited from Cashback earnings or a Cashback Advance — is a loyalty reward for use exclusively at participating GoOuts Partner businesses. Cashback cannot be withdrawn as cash, transferred to a bank account, converted to currency, or paid out in any form other than redemption at a GoOuts Partner. Cashback may be transferred to another registered GoOuts user through the app's transfer feature, who may then redeem it on the same terms as if they had earned it themselves; such a transfer is not a payment out and does not entitle either the sender or the recipient to cash. This restriction applies to all Cashback balances, including Escrow Cashback and any Advance amounts credited under Part 5. GoOuts does not offer a cash-out or withdrawal feature.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -1688,7 +1715,7 @@ Registered in England & Wales
 GoOuts Technologies Limited operates as a Technical Service Provider under Schedule 1, Part 2(j) of the UK Payment Services Regulations 2017.
 Payment services provided by Stripe Payments Europe Ltd (FCA ref: 900461).
 
-These Terms were last reviewed and approved by GoOuts Legal, June 2026.
+These Terms were last reviewed and approved by GoOuts Legal, June 2026. Clause 6.6 was amended September 2026 to permit user-to-user Cashback transfers.
 ''';
 
   static const String _privacyContent = '''

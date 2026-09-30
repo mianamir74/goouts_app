@@ -28,6 +28,7 @@
 // The next-steps list says what genuinely happens next, which for a confirmed
 // stay is the arrival photographs — the evidence that protects the guest
 // against a deposit claim, and the one thing they must not skip.
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -39,6 +40,7 @@ import '../services/stay_booking_service.dart';
 import '../services/stay_listing_service.dart';
 import '../stay_routes.dart';
 import '../theme/stay_colors.dart';
+import '../widgets/desktop_top_nav.dart';
 
 class BookingConfirmedScreen extends StatefulWidget {
   const BookingConfirmedScreen({super.key, required this.bookingId});
@@ -54,8 +56,23 @@ class _BookingConfirmedScreenState extends State<BookingConfirmedScreen> {
   StayListing? _listing;
   String? _loadedListingId;
 
+  // ── Desktop only. Whether the payment summary's invoice breakdown is open. ──
+  bool _invoiceExpanded = false;
+
   @override
   Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+        return desktop ? _buildDesktopScaffold() : _buildMobileScaffold();
+      },
+    );
+  }
+
+  // ── Mobile. Byte for byte what this screen built before the desktop layout
+  // existed — moved into its own method only so build() can choose between
+  // this and _buildDesktopScaffold, never touched otherwise. ─────────────────
+  Widget _buildMobileScaffold() {
     return Scaffold(
       backgroundColor: GoOutsColors.background,
       appBar: AppBar(
@@ -104,6 +121,847 @@ class _BookingConfirmedScreenState extends State<BookingConfirmedScreen> {
           );
         },
       ),
+    );
+  }
+
+  // ── Desktop web ──────────────────────────────────────────────────────────
+  //
+  // ADDED 14 September 2026. Was the mobile column centred to 560px under the
+  // same AppBar — a phone layout with wider margins, not a desktop one. This
+  // gives it the same DesktopTopNav + DesktopCenter shell every other "inside"
+  // Short Stay page on web already uses (see 12_checkout_screen.dart), and a
+  // genuinely wider layout: a photo beside the property details, an itinerary
+  // strip, and the neighbourhood partner perks laid out as cards rather than
+  // a single "earn cashback nearby" line.
+  //
+  // Everything below reads fields that already exist on StayBooking /
+  // StayListing. Two things Stitch's reference screen showed and this does
+  // NOT: a QR code ("Scan to open the GoOuts app") and Add to Calendar /
+  // Download Receipt buttons. Neither has any real data or capability behind
+  // it anywhere in this app — no deep link target for the QR, no calendar
+  // export, no receipt generation ("Nothing was charged on the previous
+  // screen, so nothing is receipted here" — see the file header). Inventing
+  // them would repeat exactly the failure this file's own header describes,
+  // so they are left out rather than faked.
+  Widget _buildDesktopScaffold() {
+    return Scaffold(
+      backgroundColor: GoOutsColors.background,
+      body: Column(
+        children: [
+          const DesktopTopNav(current: DesktopNavTab.stay),
+          Expanded(
+            child: StreamBuilder<StayBooking?>(
+              stream: StayBookingService.instance.watch(widget.bookingId),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final StayBooking? booking = snapshot.data;
+                if (booking == null) {
+                  return _missingBody();
+                }
+
+                _ensureListing(booking.listingId);
+
+                final List<Widget> sections = <Widget>[
+                  _buildDesktopHero(booking),
+                  _buildDesktopPropertyCard(booking),
+                  if (_desktopNextSteps(booking.status) != null)
+                    _buildDesktopNextStepsCard(booking),
+                  if (_showPartnerPerks(booking))
+                    _buildDesktopPartnerPerksCard(booking),
+                  _buildDesktopPaymentSummary(booking),
+                  _buildDesktopActions(booking),
+                ];
+
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.only(bottom: 48),
+                  child: DesktopCenter(
+                    maxWidth: 900,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: <Widget>[
+                        const SizedBox(height: 40),
+                        for (int i = 0; i < sections.length; i++) ...[
+                          if (i > 0) SizedBox(height: i == 1 ? 32 : 20),
+                          sections[i],
+                        ],
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Desktop hero: status icon, headline, body copy, reference pill, and a
+  // deposit-hold pill when this booking actually carries one. ────────────────
+  Widget _buildDesktopHero(StayBooking b) {
+    final copy = _statusCopy(b);
+    final bool hasDeposit = b.deposit != null && !b.deposit!.amount.isZero;
+    return Column(
+      children: [
+        Container(
+          width: 72,
+          height: 72,
+          decoration: BoxDecoration(
+            color: copy.tint.withValues(alpha: 0.12),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(copy.icon, size: 36, color: copy.tint),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          copy.title,
+          textAlign: TextAlign.center,
+          style: GoogleFonts.inter(
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+            color: GoOutsColors.deepNavy,
+            letterSpacing: -0.4,
+          ),
+        ),
+        const SizedBox(height: 10),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: Text(
+            copy.body,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              fontSize: 14.5,
+              color: GoOutsColors.bodyText,
+              height: 1.5,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: GoOutsColors.outlineVariant),
+          ),
+          child: Text.rich(
+            TextSpan(
+              style: GoogleFonts.inter(fontSize: 13, color: GoOutsColors.bodyText),
+              children: <InlineSpan>[
+                const TextSpan(text: 'Reference  '),
+                TextSpan(
+                  text: stayBookingReference(widget.bookingId),
+                  style: GoogleFonts.inter(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: GoOutsColors.primaryBlue,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (hasDeposit) ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: GoOutsColors.paleBlueTint,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                const Icon(Icons.shield_outlined,
+                    size: 14, color: GoOutsColors.primaryBlue),
+                const SizedBox(width: 6),
+                Text(
+                  'Deposit hold ${b.deposit!.amount.formatted}',
+                  style: GoogleFonts.inter(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: GoOutsColors.deepNavy,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ── Desktop property summary card: photo, title, address (full once the
+  // guest actually holds the booking — see 15_trip_detail_screen.dart's
+  // _addressRow for the same reasoning), and an itinerary strip. ─────────────
+  Widget _buildDesktopPropertyCard(StayBooking b) {
+    final List<StayPhoto> photos =
+        List<StayPhoto>.from(_listing?.photos ?? const <StayPhoto>[])
+          ..sort((a, c) => a.order.compareTo(c.order));
+
+    final bool holdsBooking = b.status == BookingStatus.confirmed ||
+        b.status == BookingStatus.inProgress ||
+        b.status == BookingStatus.completed;
+    final StayAddress? addr = _listing?.address;
+    final String addressLine = holdsBooking && addr != null
+        ? <String>[
+            if (addr.line1.isNotEmpty) addr.line1,
+            if (addr.town.isNotEmpty) addr.town,
+            if (addr.postcode.isNotEmpty) addr.postcode,
+          ].join(', ')
+        : ((addr?.town.isNotEmpty ?? false)
+            ? addr!.town
+            : (_listing?.title ?? ''));
+
+    final bool canMessageHost = holdsBooking &&
+        (_listing?.host.hasName ?? false) &&
+        widget.bookingId.isNotEmpty;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              if (photos.isNotEmpty) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    photos.first.url,
+                    width: 200,
+                    height: 140,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      width: 200,
+                      height: 140,
+                      color: GoOutsColors.paleBlueTint,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 20),
+              ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      _listing?.title ?? 'Your stay',
+                      style: GoogleFonts.inter(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: GoOutsColors.deepNavy,
+                      ),
+                    ),
+                    if (addressLine.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: <Widget>[
+                          const Icon(Icons.location_on_outlined,
+                              size: 14, color: GoOutsColors.bodyText),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              addressLine,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                  fontSize: 12.5, color: GoOutsColors.bodyText),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: GoOutsColors.paleBlueTint,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: <Widget>[
+                          Expanded(
+                            child: _desktopItineraryDetail(
+                              'Check-in',
+                              _shortDate(b.checkIn),
+                              'From ${_listing?.checkInTime ?? '15:00'}',
+                            ),
+                          ),
+                          _desktopItineraryDivider(),
+                          Expanded(
+                            child: _desktopItineraryDetail(
+                              'Check-out',
+                              _shortDate(b.checkOut),
+                              'Before ${_listing?.checkOutTime ?? '11:00'}',
+                            ),
+                          ),
+                          _desktopItineraryDivider(),
+                          Expanded(
+                            child: _desktopItineraryDetail(
+                              'Guests',
+                              _guestSummary(b.guests),
+                              '${b.nights} ${b.nights == 1 ? 'night' : 'nights'}',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (canMessageHost) ...[
+            const SizedBox(height: 20),
+            const Divider(color: GoOutsColors.dividerGray, height: 1),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: 240,
+              child: OutlinedButton.icon(
+                onPressed: () => Navigator.of(context).pushNamed(
+                  StayRoutes.messageHost,
+                  arguments: <String, dynamic>{'bookingId': b.id},
+                ),
+                icon: const Icon(Icons.chat_bubble_outline_rounded,
+                    size: 16, color: GoOutsColors.deepNavy),
+                label: Text(
+                  'Message ${_listing!.host.name}',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: GoOutsColors.deepNavy,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: GoOutsColors.outlineVariant),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape:
+                      RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _desktopItineraryDetail(String label, String main, String sub) =>
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              color: GoOutsColors.bodyText,
+              letterSpacing: 0.3,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            main,
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: GoOutsColors.deepNavy,
+            ),
+          ),
+          Text(
+            sub,
+            style: GoogleFonts.inter(fontSize: 11, color: GoOutsColors.bodyText),
+          ),
+        ],
+      );
+
+  Widget _desktopItineraryDivider() => Container(
+        width: 1,
+        height: 36,
+        margin: const EdgeInsets.symmetric(horizontal: 12),
+        color: GoOutsColors.outlineVariant,
+      );
+
+  // ── Desktop "what happens next": same copy the mobile card shows for the
+  // same status, widened into a card with the items laid out in a row rather
+  // than stacked. Duplicated in full rather than extracted from
+  // _buildNextSteps, so that method — mobile's — stays untouched. ────────────
+  List<({IconData icon, String title})>? _desktopNextSteps(
+      BookingStatus status) {
+    switch (status) {
+      case BookingStatus.pending:
+        return const [
+          (icon: Icons.schedule, title: 'The host replies within 24 hours'),
+          (
+            icon: Icons.notifications_outlined,
+            title: 'We will let you know as soon as they do'
+          ),
+          (
+            icon: Icons.event_available_outlined,
+            title: 'Your dates are held until then'
+          ),
+        ];
+      case BookingStatus.confirmed:
+      case BookingStatus.inProgress:
+        return const [
+          (
+            icon: Icons.photo_camera_outlined,
+            title: 'Take your arrival photographs when you get there'
+          ),
+          (
+            icon: Icons.shield_outlined,
+            title: 'They are your evidence if a damage claim is made'
+          ),
+          (
+            icon: Icons.storefront_outlined,
+            title: 'Earn cashback at GoOuts partners nearby'
+          ),
+        ];
+      case BookingStatus.declined:
+      case BookingStatus.cancelledGuest:
+      case BookingStatus.cancelledHost:
+      case BookingStatus.completed:
+      case BookingStatus.disputed:
+        return null;
+    }
+  }
+
+  Widget _buildDesktopNextStepsCard(StayBooking b) {
+    final steps = _desktopNextSteps(b.status);
+    if (steps == null) return const SizedBox.shrink();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            'What happens next',
+            style: GoogleFonts.inter(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: GoOutsColors.deepNavy,
+            ),
+          ),
+          const SizedBox(height: 16),
+          // _buildNextStepItem is the same row mobile uses for each step —
+          // reused, not modified, so the two layouts render identical rows.
+          Wrap(
+            spacing: 28,
+            runSpacing: 16,
+            children: <Widget>[
+              for (final s in steps)
+                SizedBox(width: 260, child: _buildNextStepItem(s.icon, s.title)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Desktop partner perks: stay_listings/{id}.locationContext.nearestPartners,
+  // the same field 09_neighbourhood_screen.dart reads — up to ten partners
+  // within three miles, each with a name, a category, a walking distance and a
+  // cashback rate. Shown only once the booking is actually confirmed (earning
+  // cashback nearby is a "next step" for a stay that is happening) and only
+  // when the listing actually has partners nearby, exactly the gate
+  // partnerCounts.headline already applies elsewhere in this app. ───────────
+  bool _showPartnerPerks(StayBooking b) =>
+      (b.status == BookingStatus.confirmed ||
+          b.status == BookingStatus.inProgress) &&
+      (_listing?.locationContext?.nearestPartners.isNotEmpty ?? false);
+
+  Widget _buildDesktopPartnerPerksCard(StayBooking b) {
+    if (!_showPartnerPerks(b)) return const SizedBox.shrink();
+
+    final List<StayNearbyPartner> partners = List<StayNearbyPartner>.from(
+        _listing!.locationContext!.nearestPartners)
+      ..sort((a, c) => a.walkMi.compareTo(c.walkMi));
+    final List<StayNearbyPartner> top = partners.take(3).toList();
+    final String? headline = _listing!.locationContext!.partnerCounts.headline;
+    final String town = _listing!.address.town;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              const Icon(Icons.storefront, size: 20, color: GoOutsColors.primaryBlue),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  town.isNotEmpty
+                      ? 'Partner perks near $town'
+                      : 'Partner perks near your stay',
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: GoOutsColors.deepNavy,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            headline ?? 'Earn cashback at GoOuts partners near this property.',
+            style: GoogleFonts.inter(
+                fontSize: 13, color: GoOutsColors.bodyText, height: 1.4),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              for (int i = 0; i < top.length; i++) ...[
+                if (i > 0) const SizedBox(width: 12),
+                Expanded(child: _desktopPerkTile(top[i])),
+              ],
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: ElevatedButton(
+              onPressed: () => Navigator.of(context).pushNamed(
+                StayRoutes.neighbourhood,
+                arguments: <String, dynamic>{'listingId': b.listingId},
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: GoOutsColors.primaryBlue,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape:
+                    RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: <Widget>[
+                  Text(
+                    'View all neighbourhood partner perks',
+                    style: GoogleFonts.inter(
+                        fontSize: 13.5, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(width: 6),
+                  const Icon(Icons.arrow_forward, size: 16),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _desktopPerkTile(StayNearbyPartner p) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: GoOutsColors.paleBlueTint.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Icon(_desktopPerkIcon(p.category),
+                      size: 16, color: GoOutsColors.primaryBlue),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        p.name.isEmpty ? 'GoOuts partner' : p.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: GoOutsColors.deepNavy,
+                        ),
+                      ),
+                      if (p.category.trim().isNotEmpty)
+                        Text(
+                          p.category,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                              fontSize: 10.5, color: GoOutsColors.bodyText),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: <Widget>[
+                Text(
+                  // ⚠ MILES, not minutes — see 09_neighbourhood_screen.dart's
+                  // header. There is no routing API behind this data.
+                  '${p.walkMi.toStringAsFixed(1)} miles away',
+                  style: GoogleFonts.inter(fontSize: 11, color: GoOutsColors.bodyText),
+                ),
+                if (p.cashbackRate > 0)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      p.cashbackLabel,
+                      style: GoogleFonts.inter(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: GoOutsColors.primaryBlue,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      );
+
+  /// Same loose category matching as 09_neighbourhood_screen.dart's
+  /// `_iconFor` — the category strings come from the same partner records.
+  IconData _desktopPerkIcon(String? category) {
+    final String c = (category ?? '').toLowerCase();
+    if (c.isEmpty) return Icons.apps;
+    if (c.contains('restaurant') || c.contains('food') || c.contains('dining')) {
+      return Icons.restaurant;
+    }
+    if (c.contains('pub') || c.contains('bar') || c.contains('drink')) {
+      return Icons.local_bar_outlined;
+    }
+    if (c.contains('cafe') || c.contains('coffee')) {
+      return Icons.local_cafe_outlined;
+    }
+    if (c.contains('groc') || c.contains('market') || c.contains('store') ||
+        c.contains('shop')) {
+      return Icons.shopping_bag_outlined;
+    }
+    if (c.contains('beauty') || c.contains('salon') || c.contains('barber')) {
+      return Icons.content_cut;
+    }
+    if (c.contains('gym') || c.contains('fitness')) {
+      return Icons.fitness_center;
+    }
+    return Icons.storefront_outlined;
+  }
+
+  // ── Desktop payment summary: StayPricing.lines and StayPricing.total, the
+  // same fields the checkout screen prices this stay with, plus the same
+  // paymentStatus reading 26_booking_details_screen.dart's _paymentStatusCard
+  // already does for a confirmed booking (not_taken / demo_paid / paid). ─────
+  Widget _buildDesktopPaymentSummary(StayBooking b) {
+    final bool none = b.paymentStatus == 'not_taken';
+    final bool demo = b.paymentStatus == 'demo_paid';
+    final String headlineAmount =
+        none ? b.pricing.total.formatted : b.paidPence.formatted;
+    final String statusLabel =
+        none ? 'No payment taken yet' : demo ? 'Settled in test mode' : 'Paid';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: <Widget>[
+          InkWell(
+            onTap: () => setState(() => _invoiceExpanded = !_invoiceExpanded),
+            child: Row(
+              children: <Widget>[
+                Icon(
+                  none
+                      ? Icons.schedule
+                      : demo
+                          ? Icons.science_outlined
+                          : Icons.check_circle,
+                  size: 18,
+                  color: none ? GoOutsColors.warning : GoOutsColors.primaryBlue,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '$statusLabel · ${none ? 'Total due' : 'Total paid'}: '
+                    '$headlineAmount',
+                    style: GoogleFonts.inter(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: GoOutsColors.deepNavy,
+                    ),
+                  ),
+                ),
+                Text(
+                  _invoiceExpanded ? 'Hide breakdown' : 'View breakdown',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: GoOutsColors.primaryBlue,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  _invoiceExpanded
+                      ? Icons.keyboard_arrow_up
+                      : Icons.keyboard_arrow_down,
+                  size: 16,
+                  color: GoOutsColors.primaryBlue,
+                ),
+              ],
+            ),
+          ),
+          if (_invoiceExpanded) ...[
+            const SizedBox(height: 14),
+            const Divider(color: GoOutsColors.dividerGray),
+            const SizedBox(height: 10),
+            for (final line in b.pricing.lines) ...[
+              _desktopInvoiceLine(line.label, line.amount.formatted),
+              const SizedBox(height: 6),
+            ],
+            const Divider(color: GoOutsColors.dividerGray),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: <Widget>[
+                Text(
+                  demo && !b.paidFromWallet.isZero
+                      ? '${b.paidFromWallet.formatted} from wallet'
+                      : 'Total',
+                  style:
+                      GoogleFonts.inter(fontSize: 12, color: GoOutsColors.bodyText),
+                ),
+                Text(
+                  b.pricing.total.formatted,
+                  style: GoogleFonts.inter(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w800,
+                    color: GoOutsColors.deepNavy,
+                  ),
+                ),
+              ],
+            ),
+            if (b.deposit != null && !b.deposit!.amount.isZero) ...[
+              const SizedBox(height: 10),
+              Text(
+                b.deposit!.explainer,
+                style: GoogleFonts.inter(
+                    fontSize: 11.5, color: GoOutsColors.bodyText, height: 1.4),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _desktopInvoiceLine(String label, String amount) => Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: <Widget>[
+          Text(label,
+              style:
+                  GoogleFonts.inter(fontSize: 12.5, color: GoOutsColors.bodyText)),
+          Text(
+            amount,
+            style: GoogleFonts.inter(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: GoOutsColors.deepNavy,
+            ),
+          ),
+        ],
+      );
+
+  // ── Desktop actions. Same destinations and same declined/cancelled branch
+  // as mobile's _buildActions, laid out as two buttons side by side. ─────────
+  Widget _buildDesktopActions(StayBooking b) {
+    final bool declinedOrCancelled = b.status == BookingStatus.declined ||
+        b.status == BookingStatus.cancelledGuest ||
+        b.status == BookingStatus.cancelledHost;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: <Widget>[
+        OutlinedButton.icon(
+          onPressed: () => Navigator.of(context).pushReplacementNamed(
+            declinedOrCancelled ? StayRoutes.home : StayRoutes.myBookings,
+          ),
+          icon: const Icon(Icons.luggage_outlined,
+              size: 16, color: GoOutsColors.deepNavy),
+          label: Text(
+            declinedOrCancelled ? 'Find somewhere else' : 'Go to My Bookings',
+            style: GoogleFonts.inter(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w700,
+              color: GoOutsColors.deepNavy,
+            ),
+          ),
+          style: OutlinedButton.styleFrom(
+            side: const BorderSide(color: GoOutsColors.outlineVariant),
+            backgroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        ),
+        const SizedBox(width: 16),
+        OutlinedButton.icon(
+          onPressed: () => Navigator.of(context)
+              .pushNamedAndRemoveUntil(StayRoutes.home, (r) => r.isFirst),
+          icon: const Icon(Icons.home_outlined,
+              size: 16, color: GoOutsColors.deepNavy),
+          label: Text(
+            'Return to Home',
+            style: GoogleFonts.inter(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w700,
+              color: GoOutsColors.deepNavy,
+            ),
+          ),
+          style: OutlinedButton.styleFrom(
+            side: const BorderSide(color: GoOutsColors.outlineVariant),
+            backgroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        ),
+      ],
     );
   }
 

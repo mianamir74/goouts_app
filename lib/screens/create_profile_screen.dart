@@ -1,4 +1,5 @@
-import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -7,6 +8,19 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../widgets/goouts_sheet.dart';
+
+// ── FIXED 13 September 2026, web KYC/signup pass ────────────────────────────
+//
+// This screen used to hold every picked image as a dart:io File. File has no
+// web implementation at all - Image.file(...) throws UnimplementedError the
+// moment it is built on web, which is exactly what blocked new sign-up on
+// the website (signup_screen.dart routes here straight after phone OTP).
+//
+// Fix is the same one already proven in profile_screen.dart: read every
+// picked image straight to Uint8List bytes and use those everywhere -
+// Image.memory(...) for preview, ref.putData(...) for upload. Bytes work
+// identically on mobile and web, so this needed no kIsWeb branch at all,
+// same as profile_screen.dart's fix.
 
 class CreateProfileScreen extends StatefulWidget {
   const CreateProfileScreen({super.key});
@@ -17,27 +31,28 @@ class CreateProfileScreen extends StatefulWidget {
 
 class _CreateProfileScreenState extends State<CreateProfileScreen> {
   bool _hasPhoto = false;
-  File? _profileImage;
+  Uint8List? _profileImage;
   bool _isUploading = false;
 
   // KYC doc type pre-selection ('driving_licence' | 'passport' | null)
   String? _selectedDocType;
 
   // KYC document images
-  File? _kycFrontImage;   // front of driving licence OR main passport page
-  File? _kycBackImage;    // back of driving licence (not used for passport)
+  Uint8List? _kycFrontImage;   // front of driving licence OR main passport page
+  Uint8List? _kycBackImage;    // back of driving licence (not used for passport)
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final picked =
         await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
     if (picked != null) {
+      final bytes = await picked.readAsBytes();
       // The gallery is a separate system UI. Presenting it can push this app
       // to the background, and a low memory device may unload the screen
       // behind it, so this State can be gone by the time the user has picked.
       if (!mounted) return;
       setState(() {
-        _profileImage = File(picked.path);
+        _profileImage = bytes;
         _hasPhoto = true;
       });
     }
@@ -47,12 +62,13 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
     if (picked != null) {
+      final bytes = await picked.readAsBytes();
       if (!mounted) return;   // see _pickImage above
       setState(() {
         if (isFront) {
-          _kycFrontImage = File(picked.path);
+          _kycFrontImage = bytes;
         } else {
-          _kycBackImage = File(picked.path);
+          _kycBackImage = bytes;
         }
       });
     }
@@ -69,7 +85,7 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
         // Upload profile photo
         if (_profileImage != null) {
           final ref = FirebaseStorage.instance.ref().child('users/$uid/profile_photo.jpg');
-          await ref.putFile(_profileImage!);
+          await ref.putData(_profileImage!, SettableMetadata(contentType: 'image/jpeg'));
           final url = await ref.getDownloadURL();
           await FirebaseFirestore.instance.collection('users').doc(uid)
               .set({'photoUrl': url}, SetOptions(merge: true));
@@ -80,13 +96,13 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
         if (_selectedDocType != null) kycData['kycDocType'] = _selectedDocType;
         if (_kycFrontImage != null) {
           final ref = FirebaseStorage.instance.ref('kyc/$uid/id_front.jpg');
-          await ref.putFile(_kycFrontImage!);
+          await ref.putData(_kycFrontImage!, SettableMetadata(contentType: 'image/jpeg'));
           kycData['kycIdFrontUrl'] = await ref.getDownloadURL();
           kycData['kycStatus'] = 'pending';
         }
         if (_kycBackImage != null) {
           final ref = FirebaseStorage.instance.ref('kyc/$uid/id_back.jpg');
-          await ref.putFile(_kycBackImage!);
+          await ref.putData(_kycBackImage!, SettableMetadata(contentType: 'image/jpeg'));
           kycData['kycIdBackUrl'] = await ref.getDownloadURL();
         }
         if (kycData.isNotEmpty) {
@@ -122,7 +138,31 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0392CA),
-      body: SafeArea(
+      // ⚠ DESKTOP WEB CENTERING ADDED 14 September 2026. No kIsWeb treatment
+      // existed here at all - this is the very next screen after phone OTP
+      // for every new web signup, and it rendered as a full-bleed blue
+      // column stretched across the whole browser window. Centered the same
+      // way otp_screen.dart was, for the same reason: no left brand panel
+      // makes sense mid-flow, so this keeps the existing mobile-styled form
+      // and just boxes it into a fixed-width column on desktop.
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = _buildBody();
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: content,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    return SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Column(
@@ -194,7 +234,7 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                           child: Stack(
                             fit: StackFit.expand,
                             children: [
-                              Image.file(_profileImage!, fit: BoxFit.cover),
+                              Image.memory(_profileImage!, fit: BoxFit.cover),
                               Container(color: Colors.black.withValues(alpha: 0.25)),
                               Center(
                                 child: Text(
@@ -331,7 +371,7 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                             child: Stack(
                               fit: StackFit.expand,
                               children: [
-                                Image.file(_kycFrontImage!, fit: BoxFit.cover),
+                                Image.memory(_kycFrontImage!, fit: BoxFit.cover),
                                 Container(color: Colors.black.withValues(alpha: 0.2)),
                                 Align(
                                   alignment: Alignment.bottomLeft,
@@ -381,7 +421,7 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                               child: Stack(
                                 fit: StackFit.expand,
                                 children: [
-                                  Image.file(_kycBackImage!, fit: BoxFit.cover),
+                                  Image.memory(_kycBackImage!, fit: BoxFit.cover),
                                   Container(color: Colors.black.withValues(alpha: 0.2)),
                                   Align(
                                     alignment: Alignment.bottomLeft,
@@ -488,7 +528,6 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
             ],
           ),
         ),
-      ),
     );
   }
 
@@ -506,6 +545,9 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 640)
+          : null,
       builder: (_) => DraggableScrollableSheet(
         initialChildSize: 0.85,
         maxChildSize: 0.95,

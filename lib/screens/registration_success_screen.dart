@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:confetti/confetti.dart';
@@ -44,10 +45,58 @@ class _RegistrationSuccessScreenState extends State<RegistrationSuccessScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF2F4F7),
-      body: Stack(
-        children: [
-          // Main content
-          SafeArea(
+      // ⚠ DESKTOP WEB CENTERING ADDED 14 September 2026. No kIsWeb treatment
+      // existed here - this confetti/success card had no max-width, so on
+      // desktop it stretched full browser width. The confetti overlay stays
+      // a full-Stack sibling on purpose - it explodes from the top centre of
+      // the whole screen either way, so leaving it outside the centered card
+      // doesn't change how it looks. Only the content card is centered.
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = _buildContent(greeting);
+          return Stack(
+            children: [
+              desktop
+                  ? Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 480),
+                        child: content,
+                      ),
+                    )
+                  : content,
+              // Confetti — fires from top centre
+              Align(
+                alignment: Alignment.topCenter,
+                child: ConfettiWidget(
+                  confettiController: _confettiController,
+                  blastDirection: pi / 2, // straight down
+                  blastDirectionality: BlastDirectionality.explosive,
+                  emissionFrequency: 0.08,
+                  numberOfParticles: 20,
+                  maxBlastForce: 40,
+                  minBlastForce: 15,
+                  gravity: 0.3,
+                  shouldLoop: false,
+                  colors: const [
+                    Color(0xFF0392CA),
+                    Color(0xFFFFD700),
+                    Color(0xFFFF6B6B),
+                    Color(0xFF6BCB77),
+                    Color(0xFFFF922B),
+                    Colors.white,
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildContent(String greeting) {
+    return SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Column(
@@ -290,33 +339,6 @@ class _RegistrationSuccessScreenState extends State<RegistrationSuccessScreen> {
                 ],
               ),
             ),
-          ),
-
-          // Confetti — fires from top centre
-          Align(
-            alignment: Alignment.topCenter,
-            child: ConfettiWidget(
-              confettiController: _confettiController,
-              blastDirection: pi / 2, // straight down
-              blastDirectionality: BlastDirectionality.explosive,
-              emissionFrequency: 0.08,
-              numberOfParticles: 20,
-              maxBlastForce: 40,
-              minBlastForce: 15,
-              gravity: 0.3,
-              shouldLoop: false,
-              colors: const [
-                Color(0xFF0392CA),
-                Color(0xFFFFD700),
-                Color(0xFFFF6B6B),
-                Color(0xFF6BCB77),
-                Color(0xFFFF922B),
-                Colors.white,
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 

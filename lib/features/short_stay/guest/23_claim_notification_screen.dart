@@ -36,6 +36,7 @@
 //  worse than false.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -68,9 +69,12 @@ class ClaimNotificationScreen extends StatelessWidget {
             style: GoogleFonts.inter(
                 fontSize: 15, fontWeight: FontWeight.w700)),
       ),
-      body: id.isEmpty
-          ? _centered('No claim was selected.')
-          : StreamBuilder<StayClaim?>(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = id.isEmpty
+              ? _centered('No claim was selected.')
+              : StreamBuilder<StayClaim?>(
               stream: StayClaimService.instance.watchClaim(id),
               builder: (BuildContext c,
                   AsyncSnapshot<StayClaim?> snap) {
@@ -93,7 +97,16 @@ class ClaimNotificationScreen extends StatelessWidget {
                 }
                 return _Body(claim: claim);
               },
+            );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: content,
             ),
+          );
+        },
+      ),
     );
   }
 

@@ -44,6 +44,7 @@
 // it belongs server side, in a trigger that reads the uploaded object and
 // records its digest. Recording a hash computed on the phone would prove
 // nothing, because the phone is the thing being trusted.
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -77,7 +78,10 @@ class EvidencePackScreen extends StatelessWidget {
           ),
         ),
       ),
-      body: StreamBuilder<List<StayEvidence>>(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = StreamBuilder<List<StayEvidence>>(
         stream: StayEvidenceService.instance.watch(bookingId),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -107,6 +111,15 @@ class EvidencePackScreen extends StatelessWidget {
               _buildFooter(all),
               const SizedBox(height: 24),
             ],
+          );
+        },
+      );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: content,
+            ),
           );
         },
       ),

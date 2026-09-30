@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
 import '../widgets/food_bottom_nav.dart';
 
@@ -115,9 +116,12 @@ class _FoodOrderHistoryScreenState extends State<FoodOrderHistoryScreen> {
           ),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator(color: _primary))
-          : Column(children: [
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = _loading
+              ? const Center(child: CircularProgressIndicator(color: _primary))
+              : Column(children: [
               // ⚠ GATED ON A REAL NUMBER, NOT ON HAVING ORDERS. Nothing in
               // the backend writes cashbackEarned onto a food order yet (see
               // delivery_confirmation_screen.dart), so this would otherwise
@@ -175,7 +179,16 @@ class _FoodOrderHistoryScreenState extends State<FoodOrderHistoryScreen> {
                         ),
                       ),
               ),
-            ]),
+            ]);
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: content,
+            ),
+          );
+        },
+      ),
     );
   }
 

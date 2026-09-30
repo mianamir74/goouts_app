@@ -13,6 +13,7 @@
 //      quality checking is involved.
 //   3. A skip is allowed, recorded, and counts against whoever skipped it.
 //      Nobody is ever trapped. But nobody skips silently either.
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/stay_booking.dart';
@@ -86,7 +87,20 @@ class CaptureChecklistScreen extends StatelessWidget {
         ),
         centerTitle: false,
       ),
-      body: rooms.isEmpty ? _empty() : _list(context),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content =
+              rooms.isEmpty ? _empty() : _list(context);
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: content,
+            ),
+          );
+        },
+      ),
       bottomNavigationBar: rooms.isEmpty ? null : _footer(context, isCheckOut),
     );
   }

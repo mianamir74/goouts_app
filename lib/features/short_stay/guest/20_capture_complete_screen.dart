@@ -7,6 +7,7 @@
 // is shared with the host, and it counts against whoever skipped it if there
 // is ever a claim. The guest should leave this screen knowing exactly what was
 // and was not photographed.
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/stay_enums.dart';
@@ -38,7 +39,10 @@ class CaptureCompleteScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: GoOutsColors.cardSurface,
-      body: SafeArea(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = SafeArea(
         child: Column(
           children: [
             const SizedBox(height: 24),
@@ -107,6 +111,15 @@ class CaptureCompleteScreen extends StatelessWidget {
             ),
           ],
         ),
+      );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: content,
+            ),
+          );
+        },
       ),
     );
   }

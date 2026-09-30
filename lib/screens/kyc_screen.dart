@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
@@ -44,6 +46,36 @@ class _KycScreenState extends State<KycScreen> {
 
   // ── Step tracking ──────────────────────────────────────────────────────────
   int _step = 0; // 0=details, 1=id, 2=selfie, 3=review
+
+  // ── WEB KYC, added 13 September 2026 ─────────────────────────────────────
+  //
+  // Everything below this comment down to the matching one near the bottom of
+  // the file is a second, self-contained flow for kIsWeb only. It shares the
+  // name/DOB controllers and the final markKycSubmitted contract with the
+  // mobile flow above, and touches NOTHING else in this file - no existing
+  // field, method, or mobile-only widget is modified. That is deliberate:
+  // this project has no Flutter SDK available in the environment this was
+  // written in, so the change that could be verified by compiling and
+  // running it was the change that could not touch what already works.
+  //
+  // WHY A SEPARATE FLOW AND NOT kIsWeb BRANCHES THREADED THROUGH THE STEPS
+  // ABOVE: the mobile flow's real work - CameraController image streaming,
+  // ML Kit liveness detection, dart:io File reads in the quality inspectors
+  // and MRZ reader - has no browser equivalent at all. Airbnb and Uber were
+  // checked before writing this (see the chat this was requested in): both
+  // let the browser take one photo with no on-device liveness/quality gate,
+  // upload it as taken, and have it checked afterwards. That is the shape
+  // implemented here - browser camera or file picker captures a JPEG,
+  // Firebase Storage takes the bytes directly, and unlike the mobile
+  // flow this does NOT call kycAutoDecision with invented scores (see
+  // _submitWeb below for why) - it always lands in manual review, which is
+  // the correct, honest outcome for a submission with no on-device checks
+  // behind it.
+  int _stepWeb = 0; // 0=details, 1=id, 2=selfie, 3=review
+  Uint8List? _idBytesWeb;
+  Uint8List? _selfieBytesWeb;
+  bool _submittingWeb = false;
+  String? _webError;
 
   // ── Step 0: Personal details ───────────────────────────────────────────────
   final _firstNameCtrl = TextEditingController();
@@ -1076,6 +1108,39 @@ class _KycScreenState extends State<KycScreen> {
   // ─────────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    // kIsWeb branch added 13 September 2026 - see the block of comments and
+    // fields near _stepWeb above for why this is a wholly separate flow
+    // rather than branches threaded through the mobile steps below.
+    if (kIsWeb) {
+      return Scaffold(
+        backgroundColor: _bg,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0.5,
+          leading: !_submitted
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                      size: 18, color: Colors.black87),
+                  onPressed: () {
+                    if (_stepWeb > 0) {
+                      setState(() => _stepWeb -= 1);
+                    } else {
+                      Navigator.pop(context);
+                    }
+                  },
+                )
+              : null,
+          automaticallyImplyLeading: false,
+          title: Text(
+            'Identity Verification',
+            style: GoogleFonts.inter(
+                fontSize: 18, fontWeight: FontWeight.w700, color: _dark),
+          ),
+          centerTitle: true,
+        ),
+        body: _submitted ? _buildWebStatus() : _buildWebStep(),
+      );
+    }
     return Scaffold(
       backgroundColor: _bg,
       appBar: AppBar(
@@ -1280,6 +1345,9 @@ class _KycScreenState extends State<KycScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 560)
+          : null,
       builder: (BuildContext ctx) => Container(
         decoration: const BoxDecoration(
           color: Colors.white,
@@ -2845,6 +2913,527 @@ class _KycScreenState extends State<KycScreen> {
           ],
         ),
       );
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // WEB KYC FLOW — see the comment block near `_stepWeb` above for why this
+  // exists as a separate flow instead of kIsWeb branches through the steps
+  // above. Nothing below this line is reachable on mobile.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  Widget _buildWebStep() {
+    switch (_stepWeb) {
+      case 0:
+        return _buildWebDetailsStep();
+      case 1:
+        return _buildWebCaptureStep(
+          isId: true,
+          title: 'Scan your ID',
+          subtitle:
+              'Take a clear photo of your passport or driving licence, or '
+              'upload one from your files.',
+          bytes: _idBytesWeb,
+        );
+      case 2:
+        return _buildWebCaptureStep(
+          isId: false,
+          title: 'Take a selfie',
+          subtitle: 'Take a clear photo of your face in good lighting.',
+          bytes: _selfieBytesWeb,
+        );
+      case 3:
+        return _buildWebReviewStep();
+      default:
+        return const SizedBox();
+    }
+  }
+
+  Widget _buildWebProgressDots() => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 18),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(4, (i) {
+            final active = i == _stepWeb;
+            final done = i < _stepWeb;
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              width: active ? 24 : 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: done
+                    ? _green
+                    : active
+                        ? _primary
+                        : Colors.grey[300],
+                borderRadius: BorderRadius.circular(4),
+              ),
+            );
+          }),
+        ),
+      );
+
+  // ── Step 0: details ───────────────────────────────────────────────────────
+  //
+  // Deliberately NOT a reuse of the mobile _buildDetailsStep(): that one
+  // requests camera permission through permission_handler's
+  // Permission.camera.request(), which has no real web implementation.
+  // On web, image_picker's own camera source triggers the browser's native
+  // permission prompt itself when the photo is actually taken (step 1/2
+  // below), so there is nothing to pre-request here.
+  Widget _buildWebDetailsStep() => Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildWebProgressDots(),
+                  _sectionIcon(Icons.person_outline_rounded),
+                  const SizedBox(height: 16),
+                  Text('Personal Details',
+                      style: GoogleFonts.inter(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: _dark)),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Enter your details exactly as they appear on your ID document.',
+                    style:
+                        GoogleFonts.inter(fontSize: 13, color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 28),
+                  _inputField('First Name', _firstNameCtrl,
+                      hint: 'e.g. James',
+                      validator: (v) =>
+                          v == null || v.isEmpty ? 'Required' : null),
+                  const SizedBox(height: 16),
+                  _inputField('Last Name', _lastNameCtrl,
+                      hint: 'e.g. Smith',
+                      validator: (v) =>
+                          v == null || v.isEmpty ? 'Required' : null),
+                  const SizedBox(height: 16),
+                  _inputField('Date of Birth', _dobCtrl,
+                      hint: 'DD / MM / YYYY',
+                      keyboardType: TextInputType.number,
+                      onChanged: (val) {
+                        final String formatted = formatDobInput(val);
+                        if (formatted != val) {
+                          _dobCtrl.value = TextEditingValue(
+                            text: formatted,
+                            selection: TextSelection.collapsed(
+                                offset: formatted.length),
+                          );
+                        }
+                      },
+                      validator: validateDob),
+                  const SizedBox(height: 32),
+                  _primaryButton('Continue to ID Scan', onPressed: () {
+                    if (!_formKey.currentState!.validate()) return;
+                    setState(() => _stepWeb = 1);
+                  }),
+                  const SizedBox(height: 16),
+                  _infoCard(
+                    icon: Icons.lock_outline_rounded,
+                    text:
+                        'Your data is encrypted and never shared without your consent.',
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+  // ── Steps 1 & 2: capture ──────────────────────────────────────────────────
+  //
+  // One photo, no live preview, no on-device liveness or quality check - see
+  // the comment block near `_stepWeb` for why. `ImageSource.camera` opens the
+  // browser's native camera capture UI (or the OS camera app on mobile
+  // browsers); `preferredCameraDevice` only affects which physical camera it
+  // defaults to and is silently ignored where a browser doesn't support it.
+  Widget _buildWebCaptureStep({
+    required bool isId,
+    required String title,
+    required String subtitle,
+    required Uint8List? bytes,
+  }) =>
+      Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildWebProgressDots(),
+                _sectionIcon(
+                    isId ? Icons.badge_outlined : Icons.face_retouching_natural),
+                const SizedBox(height: 16),
+                Text(title,
+                    style: GoogleFonts.inter(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: _dark)),
+                const SizedBox(height: 6),
+                Text(subtitle,
+                    style:
+                        GoogleFonts.inter(fontSize: 13, color: Colors.grey[600])),
+                const SizedBox(height: 24),
+                AspectRatio(
+                  aspectRatio: isId ? 16 / 10 : 4 / 5,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      color: const Color(0xFFEDF1F5),
+                      child: bytes != null
+                          ? Image.memory(bytes, fit: BoxFit.cover)
+                          : Center(
+                              child: Icon(
+                                  isId
+                                      ? Icons.badge_outlined
+                                      : Icons.face_outlined,
+                                  size: 48,
+                                  color: Colors.grey[400]),
+                            ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _pickWebImage(isId: isId, fromCamera: true),
+                        icon: const Icon(Icons.photo_camera_outlined, size: 18),
+                        label: const Text('Take Photo'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: _primary,
+                          side: const BorderSide(color: _primary),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () =>
+                            _pickWebImage(isId: isId, fromCamera: false),
+                        icon: const Icon(Icons.upload_file_outlined, size: 18),
+                        label: const Text('Upload File'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.grey[700],
+                          side: BorderSide(color: Colors.grey[300]!),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (_webError != null) ...[
+                  const SizedBox(height: 12),
+                  Text(_webError!,
+                      style: GoogleFonts.inter(fontSize: 12.5, color: Colors.red[700])),
+                ],
+                const SizedBox(height: 24),
+                _primaryButton(
+                  isId ? 'Continue to Selfie' : 'Continue to Review',
+                  onPressed: bytes == null
+                      ? null
+                      : () => setState(() => _stepWeb = isId ? 2 : 3),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+  Future<void> _pickWebImage({required bool isId, required bool fromCamera}) async {
+    setState(() => _webError = null);
+    try {
+      final XFile? picked = await ImagePicker().pickImage(
+        source: fromCamera ? ImageSource.camera : ImageSource.gallery,
+        imageQuality: 85,
+        preferredCameraDevice: isId ? CameraDevice.rear : CameraDevice.front,
+      );
+      if (picked == null) return; // user cancelled the browser dialog
+      final Uint8List bytes = await picked.readAsBytes();
+      if (!mounted) return;
+      setState(() {
+        if (isId) {
+          _idBytesWeb = bytes;
+        } else {
+          _selfieBytesWeb = bytes;
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _webError =
+          'Could not access your camera or files. Please check your browser '
+          'permissions and try again, or use the other option above.');
+    }
+  }
+
+  // ── Step 3: review + submit ───────────────────────────────────────────────
+  Widget _buildWebReviewStep() => Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildWebProgressDots(),
+                _sectionIcon(Icons.fact_check_outlined),
+                const SizedBox(height: 16),
+                Text('Review & Submit',
+                    style: GoogleFonts.inter(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: _dark)),
+                const SizedBox(height: 6),
+                Text(_fullNameOrFallback(),
+                    style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[700])),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(child: _webThumb(_idBytesWeb, 'ID Document')),
+                    const SizedBox(width: 12),
+                    Expanded(child: _webThumb(_selfieBytesWeb, 'Selfie')),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                _primaryButton(
+                  'Submit for Verification',
+                  onPressed: (_idBytesWeb != null &&
+                          _selfieBytesWeb != null &&
+                          !_submittingWeb)
+                      ? _submitWeb
+                      : null,
+                  loading: _submittingWeb,
+                ),
+                const SizedBox(height: 16),
+                _infoCard(
+                  icon: Icons.verified_user_outlined,
+                  text:
+                      'A member of our team reviews every submission made from '
+                      'the website. We will let you know as soon as there is an '
+                      'update.',
+                ),
+                if (_webError != null) ...[
+                  const SizedBox(height: 12),
+                  Text(_webError!,
+                      style: GoogleFonts.inter(fontSize: 12.5, color: Colors.red[700])),
+                ],
+              ],
+            ),
+          ),
+        ),
+      );
+
+  Widget _webThumb(Uint8List? bytes, String label) => ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          height: 110,
+          decoration: BoxDecoration(
+            color: const Color(0xFFEDF1F5),
+            border: Border.all(color: _green, width: 1.5),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (bytes != null)
+                Image.memory(bytes, fit: BoxFit.cover)
+              else
+                const Center(
+                    child: Icon(Icons.image_not_supported_outlined,
+                        color: Colors.grey, size: 22)),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Text(label,
+                      textAlign: TextAlign.center,
+                      style:
+                          GoogleFonts.inter(fontSize: 10, color: Colors.white)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
+  // ── Submit ─────────────────────────────────────────────────────────────────
+  //
+  // ⚠ THIS DELIBERATELY NEVER CALLS kycAutoDecision. That Cloud Function
+  // scores the on-device liveness and quality checks the mobile flow runs
+  // before submitting - checks this browser flow never ran. Sending it
+  // invented numbers just to get an auto-approval would mean a web upload
+  // could pass verification on fabricated evidence rather than a real one.
+  // markKycSubmitted alone files the photos as 'pending' for a human
+  // reviewer, which is the same safe fallback _submit()'s own catch block
+  // above uses on mobile when something goes wrong - here it is the normal,
+  // expected path, not a fallback.
+  Future<void> _submitWeb() async {
+    if (_idBytesWeb == null || _selfieBytesWeb == null) return;
+    setState(() {
+      _submittingWeb = true;
+      _webError = null;
+    });
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) {
+        throw StateError('Not signed in');
+      }
+      final idRef = FirebaseStorage.instance.ref('kyc/$uid/id_front.jpg');
+      await idRef.putData(
+          _idBytesWeb!, SettableMetadata(contentType: 'image/jpeg'));
+      final idFrontUrl = await idRef.getDownloadURL();
+
+      final selfieRef = FirebaseStorage.instance.ref('kyc/$uid/selfie.jpg');
+      await selfieRef.putData(
+          _selfieBytesWeb!, SettableMetadata(contentType: 'image/jpeg'));
+      final selfieUrl = await selfieRef.getDownloadURL();
+
+      await FirebaseFunctions.instanceFor(region: 'europe-west1')
+          .httpsCallable('markKycSubmitted')
+          .call(<String, dynamic>{
+        'idFrontUrl': idFrontUrl,
+        'selfieUrl': selfieUrl,
+        'livenessComplete': false,
+        'livenessNote': 'Submitted from the website - the on-device liveness '
+            'check only runs in the GoOuts app, so a person reviews this one.',
+      });
+
+      if (!mounted) return;
+      setState(() {
+        _kycDecisionTier = 'AMBER';
+        _submittingWeb = false;
+        _submitted = true;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _submittingWeb = false;
+        _webError =
+            'Something went wrong uploading your documents. Please check your '
+            'connection and try again.';
+      });
+    }
+  }
+
+  // ── Status screen (shown after submit, or if _checkExistingKyc found an
+  // existing kycStatus when this screen opened) ───────────────────────────
+  Widget _buildWebStatus() {
+    final IconData icon;
+    final Color iconBg;
+    final Color iconColor;
+    final String heading;
+    final String message;
+    final bool showRetry;
+
+    switch (_kycDecisionTier) {
+      case 'GREEN':
+        icon = Icons.verified_rounded;
+        iconBg = _green.withValues(alpha: 0.12);
+        iconColor = _green;
+        heading = 'Identity Verified!';
+        message =
+            'Your identity has been verified. You can now use all GoOuts features.';
+        showRetry = false;
+      case 'RED':
+        icon = Icons.cancel_rounded;
+        iconBg = const Color(0xFFFEE2E2);
+        iconColor = const Color(0xFFDC2626);
+        heading = 'Verification Unsuccessful';
+        message =
+            'We could not verify your identity from the images provided. '
+            'Please ensure good lighting, all text is visible, and try again.';
+        showRetry = true;
+      default: // AMBER
+        icon = Icons.hourglass_top_rounded;
+        iconBg = const Color(0xFFFEF3C7);
+        iconColor = const Color(0xFFB45309);
+        heading = 'Submitted for Review';
+        message =
+            'A member of our team reviews every submission made from the '
+            'website. We will let you know as soon as there is an update.';
+        showRetry = false;
+    }
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 90,
+                height: 90,
+                decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
+                child: Icon(icon, color: iconColor, size: 48),
+              ),
+              const SizedBox(height: 28),
+              Text(heading,
+                  style: GoogleFonts.inter(
+                      fontSize: 24, fontWeight: FontWeight.w800, color: _dark),
+                  textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              Text(message,
+                  style: GoogleFonts.inter(
+                      fontSize: 14, color: Colors.grey[600], height: 1.6),
+                  textAlign: TextAlign.center),
+              if (_idBytesWeb != null && _selfieBytesWeb != null) ...[
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(child: _webThumb(_idBytesWeb, 'ID Document')),
+                    const SizedBox(width: 12),
+                    Expanded(child: _webThumb(_selfieBytesWeb, 'Selfie')),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 36),
+              _primaryButton(showRetry ? 'Try Again' : 'Back to Profile',
+                  onPressed: () {
+                if (showRetry) {
+                  setState(() {
+                    _stepWeb = 0;
+                    _idBytesWeb = null;
+                    _selfieBytesWeb = null;
+                    _submitted = false;
+                    _kycDecisionTier = 'GREEN';
+                    _webError = null;
+                  });
+                  return;
+                }
+                if (Navigator.canPop(context)) {
+                  Navigator.pop(context);
+                } else {
+                  Navigator.pushNamedAndRemoveUntil(context, '/home', (_) => false);
+                }
+              }),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

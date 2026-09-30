@@ -23,6 +23,7 @@
 import 'dart:io';
 
 import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/stay_enums.dart';
@@ -183,15 +184,27 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen>
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          _viewfinder(),
-          if (widget.referencePhotoUrl != null) _ghost(),
-          _topBar(guidance),
-          _bottomControls(),
-          if (_error != null) _errorOverlay(),
-        ],
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = Stack(
+            fit: StackFit.expand,
+            children: [
+              _viewfinder(),
+              if (widget.referencePhotoUrl != null) _ghost(),
+              _topBar(guidance),
+              _bottomControls(),
+              if (_error != null) _errorOverlay(),
+            ],
+          );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: content,
+            ),
+          );
+        },
       ),
     );
   }

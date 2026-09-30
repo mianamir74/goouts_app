@@ -109,9 +109,17 @@ class UserFcmService {
     final allow = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
+      // ⚠ DESKTOP WEB FIX ADDED 14 September 2026. This Dialog had no width
+      // constraint anywhere in its tree, so on desktop web the Dialog widget
+      // (and the SizedBox(width: double.infinity) button inside it) stretched
+      // to the full browser window instead of staying a compact card - the
+      // same class of bug as every screen fixed earlier today, just in a
+      // dialog instead of a Scaffold body.
       builder: (ctx) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        child: Padding(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -167,6 +175,7 @@ class UserFcmService {
               ),
             ],
           ),
+        ),
         ),
       ),
     );

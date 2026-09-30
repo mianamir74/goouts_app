@@ -10,6 +10,7 @@
 //  ⚠ MILES, NEVER MINUTES, for the reason given in 07. And the ODbL attribution
 //  is required at the bottom, read from the document rather than hardcoded.
 // ─────────────────────────────────────────────────────────────────────────────
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -154,13 +155,16 @@ class _ClusterDetailScreenState extends State<ClusterDetailScreen> {
       bottomNavigationBar: StayBottomNav(
         current: widget.fromListing ? StayTab.search : StayTab.trips,
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : c == null
-              ? _missing()
-              : ListView(
-                  padding: EdgeInsets.zero,
-                  children: <Widget>[
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = _loading
+              ? const Center(child: CircularProgressIndicator())
+              : c == null
+                  ? _missing()
+                  : ListView(
+                      padding: EdgeInsets.zero,
+                      children: <Widget>[
                     if (c.photo != null) _photo(c.photo!),
                     Padding(
                       padding: const EdgeInsets.all(16),
@@ -202,7 +206,16 @@ class _ClusterDetailScreenState extends State<ClusterDetailScreen> {
                       ),
                     ),
                   ],
-                ),
+                );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: content,
+            ),
+          );
+        },
+      ),
     );
   }
 

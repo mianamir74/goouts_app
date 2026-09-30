@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
 import '../services/user_service.dart';
 import '../services/transaction_service.dart';
@@ -81,7 +82,10 @@ class PartnerOfferScreen extends StatelessWidget {
           const SizedBox(width: 8),
         ],
       ),
-      body: SingleChildScrollView(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -345,6 +349,15 @@ class PartnerOfferScreen extends StatelessWidget {
             const SizedBox(height: 120),
           ],
         ),
+      );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: content,
+            ),
+          );
+        },
       ),
       bottomSheet: SafeArea(
         child: Container(
@@ -413,6 +426,9 @@ class PartnerOfferScreen extends StatelessWidget {
       isScrollControlled: true,
       isDismissible: true,
       backgroundColor: Colors.transparent,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 560)
+          : null,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheet) {
 
@@ -761,6 +777,9 @@ class PartnerOfferScreen extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 560)
+          : null,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheet) {
           final spendAmount = double.tryParse(amountCtrl.text) ?? 0.0;
@@ -859,6 +878,12 @@ class PartnerOfferScreen extends StatelessWidget {
                             style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w700, color: _dark),
                             decoration: InputDecoration(
                               border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              errorBorder: InputBorder.none,
+                              disabledBorder: InputBorder.none,
+                              focusedErrorBorder: InputBorder.none,
+                              filled: false,
                               hintText: '0.00',
                               hintStyle: GoogleFonts.inter(fontSize: 22, color: Colors.grey[400]),
                             ),

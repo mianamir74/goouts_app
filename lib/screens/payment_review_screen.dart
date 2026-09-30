@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
 import '../services/transaction_service.dart';
 import '../widgets/goouts_sheet.dart';
@@ -101,7 +102,10 @@ class _PaymentReviewScreenState extends State<PaymentReviewScreen> {
         ),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
@@ -485,6 +489,15 @@ class _PaymentReviewScreenState extends State<PaymentReviewScreen> {
             const SizedBox(height: 32),
           ],
         ),
+      );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: content,
+            ),
+          );
+        },
       ),
     );
   }

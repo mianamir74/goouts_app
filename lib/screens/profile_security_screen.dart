@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
 import '../services/user_service.dart';
 import '../services/biometric_service.dart';
@@ -98,6 +99,9 @@ class _ProfileSecurityScreenState extends State<ProfileSecurityScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 560)
+          : null,
       builder: (_) => StatefulBuilder(
         builder: (ctx, setSheet) => Padding(
           padding:
@@ -286,7 +290,10 @@ class _ProfileSecurityScreenState extends State<ProfileSecurityScreen> {
         ),
         centerTitle: false,
       ),
-      body: SingleChildScrollView(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+          final Widget content = SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
@@ -474,6 +481,15 @@ class _ProfileSecurityScreenState extends State<ProfileSecurityScreen> {
             const SizedBox(height: 24),
           ],
         ),
+      );
+          if (!desktop) return content;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: content,
+            ),
+          );
+        },
       ),
     );
   }

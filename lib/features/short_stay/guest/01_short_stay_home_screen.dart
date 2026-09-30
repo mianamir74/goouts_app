@@ -62,7 +62,10 @@
 //  ⚠ NOTHING BELOW INVENTS A NUMBER. Rating hidden when ratingCount == 0.
 //  Partner count hidden when 0. Cashback hidden unless the rate is known.
 // ─────────────────────────────────────────────────────────────────────────────
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../models/stay_listing.dart';
 // StaySearchCriteria lives here, not in stay_listing_service.
 import '../services/stay_availability_service.dart';
@@ -72,6 +75,7 @@ import '../services/stay_recently_viewed.dart';
 import '../theme/stay_colors.dart';
 import '../theme/stay_type.dart';
 import '../stay_routes.dart';
+import '../widgets/desktop_top_nav.dart' show JoinAsHostButton, AccountMenuButton, GoOutsBrandLogo;
 import '../widgets/stay_bottom_nav.dart';
 
 class ShortStayHomeScreen extends StatefulWidget {
@@ -99,8 +103,39 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
 
   StayCashbackRate _rate = StayCashbackRate.unknown;
 
-  List<StayListing> get _topByPartners => _listings.take(4).toList();
-  List<StayListing> get _others => _listings.skip(4).toList();
+  // ── ⚠ CITY ROWS, 9 September 2026. REPLACED "most partners" + a grid. ────
+  //
+  // Was one row of the top 4 by partner count, then every remaining
+  // property dumped into a 2 (mobile) / 3 (desktop) column grid under
+  // "Explore United Kingdom" — one undifferentiated pile, nothing like the
+  // "Popular homes in London", "Available in Manchester" rows every
+  // reference site (Airbnb, booking.com) actually uses on its homepage.
+  //
+  // Grouped on address.town — exactly what the host typed, never geocoded
+  // or invented here — so a "London" row only ever holds properties a host
+  // actually marked as London. London is pinned first when present; every
+  // other town follows busiest-first, the same ordering the old partners
+  // row used.
+  Map<String, List<StayListing>> get _byCity {
+    final Map<String, List<StayListing>> map = <String, List<StayListing>>{};
+    for (final StayListing l in _listings) {
+      final String town = l.address.town.trim();
+      if (town.isEmpty) continue;
+      map.putIfAbsent(town, () => <StayListing>[]).add(l);
+    }
+    return map;
+  }
+
+  List<String> get _cityOrder {
+    final List<String> cities = _byCity.keys.toList();
+    cities.sort((a, b) {
+      final bool aLondon = a.toLowerCase() == 'london';
+      final bool bLondon = b.toLowerCase() == 'london';
+      if (aLondon != bLondon) return aLondon ? -1 : 1;
+      return _byCity[b]!.length.compareTo(_byCity[a]!.length);
+    });
+    return cities;
+  }
 
   @override
   void initState() {
@@ -214,6 +249,9 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: GoOutsColors.cardSurface,
+      constraints: kIsWeb && MediaQuery.of(context).size.width >= 900
+          ? const BoxConstraints(maxWidth: 560)
+          : null,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -291,6 +329,31 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ⚠ ADDED 9 September 2026. Reported: "the web version is not perfect,
+    // need spacing both side... use your skills to make it professional
+    // UI/UX... check Airbnb, Uber Eats, Deliveroo, booking.com."
+    //
+    // Those sites all share the same shape: a real top nav bar (not a phone
+    // tab bar pinned to the bottom), a wide hero with a prominent search row,
+    // and page content held to a comfortable reading width and CENTRED, so a
+    // wide monitor gets even gutters on both sides instead of the mobile
+    // layout pinned to the left edge with a void on the right.
+    //
+    // This is a SEPARATE layout, not a stretched version of the phone one.
+    // The mobile branch below is completely unchanged — StaySpacing's "16,
+    // without exception" rule is a mobile rule, and a desktop browser window
+    // is not a phone screen wearing a costume. kIsWeb also gates this off on
+    // an actual phone opening this same URL: it still gets the phone layout,
+    // which is correct for it.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+        return desktop ? _buildDesktop(context) : _buildMobile(context);
+      },
+    );
+  }
+
+  Widget _buildMobile(BuildContext context) {
     return Scaffold(
       backgroundColor: GoOutsColors.pageBackground,
       // ⚠ The app bar carries NO title. The hero headline immediately below is
@@ -301,10 +364,20 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         toolbarHeight: StaySpacing.buttonHeight,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        // ⚠ ADDED 9 September 2026. On the phone app this screen is always
+        // pushed on top of something, so a back arrow always has somewhere
+        // to go. On web this is the app's ROOT screen (see main.dart's
+        // `home: kIsWeb ? ShortStayHomeScreen() : ...`) — there is nothing
+        // to pop, and an arrow that does nothing when tapped is exactly the
+        // "decorative back button" class of bug already fixed everywhere
+        // else in this app. canPop() is false at the root on both
+        // platforms, so this one check covers both without a kIsWeb branch.
+        leading: Navigator.of(context).canPop()
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () => Navigator.of(context).pop(),
+              )
+            : null,
       ),
       bottomNavigationBar: const StayBottomNav(current: StayTab.search),
       body: RefreshIndicator(
@@ -320,6 +393,19 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
           children: <Widget>[
             _hero(),
             StaySpacing.gapSection,
+            // ⚠ ADDED 9 September 2026, building the web version of this
+            // app. Food ordering (screens/food_delivery_screen.dart etc.)
+            // ships in the same build as Short Stay — it always has, they
+            // are the same app — but nothing on this screen ever linked to
+            // it, because on phone a guest reaches food ordering from the
+            // main wallet home screen, not from here. Web visitors land on
+            // THIS screen first (see main.dart), so without this card
+            // food ordering was live but functionally unreachable on web.
+            Padding(
+              padding: StaySpacing.pageH,
+              child: _foodOrderingCard(),
+            ),
+            StaySpacing.gapSection,
             if (_loading)
               _skeletons()
             else if (_error != null)
@@ -327,12 +413,13 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
             else if (_listings.isEmpty)
               Padding(padding: StaySpacing.pageH, child: _buildEmpty())
             else ...<Widget>[
-              _sectionHeader('Places with the most GoOuts partners nearby'),
-              _partnersRow(_topByPartners),
-              if (_others.isNotEmpty) ...<Widget>[
-                StaySpacing.gapSection,
-                _sectionHeader('More places to stay'),
-                _wideRow(_others),
+              // ── ⚠ ONE SECTION PER CITY, 9 September 2026. London first,
+              // then every other town, busiest first — see _byCity/_cityOrder
+              // for the full note.
+              for (int i = 0; i < _cityOrder.length; i++) ...<Widget>[
+                if (i > 0) StaySpacing.gapSection,
+                _sectionHeader(_cityOrder[i]),
+                _wideRow(_byCity[_cityOrder[i]]!),
               ],
               if (_recent.isNotEmpty) ...<Widget>[
                 StaySpacing.gapSection,
@@ -346,6 +433,529 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
       ),
     );
   }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  DESKTOP WEB LAYOUT — see the note at the top of build().
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /// Content column width. Airbnb and booking.com both settle around
+  /// 1400-1760px on a wide monitor rather than stretching edge to edge —
+  /// past this a row of cards just gets more empty-feeling gaps between
+  /// them, not more usable page.
+  static const double _desktopMaxWidth = 1400;
+
+  Widget _buildDesktop(BuildContext context) {
+    return Scaffold(
+      backgroundColor: GoOutsColors.pageBackground,
+      body: Column(
+        children: <Widget>[
+          _desktopTopNav(context),
+          Expanded(
+            child: RefreshIndicator(
+              color: GoOutsColors.primaryBlue,
+              onRefresh: () async {
+                _loadRate();
+                _loadRecent();
+                await _loadListings();
+              },
+              child: ListView(
+                padding: EdgeInsets.zero,
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: <Widget>[
+                  _desktopHero(context),
+                  // ── ⚠ FOOD ORDERING CARD REMOVED ON DESKTOP, 9 September
+                  // 2026. Was added because the mobile layout's bottom tab
+                  // bar has no Food tab, so this card was the only way a web
+                  // visitor could reach food ordering at all. The desktop
+                  // top nav (_desktopTopNav above) now carries a Food icon
+                  // tab of its own, so the card duplicated a path that
+                  // already exists — same reasoning Airbnb's own Homes page
+                  // uses: Experiences/Services get a nav icon, not a promo
+                  // card competing with the actual listings. MOBILE KEEPS
+                  // THE CARD (see _buildMobile below) — its bottom nav still
+                  // has no Food tab, so removing it there would leave no way
+                  // in at all.
+                  const SizedBox(height: 40),
+                  if (_loading)
+                    _desktopSection(_skeletons())
+                  else if (_error != null)
+                    _desktopSection(_buildLoadFailed())
+                  else if (_listings.isEmpty)
+                    _desktopSection(_buildEmpty())
+                  else ...<Widget>[
+                    // ── ⚠ ONE SECTION PER CITY, 9 September 2026. Replaced
+                    // "most partners" + a single "Explore United Kingdom"
+                    // grid with London first, then every other town,
+                    // busiest first — see _byCity/_cityOrder's own note.
+                    // 4 columns rather than the mobile grid's 2: at 1400px
+                    // wide, 2 columns produced two oversized cards with
+                    // empty-feeling gaps; each _desktopSection wrap keeps
+                    // every header and row lined up on the identical
+                    // (1400 wide, 48px outer padding) box, edge to edge.
+                    for (int i = 0; i < _cityOrder.length; i++) ...<Widget>[
+                      if (i > 0) const SizedBox(height: 40),
+                      _desktopSection(_sectionHeader(_cityOrder[i])),
+                      _desktopSection(_wideRow(
+                        _byCity[_cityOrder[i]]!,
+                        crossAxisCount: 4,
+                        photoHeight: 190,
+                      )),
+                    ],
+                    if (_recent.isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 40),
+                      _desktopSection(_sectionHeader('Recently viewed')),
+                      _desktopSection(_recentRow()),
+                    ],
+                  ],
+                  const SizedBox(height: 64),
+                  _desktopSection(_desktopAboutTeaser(context)),
+                  const SizedBox(height: 64),
+                  _desktopFooter(),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Centres a child inside [_desktopMaxWidth] with even side gutters — this
+  /// is the actual fix for "need spacing both side". Everything that already
+  /// carries its own `StaySpacing.pageH` (the card rows) keeps that padding
+  /// AS AN INNER GUTTER relative to this box, so their cards line up with
+  /// the section headers without those methods needing to change at all.
+  ///
+  /// ⚠ FIXED 9 September 2026, found in live desktop review: without the
+  /// SizedBox(width: double.infinity) below, ConstrainedBox only sets a
+  /// CEILING — it does not make its child actually BE 1400 wide. A Text
+  /// inside a Padding shrink-wraps to its own content width regardless of
+  /// that ceiling, so Center() was centring a small text-width blob in the
+  /// middle of the page instead of left-aligning it inside a 1400-wide,
+  /// evenly-guttered lane. The SizedBox forces the full width through, so
+  /// everything downstream (the padding, the text, the row) actually fills
+  /// the lane and lines up the way "need spacing both side" asked for.
+  Widget _desktopSection(Widget child) => Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: _desktopMaxWidth),
+          child: SizedBox(
+            width: double.infinity,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 48),
+              child: child,
+            ),
+          ),
+        ),
+      );
+
+
+  /// White, bottom hairline, GoOuts wordmark left, the same four
+  /// destinations StayBottomNav offers on the phone as plain-text links,
+  /// sign in / account on the right. This REPLACES StayBottomNav on desktop
+  /// rather than sitting above it — a tab bar pinned to the bottom of a
+  /// browser window is the single biggest "this is a phone app, not a
+  /// website" tell across every reference site checked (Airbnb, Uber Eats,
+  /// Deliveroo, booking.com — all top nav, none bottom tabs).
+  // ── ⚠ ICON-BEFORE-TEXT, 9 September 2026. ─────────────────────────────────
+  //
+  // Was icon-above-label with an active underline (Airbnb's mobile-app-style
+  // stacked tab). Changed to icon-then-label on one line so every nav item —
+  // including "GoOuts" itself — sits on the same baseline, plus a hover
+  // colour change now that this only ever runs on web, where hover is a real
+  // signal a text-only nav bar can't give. Nav bar back to 72px, its
+  // original height, now that nothing needs the extra room for a stacked
+  // icon/label/underline.
+  Widget _desktopTopNav(BuildContext context) {
+    final User? user = FirebaseAuth.instance.currentUser;
+    return Container(
+      height: 72,
+      decoration: const BoxDecoration(
+        color: GoOutsColors.cardSurface,
+        border: Border(
+          bottom: BorderSide(color: GoOutsColors.outlineVariant, width: 1),
+        ),
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: _desktopMaxWidth),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 48),
+            child: Row(
+              children: <Widget>[
+                // ── FAR LEFT: logo, hyperlinked home ────────────────────────
+                const GoOutsBrandLogo(),
+                // ── CENTRE: the same four tabs as every other page's nav ──
+                Expanded(
+                  child: Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        _NavIconTab(
+                          icon: Icons.villa_rounded,
+                          label: 'Short Stay',
+                          active: true,
+                          onTap: () {},
+                        ),
+                        const SizedBox(width: 4),
+                        _NavIconTab(
+                          icon: Icons.restaurant_rounded,
+                          label: 'Food Delivery',
+                          onTap: () =>
+                              Navigator.of(context).pushNamed('/food-delivery'),
+                        ),
+                        const SizedBox(width: 4),
+                        _NavIconTab(
+                          icon: Icons.local_offer_rounded,
+                          label: 'Explore Cashback',
+                          onTap: () => Navigator.of(context)
+                              .pushNamed(StayRoutes.exploreCashback),
+                        ),
+                        const SizedBox(width: 4),
+                        _NavIconTab(
+                          icon: Icons.info_outline_rounded,
+                          label: 'About Us',
+                          onTap: () => Navigator.of(context)
+                              .pushNamed(StayRoutes.aboutUs),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // ── FAR RIGHT: Join as Host, then profile+menu — matches the
+                // shared bar in desktop_top_nav.dart used by every "inside"
+                // page, and the goouts.co.uk theme (colours, ghost-button
+                // style) this was asked to keep. See that file's own header
+                // comment for why left/right are the way they are.
+                JoinAsHostButton(),
+                const SizedBox(width: 14),
+                AccountMenuButton(user: user),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ⚠ _navLink/_navPrimaryButton REMOVED 14 September 2026 — Sign up/Sign in
+  // /Sign out now live inside AccountMenuButton's dropdown (see
+  // desktop_top_nav.dart), not as standalone bar items, as part of the same
+  // nav rebuild that moved account controls to the far left.
+
+  /// Same gradient and copy as the phone hero, at desktop scale: a bigger
+  /// headline (this is a NEW style, scoped to this method — StayType's "20px
+  /// is the largest text in the product" rule is written for the mobile
+  /// scale in StaySpacing.page's 16px world, not for a hero on a 1440px
+  /// browser window), and the Uber Eats/booking.com shape of ONE search row
+  /// — field, dates, guests and a solid button side by side — rather than
+  /// the phone's stacked field-then-pills, because there is finally room
+  /// for it on one line.
+  Widget _desktopHero(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 72),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: <Color>[GoOutsColors.deepNavy, GoOutsColors.primaryBlue],
+        ),
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 860),
+          child: Column(
+            children: <Widget>[
+              Text('Stay somewhere, earn everywhere',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 44,
+                    height: 1.15,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: -0.5,
+                  )),
+              const SizedBox(height: 14),
+              Text(
+                'Book a place, then get cashback at GoOuts partners around it.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  fontSize: 17,
+                  color: Colors.white.withValues(alpha: 0.85),
+                ),
+              ),
+              const SizedBox(height: 36),
+              _desktopSearchRow(context),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _desktopSearchRow(BuildContext context) {
+    return Container(
+      height: 64,
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(999),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+              color: Color(0x33000000), blurRadius: 24, offset: Offset(0, 8)),
+        ],
+      ),
+      child: Row(
+        children: <Widget>[
+          const SizedBox(width: 12),
+          const Icon(Icons.search, size: 20, color: GoOutsColors.outlineVariant),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: _whereCtrl,
+              textInputAction: TextInputAction.search,
+              onChanged: (_) => setState(() {}),
+              onSubmitted: (_) => _search(),
+              cursorColor: GoOutsColors.primaryBlue,
+              style: GoogleFonts.inter(fontSize: 15, color: GoOutsColors.deepNavy),
+              decoration: InputDecoration(
+                isDense: true,
+                filled: false,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                hintText: 'Where are you going',
+                hintStyle: GoogleFonts.inter(
+                    fontSize: 15, color: GoOutsColors.outlineVariant),
+              ),
+            ),
+          ),
+          _desktopDivider(),
+          _desktopSearchSegment(_datesLabel, Icons.calendar_today_outlined,
+              _pickDates, active: _dates != null),
+          _desktopDivider(),
+          _desktopSearchSegment(_guestsLabel, Icons.group_outlined,
+              _pickGuests,
+              active: _countedGuests != 2 || _infants > 0),
+          const SizedBox(width: 6),
+          InkWell(
+            onTap: _search,
+            borderRadius: BorderRadius.circular(999),
+            child: Container(
+              height: 52,
+              padding: const EdgeInsets.symmetric(horizontal: 26),
+              decoration: BoxDecoration(
+                color: GoOutsColors.primaryBlue,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Center(
+                child: Text('Search',
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    )),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _desktopDivider() => Container(
+        width: 1,
+        height: 32,
+        color: GoOutsColors.outlineVariant.withValues(alpha: 0.5),
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+      );
+
+  Widget _desktopSearchSegment(
+      String text, IconData icon, VoidCallback onTap,
+      {bool active = false}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(icon,
+                size: 17,
+                color: active
+                    ? GoOutsColors.primaryBlue
+                    : GoOutsColors.bodyText),
+            const SizedBox(width: 6),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 130),
+              child: Text(text,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                    color: active
+                        ? GoOutsColors.primaryBlue
+                        : GoOutsColors.bodyText,
+                  )),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Short About Us teaser on the home page itself, requested directly —
+  /// "a short about us on the main page", alongside the fuller page at
+  /// StayRoutes.aboutUs (see 32_about_us_screen.dart, which carries the same
+  /// real copy word for word from index.html's #about-us section). This is
+  /// the condensed version: the headline, one summary line, the four value
+  /// labels with no body text, and a link through to the full page — same
+  /// relationship the marketing site itself doesn't need (it has no
+  /// separate About page, this app does), but the copy underneath is
+  /// identical, not a third rewrite.
+  Widget _desktopAboutTeaser(BuildContext context) {
+    const List<(IconData, String, Color)> values = <(IconData, String, Color)>[
+      (Icons.check_circle_rounded, 'Honest and Transparent', Color(0xFF0392CA)),
+      (Icons.groups_rounded, 'Built for Communities', Color(0xFFF59E0B)),
+      (Icons.balance_rounded, 'Fair for Everyone', Color(0xFF10B981)),
+      (Icons.verified_rounded, 'No Gimmicks', Color(0xFF6C63FF)),
+    ];
+    return Container(
+      padding: const EdgeInsets.all(40),
+      decoration: BoxDecoration(
+        color: GoOutsColors.cardSurface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: GoOutsColors.outlineVariant.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Expanded(
+            flex: 5,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text('About Us',
+                    style: GoogleFonts.inter(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: GoOutsColors.primaryBlue,
+                      letterSpacing: 0.4,
+                    )),
+                const SizedBox(height: 10),
+                RichText(
+                  text: TextSpan(
+                    style: GoogleFonts.inter(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      color: GoOutsColors.deepNavy,
+                      height: 1.25,
+                      letterSpacing: -0.4,
+                    ),
+                    children: const <TextSpan>[
+                      TextSpan(text: 'We built GoOuts because '),
+                      TextSpan(
+                        text: 'people deserve more.',
+                        style: TextStyle(color: GoOutsColors.primaryBlue),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'When you spend at a local venue, you should get something '
+                  'back right away — real Cashback Points, not a voucher that '
+                  'expires.',
+                  style: GoogleFonts.inter(
+                    fontSize: 14.5,
+                    height: 1.6,
+                    color: GoOutsColors.bodyText,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                InkWell(
+                  onTap: () =>
+                      Navigator.of(context).pushNamed(StayRoutes.aboutUs),
+                  borderRadius: BorderRadius.circular(6),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Text('Read our story',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: GoOutsColors.primaryBlue,
+                          )),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.arrow_forward_rounded,
+                          size: 16, color: GoOutsColors.primaryBlue),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 48),
+          Expanded(
+            flex: 6,
+            child: GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 20,
+              crossAxisSpacing: 24,
+              childAspectRatio: 2.6,
+              children: <Widget>[
+                for (final (IconData icon, String label, Color accent) in values)
+                  Row(
+                    children: <Widget>[
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(icon, color: accent, size: 18),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(label,
+                            style: GoogleFonts.inter(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                              color: GoOutsColors.deepNavy,
+                            )),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _desktopFooter() => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 28),
+        decoration: const BoxDecoration(
+          border: Border(
+            top: BorderSide(color: GoOutsColors.outlineVariant, width: 1),
+          ),
+        ),
+        child: Center(
+          child: Text('© ${DateTime.now().year} GoOuts',
+              style: GoogleFonts.inter(
+                  fontSize: 13, color: GoOutsColors.bodyText)),
+        ),
+      );
 
   // ── HERO ──────────────────────────────────────────────────────────────────
   //
@@ -432,8 +1042,8 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
-                disabledBorder: InputBorder.none,
                 errorBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
                 focusedErrorBorder: InputBorder.none,
                 hintText: 'Where are you going',
                 hintStyle: StayType.buttonText
@@ -527,6 +1137,53 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
             StaySpacing.page, 0, StaySpacing.page, StaySpacing.inline),
         child: Text(title,
             style: StayType.sectionHeader.on(GoOutsColors.deepNavy)),
+      );
+
+  /// ⚠ ADDED 9 September 2026, building the web version of this app. See the
+  /// call site above in build() for why this exists. Same visual language as
+  /// the rest of this screen (GoOutsColors, StayType, StaySpacing) so it
+  /// doesn't look bolted on.
+  Widget _foodOrderingCard() => InkWell(
+        onTap: () => Navigator.of(context).pushNamed('/food-delivery'),
+        borderRadius: BorderRadius.circular(StaySpacing.inline),
+        child: Container(
+          padding: const EdgeInsets.all(StaySpacing.card),
+          decoration: BoxDecoration(
+            color: GoOutsColors.cardSurface,
+            borderRadius: BorderRadius.circular(StaySpacing.inline),
+            border: Border.all(color: GoOutsColors.paleBlueTint),
+          ),
+          child: Row(
+            children: <Widget>[
+              Container(
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(
+                  color: GoOutsColors.paleBlueTint,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.restaurant_outlined,
+                    color: GoOutsColors.primaryBlue),
+              ),
+              const SizedBox(width: StaySpacing.card),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text('Order food too',
+                        style: StayType.buttonText.on(GoOutsColors.deepNavy)),
+                    const SizedBox(height: 2),
+                    Text('Get it delivered and earn cashback at the same time.',
+                        style:
+                            StayType.caption.on(GoOutsColors.outlineVariant)),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios,
+                  size: 14, color: GoOutsColors.outlineVariant),
+            ],
+          ),
+        ),
       );
 
   // ── CARDS ─────────────────────────────────────────────────────────────────
@@ -708,7 +1365,15 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
   /// Vertical two-column grid rather than a sideways row: this list is every
   /// remaining property, and a long list that scrolls sideways is one nobody
   /// reaches the end of.
-  Widget _wideRow(List<StayListing> items) {
+  /// [crossAxisCount] and [photoHeight] default to the original mobile
+  /// shape (2 columns, 118px photo). The desktop city sections added
+  /// 9 September 2026 pass 4 and a shorter photo — narrower cards read as
+  /// more deliberate on a wide monitor than two oversized ones stretched
+  /// edge to edge, which is what this grid looked like at the old 2-column
+  /// count on a 1400px desktop row.
+  Widget _wideRow(List<StayListing> items,
+      {int crossAxisCount = 2, double photoHeight = 118}) {
+    final double cardHeight = photoHeight + 114;
     return Padding(
       padding: StaySpacing.pageH,
       child: GridView.builder(
@@ -716,11 +1381,11 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
         physics: const NeverScrollableScrollPhysics(),
         padding: EdgeInsets.zero,
         itemCount: items.length,
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
           mainAxisSpacing: StaySpacing.card,
           crossAxisSpacing: StaySpacing.card,
-          mainAxisExtent: 232,
+          mainAxisExtent: cardHeight,
         ),
         itemBuilder: (context, i) {
           final StayListing l = items[i];
@@ -738,7 +1403,7 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  _photo(l, h: 118),
+                  _photo(l, h: photoHeight),
                   Padding(
                     padding: const EdgeInsets.all(StaySpacing.inline),
                     child: Column(
@@ -955,6 +1620,65 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
               textAlign: TextAlign.center,
               style: StayType.body.on(GoOutsColors.bodyText)),
         ],
+      ),
+    );
+  }
+}
+
+/// Icon-then-label nav item, one row, hover-aware. Same widget as
+/// desktop_top_nav.dart's own _NavIconTab (deliberately not shared — see
+/// that file's note on why this nav bar stays a separate inline copy).
+class _NavIconTab extends StatefulWidget {
+  const _NavIconTab({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.active = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool active;
+
+  @override
+  State<_NavIconTab> createState() => _NavIconTabState();
+}
+
+class _NavIconTabState extends State<_NavIconTab> {
+  bool _hovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color color = widget.active
+        ? GoOutsColors.primaryBlue
+        : _hovering
+            ? GoOutsColors.primaryBlue
+            : GoOutsColors.deepNavy;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() => _hovering = false),
+      child: InkWell(
+        onTap: widget.onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Icon(widget.icon, size: 19, color: color),
+              const SizedBox(width: 7),
+              Text(widget.label,
+                  style: GoogleFonts.inter(
+                    fontSize: 14.5,
+                    fontWeight:
+                        widget.active ? FontWeight.w700 : FontWeight.w600,
+                    color: color,
+                  )),
+            ],
+          ),
+        ),
       ),
     );
   }

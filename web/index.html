@@ -31,8 +31,176 @@
 
   <title>goouts_app</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- ⚠ ADDED 9 September 2026, found in a "check every linked page"
+       failure-mode audit. Six screens reachable from this web build use
+       GoogleMap() (google_maps_flutter) — 05_listing_detail_screen.dart
+       (the second screen every guest opens, from every listing card),
+       04_map_results_screen, 09_neighbourhood_screen, 15_trip_detail_screen,
+       26_booking_details_screen, and widgets/live_tracking_map.dart. The
+       Flutter widget itself works on web via google_maps_flutter_web, but
+       ONLY if the Google Maps JavaScript API is loaded on the page first —
+       there is no other way for the web version of the plugin to draw a
+       map. Without this script tag every one of those screens shows a
+       blank grey box where the map should be, with no error visible to the
+       person looking at it.
+
+       The key below is the SAME one already used for Android
+       (AndroidManifest.xml) and iOS (AppDelegate.swift) — reused, not new.
+       ⚠ ONE THING I CANNOT VERIFY FROM CODE: Google Maps API keys can carry
+       an HTTP-referrer restriction in Google Cloud Console, and this key
+       was issued for a phone app, not a website. If the map STILL shows
+       blank after this deploys, that restriction is almost certainly why —
+       the fix is adding https://goouts-book.web.app/* as an allowed
+       referrer on this key in Google Cloud Console, not a code change. -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAymdUNNVULCvMaA6FLTqTw5cVRk9_sUBI"
+          async defer></script>
+
+  <!-- ⚠ ADDED 9 September 2026, FIXED 9 September 2026 — fixes a "double
+       box" glitch reported on the food-address-picker search field, which
+       is really an app-wide Flutter-Web bug, not a per-page one. Every
+       Flutter TextField on the web renders a REAL hidden <input>/<textarea>
+       underneath the custom-painted field — Flutter needs it for keyboard,
+       IME and browser autofill to work. Chrome draws its OWN default focus
+       outline/border on that hidden native element, which sits right on top
+       of whatever border our Flutter code paints — that's the second
+       coloured box appearing only while typing.
+
+       ⚠ WHY THIS IS A <style> BLOCK **AND** A <script> BELOW, NOT JUST ONE:
+       this <style> block lives in the normal page — but Flutter Web renders
+       everything, including that hidden <input>, inside a Shadow DOM
+       (<flt-glass-pane>, confirmed via its .shadowRoot in the live page).
+       Shadow DOM is deliberately walled off from the page's own CSS — a
+       light-DOM <style> like this one CANNOT reach an element inside it, at
+       all, full stop. That is exactly why the first version of this fix
+       (this block alone) changed nothing after deploying: it was never
+       reaching the element it was meant to fix. It's left here as a
+       harmless fallback for any input Flutter ever renders OUTSIDE that
+       shadow root; the <script> right after it is the part that actually
+       reaches inside. -->
+  <style>
+    input, textarea, select {
+      outline: none !important;
+      border: none !important;
+      box-shadow: none !important;
+      background: transparent !important;
+      -webkit-appearance: none !important;
+      appearance: none !important;
+    }
+    input:focus, textarea:focus, select:focus {
+      outline: none !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+    /* Chrome tints autofilled fields yellow/green via an internal shadow
+       DOM the CSS above can't reach directly — this neutralises it. */
+    input:-webkit-autofill,
+    input:-webkit-autofill:hover,
+    input:-webkit-autofill:focus,
+    textarea:-webkit-autofill,
+    textarea:-webkit-autofill:hover,
+    textarea:-webkit-autofill:focus {
+      -webkit-box-shadow: 0 0 0px 1000px transparent inset !important;
+      -webkit-text-fill-color: transparent !important;
+      transition: background-color 5000s ease-in-out 0s;
+    }
+  </style>
+
+  <!-- ⚠ THE ACTUAL FIX. <flt-glass-pane> doesn't exist yet when this page
+       first loads — Flutter's engine creates it (and attaches its shadow
+       root) after flutter_bootstrap.js finishes starting the app, on a
+       timeline this script doesn't control. So instead of a one-shot
+       lookup, a MutationObserver watches the whole document for it to
+       appear, and the moment it does, copies the SAME rules from the
+       <style> block above into a <style> element INSIDE that shadow root —
+       which is the one place a rule can actually reach that hidden input.
+       Placed before flutter_bootstrap.js on purpose, so the observer is
+       already watching before the engine has any chance to create the
+       glass pane. Runs once per glass pane found, then stops watching —
+       Flutter creates exactly one for the life of the page. -->
+  <script>
+    (function () {
+      var CSS_TEXT =
+        'input, textarea, select {' +
+        '  outline: none !important;' +
+        '  border: none !important;' +
+        '  box-shadow: none !important;' +
+        '  background: transparent !important;' +
+        '  -webkit-appearance: none !important;' +
+        '  appearance: none !important;' +
+        '}' +
+        'input:focus, textarea:focus, select:focus {' +
+        '  outline: none !important;' +
+        '  border: none !important;' +
+        '  box-shadow: none !important;' +
+        '}' +
+        'input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus,' +
+        'textarea:-webkit-autofill, textarea:-webkit-autofill:hover, textarea:-webkit-autofill:focus {' +
+        '  -webkit-box-shadow: 0 0 0px 1000px transparent inset !important;' +
+        '  -webkit-text-fill-color: transparent !important;' +
+        '  transition: background-color 5000s ease-in-out 0s;' +
+        '}';
+
+      function injectInto(root) {
+        if (root.__goOutsInputFixApplied) return;
+        root.__goOutsInputFixApplied = true;
+        var style = document.createElement('style');
+        style.textContent = CSS_TEXT;
+        root.appendChild(style);
+      }
+
+      function scanForGlassPane() {
+        var panes = document.querySelectorAll('flt-glass-pane');
+        var found = false;
+        for (var i = 0; i < panes.length; i++) {
+          if (panes[i].shadowRoot) {
+            injectInto(panes[i].shadowRoot);
+            found = true;
+          }
+        }
+        return found;
+      }
+
+      if (scanForGlassPane()) return; // already there (hot reload, etc.)
+
+      var observer = new MutationObserver(function () {
+        if (scanForGlassPane() && observer) {
+          observer.disconnect();
+          observer = null;
+        }
+      });
+      observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+      });
+    })();
+  </script>
 </head>
 <body>
+  <!-- ADDED 23 September 2026, per Mian — Food Delivery/Short Stay opens in
+       a new tab but the tab sat totally blank/white while the app engine
+       downloaded, which reads as "stuck" even though it is just loading.
+       This spinner shows immediately (it is plain HTML, not Flutter) and
+       removes itself the moment Flutter's own onEntrypointLoaded fires, so
+       there is visible feedback the whole time instead of a blank tab. -->
+  <style>
+    #goOutsBootLoader {
+      position: fixed; inset: 0; z-index: 9999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 16px; background: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    #goOutsBootLoader .spin {
+      width: 40px; height: 40px; border-radius: 50%;
+      border: 3px solid rgba(3,146,202,0.15); border-top-color: #0392CA;
+      animation: goOutsSpin 0.8s linear infinite;
+    }
+    #goOutsBootLoader p { margin: 0; font-size: 14px; color: #6b7280; }
+    @keyframes goOutsSpin { to { transform: rotate(360deg); } }
+  </style>
+  <div id="goOutsBootLoader">
+    <div class="spin"></div>
+    <p>Loading GoOuts...</p>
+  </div>
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader
@@ -41,6 +209,12 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      var el = document.getElementById('goOutsBootLoader');
+      if (el) el.remove();
+    });
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
