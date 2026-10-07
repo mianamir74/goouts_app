@@ -161,7 +161,7 @@ class _ReferFriendScreenState extends State<ReferFriendScreen> {
                       fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white)),
             ),
             const SizedBox(height: 16),
-            Text('Give a friend £2.\nGet £2 yourself.',
+            Text('Invite a friend.\nEarn £5 yourself.',
                 style: GoogleFonts.inter(
                     fontSize: 26,
                     fontWeight: FontWeight.w900,
@@ -170,11 +170,12 @@ class _ReferFriendScreenState extends State<ReferFriendScreen> {
             const SizedBox(height: 10),
             Text(
               // Wording matches onFoodOrderReferralHooks in the Cloud
-              // Functions: the £2 is released when the first order is
+              // Functions (welcome_bonus.js since 4 October 2026): the £5 is released
+              // when the friend completes all three welcome purchases. Was: £2 when the first order is
               // DELIVERED, not when it is placed, so a cancelled order never
               // pays out. Do not soften this back to "places" without changing
               // the trigger too.
-              'Every time a friend signs up with your code and their first order is delivered, £2 lands in your wallet automatically. You will be notified the moment it arrives.',
+              'Every time a friend signs up with your code and completes their three welcome purchases, £5 lands in your wallet automatically. You can earn for up to 20 friends. You will be notified the moment it arrives.',
               style: GoogleFonts.inter(
                   fontSize: 13,
                   color: Colors.white.withValues(alpha: 0.85),
@@ -303,14 +304,14 @@ class _ReferFriendScreenState extends State<ReferFriendScreen> {
               number: '2',
               color: const Color(0xFFF59E0B),
               title: 'They sign up and order',
-              desc: 'Your friend creates their GoOuts account using your invite code and places their first order.',
+              desc: 'Your friend creates their GoOuts account using your invite code and makes three purchases of £5 or more to unlock their own £5 welcome bonus.',
             ),
             _stepConnector(),
             _step(
               number: '3',
               color: _green,
-              title: '£2 lands in your wallet',
-              desc: 'You get notified instantly. £2 in Cashback Points is automatically credited to your GoOuts wallet. Every single time.',
+              title: '£5 lands in your wallet',
+              desc: 'You get notified instantly. £5 is automatically credited to your GoOuts wallet when your friend completes their third purchase. Up to 20 friends.',
             ),
           ],
         ),
@@ -467,7 +468,7 @@ class _ReferFriendScreenState extends State<ReferFriendScreen> {
                 style: GoogleFonts.inter(
                     fontSize: 15, fontWeight: FontWeight.w700, color: _dark)),
             const SizedBox(height: 6),
-            Text('Share your code and start earning £2 for every friend who joins.',
+            Text('Share your code and start earning £5 for every friend who joins and buys.',
                 style: GoogleFonts.inter(
                     fontSize: 13, color: Colors.grey[500], height: 1.5),
                 textAlign: TextAlign.center),
@@ -497,6 +498,8 @@ class _ReferFriendScreenState extends State<ReferFriendScreen> {
             final r    = entry.value as Map<String, dynamic>;
             final name = r['name'] as String? ?? 'GoOuts User';
             final done = r['rewarded'] as bool? ?? false;
+            // What was actually paid for this friend. See ReferralService.
+            final paid = (r['amount'] as double?) ?? 0.0;
             return Column(
               children: [
                 if (i > 0) Divider(height: 1, color: Colors.grey[100]),
@@ -542,7 +545,11 @@ class _ReferFriendScreenState extends State<ReferFriendScreen> {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          done ? '+£2.00' : 'Pending',
+                          done
+                              ? (paid > 0
+                                  ? '+£${paid.toStringAsFixed(2)}'
+                                  : 'Limit reached')
+                              : 'Pending',
                           style: GoogleFonts.inter(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,

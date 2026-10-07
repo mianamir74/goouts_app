@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:confetti/confetti.dart';
 import 'dart:math';
+import '../widgets/welcome_bonus_progress.dart';
 
 class BonusAddedScreen extends StatefulWidget {
   const BonusAddedScreen({super.key});
@@ -368,106 +369,11 @@ class _BonusAddedScreenState extends State<BonusAddedScreen> {
 
                     const SizedBox(height: 20),
 
-                    // ── £2 Hero Banner ────────────────────────────────────
-                    Container(
-                      clipBehavior: Clip.antiAlias,
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 22),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF005A82), Color(0xFF0392CA)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(22),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _primary.withValues(alpha: 0.30),
-                            blurRadius: 18,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          const Icon(Icons.card_giftcard_rounded,
-                              color: Colors.white70, size: 30),
-                          const SizedBox(height: 8),
-                          Text(
-                            '£2.00',
-                            style: GoogleFonts.inter(
-                              fontSize: 52,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                              height: 1.0,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Welcome Bonus — Added to your wallet',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white.withValues(alpha: 0.90),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 7),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.30)),
-                            ),
-                            child: Text(
-                              'Wallet balance: £2.00',
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // How to use it banner
-                    Container(
-                      clipBehavior: Clip.antiAlias,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF0F9FF),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                            color: _primary.withValues(alpha: 0.15)),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(Icons.info_outline_rounded,
-                              color: _primary, size: 18),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              'Spend it at any GoOuts partner and earn cashback on top. '
-                              'Your £2 is ready to use right now.',
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                color: const Color(0xFF0D1B3E),
-                                height: 1.55,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    // ── Welcome bonus: £5 in three steps ──────────────────
+                    // Replaced the flat two pound "added to your wallet"
+                    // banner on 4 October 2026. See
+                    // widgets/welcome_bonus_progress.dart.
+                    const WelcomeBonusProgress(),
 
                     const SizedBox(height: 16),
 
@@ -516,57 +422,6 @@ class _BonusAddedScreenState extends State<BonusAddedScreen> {
                                     fontWeight: FontWeight.bold,
                                     color: _primary,
                                     fontSize: 16,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          const SizedBox(height: 12),
-
-                          // £2 Welcome Bonus status row
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFDCFCE7),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                  color: const Color(0xFF16A34A)
-                                      .withValues(alpha: 0.2)),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFF16A34A),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.check_rounded,
-                                      color: Colors.white, size: 20),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '£2.00 credited to your wallet',
-                                        style: GoogleFonts.inter(
-                                          fontWeight: FontWeight.bold,
-                                          color: const Color(0xFF14532D),
-                                          fontSize: 15,
-                                        ),
-                                      ),
-                                      Text(
-                                        'Use at any GoOuts partner',
-                                        style: GoogleFonts.inter(
-                                          color: const Color(0xFF166534),
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                    ],
                                   ),
                                 ),
                               ],

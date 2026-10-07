@@ -89,7 +89,15 @@ class UserService {
       'country': country,
       'role': 'customer',
       'kycStatus': 'not_started',
-      'walletBalance': 2.0,   // £2 welcome bonus credited on registration
+      // ⚠ CHANGED 4 October 2026. This was 2.0: the app credited a flat £2
+      // welcome bonus to itself at registration. The welcome bonus is now £5,
+      // unlocked in three steps by real purchases, and the SERVER pays each
+      // step (admin_panel/functions/welcome_bonus.js). So the wallet starts at
+      // zero, and welcomeBonusScheme tells the server this account is on the
+      // new scheme. An old build that still writes 2.0 here is treated as
+      // legacy by the server and gets no steps on top.
+      'walletBalance': 0.0,
+      'welcomeBonusScheme': 'tiered_v1',
       'cashbackBalance': 0.0,
       'cashbackPoints': 0,
       // ── Family & GoOuts Plus fields ──
@@ -121,16 +129,9 @@ class UserService {
       'createdAt': FieldValue.serverTimestamp(),
     });
 
-    // Credit £2 welcome bonus transaction to history
-    await TransactionService().addTransaction(
-      title: '£2 Welcome Bonus',
-      amount: 2.0,
-      amountFormatted: '+£2.00',
-      type: 'Welcome Bonus',
-      iconKey: 'gift',
-      positive: true,
-      status: 'Completed',
-    );
+    // The '£2 Welcome Bonus' history row that used to be written here is gone
+    // with the flat bonus (4 October 2026). The server now writes one
+    // 'Welcome Bonus, step N of 3' row each time a step is unlocked.
   }
 
   /// Fetch current user's Firestore data

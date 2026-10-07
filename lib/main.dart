@@ -58,6 +58,7 @@ import 'screens/delivery_confirmation_screen.dart';
 import 'screens/food_delivery_chat_screen.dart';
 import 'screens/food_order_history_screen.dart';
 import 'screens/refer_friend_screen.dart';
+import 'widgets/welcome_bonus_progress.dart';
 import 'screens/become_a_partner_screen.dart';
 import 'screens/family_plan_screen.dart';
 import 'screens/goouts_plus_unlocked_screen.dart';
@@ -177,6 +178,10 @@ void routeFromMessage(RemoteMessage msg) {
       break;
     case 'refer_friend':
       nav.pushNamed('/refer-friend');
+      break;
+    // Added 4 October 2026. Set by welcome_bonus.js on every step message.
+    case 'welcome_bonus':
+      nav.pushNamed('/welcome-bonus');
       break;
     // ⚠ THE KEY IS 'stay_claim' AND IT IS SET IN stay_claims.js _notify().
     //
@@ -346,6 +351,8 @@ class _GoOutsAppState extends State<GoOutsApp> {
         '/special-offers': (context) => const SpecialOffersScreen(),
         '/partner-offer': (context) => const PartnerOfferScreen(),
         '/bonus-added': (context) => const BonusAddedScreen(),
+        // Added 4 October 2026. The £5 three step welcome bonus progress.
+        '/welcome-bonus': (context) => const WelcomeBonusScreen(),
         '/family-plan': (context) => const FamilyPlanScreen(),
         '/goouts-plus-unlocked': (context) => const GoOutsPlusUnlockedScreen(),
         '/family-cashback-intro': (context) {

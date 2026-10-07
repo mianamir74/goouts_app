@@ -50,7 +50,13 @@ class _TransferScreenState extends State<TransferScreen> {
   @override
   void initState() {
     super.initState();
-    _available = widget.availableBalance ?? 0;
+    // ⚠ CHANGED 4 October 2026. Only EARNED CASHBACK may be shared with
+    // another user. Wallet top-ups, welcome bonus and referral rewards may
+    // not, because moving stored money between people is what brings a
+    // product under payment and anti money laundering rules (Mian's decision).
+    // The value the caller passes in is the WALLET balance, so it is no longer
+    // used as the first paint; the figure comes from cashbackBalance below.
+    _available = 0;
     _loadBalance();
   }
 
@@ -66,7 +72,7 @@ class _TransferScreenState extends State<TransferScreen> {
           .doc(uid)
           .get();
       if (!mounted) return;
-      final raw = snap.data()?['walletBalance'];
+      final raw = snap.data()?['cashbackBalance'];
       setState(() {
         _available = raw is num ? raw.toDouble() : 0.0;
         _balanceLoading = false;
@@ -120,7 +126,8 @@ class _TransferScreenState extends State<TransferScreen> {
                           color: _dark)),
                   content: Text(
                     'Enter the recipient\'s registered email or phone number, '
-                    'then enter the amount you wish to transfer from your GoOuts wallet. '
+                    'then enter the amount of earned cashback you wish to share. '
+                    'Only cashback can be shared, not wallet top-ups or bonus. '
                     'Transfers are instant and free between GoOuts users.',
                     style: GoogleFonts.inter(
                         fontSize: 14, color: Colors.grey[700])),
@@ -313,7 +320,7 @@ class _TransferScreenState extends State<TransferScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Available Balance',
+                              'Cashback Available to Share',
                               style: GoogleFonts.inter(
                                   fontSize: 14, color: Colors.grey[500]),
                             ),
@@ -615,7 +622,7 @@ class _TransferScreenState extends State<TransferScreen> {
                   if (_amount > available) {
                     GoOutsSheet.warning(context,
                       title: 'Insufficient Balance',
-                      message: 'Available balance: £${available.toStringAsFixed(2)}',
+                      message: 'Cashback available to share: £${available.toStringAsFixed(2)}',
                     );
                     return;
                   }

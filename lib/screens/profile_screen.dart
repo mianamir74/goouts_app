@@ -915,14 +915,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _menuRow(
               icon: Icons.card_giftcard_rounded,
               title: 'Refer a Friend',
-              subtitle: 'Give £2, get £2 for every friend who joins',
+              subtitle: 'Earn £5 for every friend who joins and buys',
               trailing: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: const Color(0xFF10B981).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text('£2 Reward',
+                child: Text('£5 Reward',
                     style: GoogleFonts.inter(
                         fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF10B981))),
               ),

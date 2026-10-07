@@ -135,12 +135,19 @@ class ReferralService {
         return {
           'name': data['displayName'] as String? ?? 'GoOuts User',
           'rewarded': data['rewarded'] as bool? ?? false,
+          // Added 4 October 2026. What was actually paid for this friend:
+          // £5 on the new scheme, £2 for older referrals (which have no
+          // rewardAmount field), 0 when the 20 friend limit had been reached.
+          'amount': data['rewardAmount'] is num
+              ? (data['rewardAmount'] as num).toDouble()
+              : ((data['rewarded'] as bool? ?? false) ? 2.0 : 0.0),
           'joinedAt': data['joinedAt'],
         };
       }).toList();
 
       final rewardedCount = referrals.where((r) => r['rewarded'] == true).length;
-      final totalEarned = rewardedCount * 2.0;
+      final totalEarned = referrals.fold<double>(
+          0.0, (total, r) => total + ((r['amount'] as double?) ?? 0.0));
 
       return {
         'count': referrals.length,

@@ -71,6 +71,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'profile': Navigator.pushNamed(context, '/profile'); break;
       case 'wallet':  Navigator.pushNamed(context, '/wallet');  break;
       case 'messages':Navigator.pushNamed(context, '/messages');break;
+      // Added 4 October 2026. Both keys are set by welcome_bonus.js. Without
+      // these the tap fell through to the plain detail screen.
+      case 'refer_friend':  Navigator.pushNamed(context, '/refer-friend');  break;
+      case 'welcome_bonus': Navigator.pushNamed(context, '/welcome-bonus'); break;
       default:
         // Informational notifications → show detail screen
         Navigator.pushNamed(context, '/notification-detail', arguments: data);
