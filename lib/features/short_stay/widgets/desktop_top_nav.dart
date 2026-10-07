@@ -173,6 +173,16 @@ class GoOutsBrandLogo extends StatelessWidget {
 /// in a new tab — the same "Join as Host" destination a host would actually
 /// need, not a dead link. Public for the same reason as GoOutsBrandLogo above.
 class JoinAsHostButton extends StatefulWidget {
+  /// 7 October 2026: label and destination can be overridden, so the Food
+  /// Delivery page can say "Join as Partner" and open the partner page
+  /// instead of the Host dashboard. Defaults are unchanged for Short Stay.
+  const JoinAsHostButton({super.key, this.label = 'Join as Host', this.url});
+
+  final String label;
+
+  /// Null = the Host dashboard (kHostDashboardUrl).
+  final String? url;
+
   @override
   State<JoinAsHostButton> createState() => _JoinAsHostButtonState();
 }
@@ -181,7 +191,7 @@ class _JoinAsHostButtonState extends State<JoinAsHostButton> {
   bool _hovering = false;
 
   Future<void> _open() async {
-    final uri = Uri.parse(kHostDashboardUrl);
+    final uri = Uri.parse(widget.url ?? kHostDashboardUrl);
     await launchUrl(uri, webOnlyWindowName: '_blank');
   }
 
@@ -206,7 +216,7 @@ class _JoinAsHostButtonState extends State<JoinAsHostButton> {
             ),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Text('Join as Host',
+          child: Text(widget.label,
               style: GoogleFonts.inter(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,

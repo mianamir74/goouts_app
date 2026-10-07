@@ -540,8 +540,10 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: <Widget>[
+                        // 7 October 2026, requested directly: no icon on
+                        // Short Stay, Explore Cashback or About Us here -
+                        // plain links, like goouts.co.uk's own top nav.
                         _NavIconTab(
-                          icon: Icons.villa_rounded,
                           label: 'Short Stay',
                           onTap: () => Navigator.of(context)
                               .pushNamedAndRemoveUntil(
@@ -556,14 +558,12 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
                         ),
                         const SizedBox(width: 4),
                         _NavIconTab(
-                          icon: Icons.local_offer_rounded,
                           label: 'Explore Cashback',
                           onTap: () => Navigator.of(context)
                               .pushNamed(StayRoutes.exploreCashback),
                         ),
                         const SizedBox(width: 4),
                         _NavIconTab(
-                          icon: Icons.info_outline_rounded,
                           label: 'About Us',
                           onTap: () => Navigator.of(context)
                               .pushNamed(StayRoutes.aboutUs),
@@ -580,6 +580,10 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
                 // profile+menu LAST. Spacing widened from 4px to 10px
                 // between these icons so they read as separate tap targets
                 // instead of a cramped cluster.
+                // 7 October 2026, requested directly: Social Boost now comes
+                // BEFORE the cart and Orders.
+                _socialBoostNavLink(context),
+                const SizedBox(width: 14),
                 if (user != null) ...<Widget>[
                   _cartIconButton(context),
                   const SizedBox(width: 10),
@@ -592,9 +596,13 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
                   ),
                   const SizedBox(width: 10),
                 ],
-                _socialBoostNavLink(context),
-                const SizedBox(width: 20),
-                JoinAsHostButton(),
+                const SizedBox(width: 10),
+                // 7 October 2026, requested directly: on Food Delivery this
+                // is for restaurants, not hosts.
+                const JoinAsHostButton(
+                  label: 'Join as Partner',
+                  url: 'https://www.goouts.co.uk/business.html#apply',
+                ),
                 const SizedBox(width: 14),
                 AccountMenuButton(user: user),
               ],
@@ -672,33 +680,48 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
                 size: 19,
                 color: _socialBoostOnly ? _primary : _navy),
             const SizedBox(width: 7),
-            Text('Social Boost',
-                style: GoogleFonts.inter(
-                  fontSize: 14.5,
-                  fontWeight:
-                      _socialBoostOnly ? FontWeight.w700 : FontWeight.w500,
-                  color: _socialBoostOnly ? _primary : _navy,
-                )),
-            const SizedBox(width: 6),
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: <Color>[Color(0xFF6C63FF), Color(0xFFF59E0B)],
+            // 7 October 2026, requested directly: the BONUS badge sits
+            // ABOVE the end of "Boost", the way goouts.co.uk's own nav has
+            // it (top:-8px; right:-22px there), instead of beside the text.
+            // The trailing SizedBox keeps the overhang off the next item.
+            Stack(
+              clipBehavior: Clip.none,
+              children: <Widget>[
+                Text('Social Boost',
+                    style: GoogleFonts.inter(
+                      fontSize: 14.5,
+                      fontWeight: _socialBoostOnly
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                      color: _socialBoostOnly ? _primary : _navy,
+                    )),
+                Positioned(
+                  top: -10,
+                  right: -24,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 5, vertical: 2),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: <Color>[Color(0xFF6C63FF), Color(0xFFF59E0B)],
+                      ),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text('BONUS',
+                        style: GoogleFonts.inter(
+                          fontSize: 8,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          letterSpacing: 0.5,
+                          height: 1,
+                        )),
+                  ),
                 ),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text('BONUS',
-                  style: GoogleFonts.inter(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                    height: 1,
-                  )),
+              ],
             ),
+            const SizedBox(width: 26),
           ],
         ),
       ),
@@ -2099,13 +2122,14 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
 /// since those are private State fields this top-level class can't reach.
 class _NavIconTab extends StatefulWidget {
   const _NavIconTab({
-    required this.icon,
+    this.icon,
     required this.label,
     required this.onTap,
     this.active = false,
   });
 
-  final IconData icon;
+  /// Null = a plain text link with no leading icon.
+  final IconData? icon;
   final String label;
   final VoidCallback onTap;
   final bool active;
@@ -2136,8 +2160,10 @@ class _NavIconTabState extends State<_NavIconTab> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Icon(widget.icon, size: 19, color: color),
-              const SizedBox(width: 7),
+              if (widget.icon != null) ...<Widget>[
+                Icon(widget.icon, size: 19, color: color),
+                const SizedBox(width: 7),
+              ],
               Text(widget.label,
                   style: GoogleFonts.inter(
                     fontSize: 14.5,
