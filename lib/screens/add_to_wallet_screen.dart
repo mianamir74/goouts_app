@@ -18,6 +18,9 @@ class _AddToWalletScreenState extends State<AddToWalletScreen>
   late Animation<Offset> _slideAnim;
   bool _cardAdded = false;
   bool _fromWallet = false;
+  // 7 October 2026: card shows the registered user's name (was a hardcoded
+  // placeholder). Falls back to 'CARD HOLDER' until the profile loads.
+  String _cardHolder = '';
 
   @override
   void initState() {
@@ -33,11 +36,25 @@ class _AddToWalletScreenState extends State<AddToWalletScreen>
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
     _animController.forward();
+    _loadCardHolder();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final args = ModalRoute.of(context)?.settings.arguments;
       if (args == 'fromWallet') setState(() => _fromWallet = true);
     });
   }
+
+  Future<void> _loadCardHolder() async {
+    try {
+      final data = await UserService().getCurrentUser();
+      final name = (data?['fullName'] as String?)?.trim() ?? '';
+      if (mounted && name.isNotEmpty) setState(() => _cardHolder = name);
+    } catch (_) {
+      // Leave the neutral 'CARD HOLDER' label in place.
+    }
+  }
+
+  String get _cardHolderLabel =>
+      _cardHolder.isNotEmpty ? _cardHolder.toUpperCase() : 'CARD HOLDER';
 
   @override
   void dispose() {
@@ -85,11 +102,25 @@ class _AddToWalletScreenState extends State<AddToWalletScreen>
                 opacity: _fadeAnim,
                 child: SlideTransition(
                   position: _slideAnim,
-                  child: SingleChildScrollView(
+                  child: _cardAdded
+                      // 7 October 2026: success state fills exactly one screen
+                      // (button pinned to the bottom); it only scrolls on very
+                      // short screens.
+                      ? LayoutBuilder(
+                          builder: (context, box) => SingleChildScrollView(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 24),
+                            child: ConstrainedBox(
+                              constraints:
+                                  BoxConstraints(minHeight: box.maxHeight),
+                              child: IntrinsicHeight(
+                                  child: _buildSuccessState()),
+                            ),
+                          ),
+                        )
+                      : SingleChildScrollView(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: _cardAdded
-                        ? _buildSuccessState()
-                        : Column(
+                    child: Column(
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               const SizedBox(height: 48),
@@ -121,45 +152,45 @@ class _AddToWalletScreenState extends State<AddToWalletScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        const SizedBox(height: 32),
+        const SizedBox(height: 12),
 
         // Virtual Card
         _buildSuccessCard(primaryColor),
 
-        const SizedBox(height: 48),
+        const SizedBox(height: 24),
 
         // Green tick
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           decoration: const BoxDecoration(
             color: successColor,
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.check, color: Colors.white, size: 40),
+          child: const Icon(Icons.check, color: Colors.white, size: 34),
         ),
 
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
 
         Text(
           'Card Added!',
           style: GoogleFonts.inter(
-              fontSize: 32,
+              fontSize: 28,
               fontWeight: FontWeight.bold,
               color: textNavy),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         Text(
           'Your GoOuts card has been added to your phone wallet successfully.',
           textAlign: TextAlign.center,
           style: GoogleFonts.inter(
-              fontSize: 16, color: textGrey, height: 1.5),
+              fontSize: 15, color: textGrey, height: 1.4),
         ),
 
-        const SizedBox(height: 48),
+        const SizedBox(height: 24),
 
         // Bank link nudge card
         Container(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: primaryColor.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(20),
@@ -191,12 +222,13 @@ class _AddToWalletScreenState extends State<AddToWalletScreen>
           ),
         ),
 
-        const SizedBox(height: 40),
+        const SizedBox(height: 16),
+        const Spacer(),
 
         // Continue / Next button
         SizedBox(
           width: double.infinity,
-          height: 64,
+          height: 56,
           child: ElevatedButton(
             onPressed: () => _fromWallet
                 ? Navigator.pushReplacementNamed(context, '/home')
@@ -222,7 +254,7 @@ class _AddToWalletScreenState extends State<AddToWalletScreen>
             ),
           ),
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 16),
       ],
     );
   }
@@ -230,7 +262,7 @@ class _AddToWalletScreenState extends State<AddToWalletScreen>
   Widget _buildSuccessCard(Color primaryColor) {
     return Container(
       width: double.infinity,
-      height: 220,
+      height: 196,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -278,12 +310,13 @@ class _AddToWalletScreenState extends State<AddToWalletScreen>
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 2)),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Column(
+                    Expanded(
+                      child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('CARD HOLDER',
@@ -292,13 +325,17 @@ class _AddToWalletScreenState extends State<AddToWalletScreen>
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold)),
                         const SizedBox(height: 4),
-                        Text('ALEX STERLING',
+                        Text(_cardHolderLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.inter(
                                 color: Colors.white,
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold)),
                       ],
                     ),
+                    ),
+                    const SizedBox(width: 12),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -315,6 +352,7 @@ class _AddToWalletScreenState extends State<AddToWalletScreen>
                                 fontWeight: FontWeight.bold)),
                       ],
                     ),
+                    const SizedBox(width: 16),
                     Text('VISA',
                         style: GoogleFonts.inter(
                             color: Colors.white,
@@ -457,7 +495,7 @@ class _AddToWalletScreenState extends State<AddToWalletScreen>
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('ALEX STERLING',
+                    Text(_cardHolderLabel,
                         style: GoogleFonts.inter(
                             fontSize: 11,
                             color: Colors.white.withValues(alpha: 0.8),
