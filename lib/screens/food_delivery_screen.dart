@@ -342,7 +342,7 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
       child: Stack(
         fit: StackFit.expand,
         children: <Widget>[
-          Container(color: const Color(0xFFFAC836)), // shows instantly while the photo loads — sampled from this photo's own background yellow, so there's no colour flash
+          Container(color: const Color(0xFFE7B070)), // 7 October 2026: wood tone of the new table photo (was couple-photo yellow) // shows instantly while the photo loads — sampled from this photo's own background yellow, so there's no colour flash
           Image.asset(
             'assets/images/food_hero_couple.jpg',
             fit: BoxFit.cover,

@@ -69,10 +69,16 @@ class _FoodDeliveryChatScreenState extends State<FoodDeliveryChatScreen> {
       final data        = snap.data()!;
       final status      = data['status'] as String? ?? '';
       final deliveredAt = (data['deliveredAt'] as Timestamp?)?.toDate();
+      // 7 October 2026: a driver accepting no longer changes `status` (it
+      // stays the restaurant's accepted/preparing/ready until pickup), so
+      // "driver on the way" is now: a driver is assigned and not yet
+      // picked up.
+      final driverOnWay = data['driverId'] != null &&
+          const ['accepted', 'preparing', 'ready'].contains(status);
       setState(() {
         _orderStatus = status;
         _deliveredAt = deliveredAt;
-        _chatOpen    = _computeChatOpen(status, deliveredAt);
+        _chatOpen    = driverOnWay || _computeChatOpen(status, deliveredAt);
       });
       _scheduleLockIfNeeded(deliveredAt);
     });

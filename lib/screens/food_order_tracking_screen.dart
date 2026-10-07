@@ -209,7 +209,11 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
     const blocked = ['ready', 'driver_heading_to_restaurant',
                      'driver_picked_up', 'delivered',
                      'cancelled', 'cancelled_with_fee', 'refunded', 'rejected'];
-    if (blocked.contains(status)) {
+    // 7 October 2026: a driver being assigned no longer changes `status`,
+    // so "driver already on the way" is read from driverId. Mirrors
+    // cancelFoodOrder's own server-side check.
+    final driverAssigned = _order?['driverId'] != null;
+    if (blocked.contains(status) || driverAssigned) {
       if (mounted) setState(() { _cancelAllowed = false; _cancelFree = false; _cancelFreeRemaining = null; });
       return;
     }
@@ -714,7 +718,9 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
         actions: [
           // Chat button — shown once driver is heading to restaurant
           if (['driver_heading_to_restaurant', 'driver_picked_up', 'delivered']
-              .contains(status))
+                  .contains(status) ||
+              (order['driverId'] != null &&
+                  const ['accepted', 'preparing', 'ready'].contains(status)))
             IconButton(
               icon: const Icon(Icons.chat_bubble_outline_rounded,
                   color: Color(0xFF0392CA)),
@@ -759,7 +765,10 @@ class _FoodOrderTrackingScreenState extends State<FoodOrderTrackingScreen> {
 
             // Live tracking map — shown when driver is en route
             if (['driver_heading_to_restaurant', 'driver_picked_up']
-                .contains(status)) ...[
+                    .contains(status) ||
+                (order['driverId'] != null &&
+                    const ['accepted', 'preparing', 'ready']
+                        .contains(status))) ...[
               const SizedBox(height: 16),
               LiveTrackingMap(
                 orderId: _orderId,
