@@ -1406,15 +1406,15 @@ class _CreateProfileExpandedScreenState
   }
 
   static const String _termsContent = '''
-GOOUTS LIMITED — TERMS & CONDITIONS OF SERVICE
+GOOUTS TECHNOLOGIES LTD — TERMS & CONDITIONS OF SERVICE
 Last Updated: September 2026 | Version 3.2
-Registered in England & Wales
+Registered in England & Wales, Company No. 12200097
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 IMPORTANT — PLEASE READ CAREFULLY
 
-By registering for a GoOuts account and ticking the acceptance box, you are entering into a legally binding agreement with GoOuts Technologies Limited ("GoOuts", "we", "us", "our"). These Terms govern your use of the GoOuts mobile application, wallet, cashback services, escrow facility, and advance facility. If you do not agree to these Terms in their entirety, you must not register or use our services.
+By registering for a GoOuts account and ticking the acceptance box, you are entering into a legally binding agreement with GoOuts Technologies Ltd ("GoOuts", "we", "us", "our"). These Terms govern your use of the GoOuts mobile application, wallet, cashback services, escrow facility, and advance facility. If you do not agree to these Terms in their entirety, you must not register or use our services.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -1618,7 +1618,7 @@ PART 9 — KYC & IDENTITY VERIFICATION
 
 9.1 LEGAL BASIS
 
-GoOuts Technologies Limited is required by law to verify the identity of all account holders under the Money Laundering, Terrorist Financing and Transfer of Funds (Information on the Payer) Regulations 2017 (SI 2017/692) ("MLR 2017") and the Proceeds of Crime Act 2002. The full text of MLR 2017 is available at: https://www.legislation.gov.uk/uksi/2017/692/contents As a business operating a cashback rewards and digital wallet platform in the United Kingdom, GoOuts is subject to UK Anti-Money Laundering ("AML") obligations and is required to conduct Know Your Customer ("KYC") checks before users can actively use cashback and wallet features.
+GoOuts Technologies Ltd is required by law to verify the identity of all account holders under the Money Laundering, Terrorist Financing and Transfer of Funds (Information on the Payer) Regulations 2017 (SI 2017/692) ("MLR 2017") and the Proceeds of Crime Act 2002. The full text of MLR 2017 is available at: https://www.legislation.gov.uk/uksi/2017/692/contents As a business operating a cashback rewards and digital wallet platform in the United Kingdom, GoOuts is subject to UK Anti-Money Laundering ("AML") obligations and is required to conduct Know Your Customer ("KYC") checks before users can actively use cashback and wallet features.
 
 9.2 KYC IS MANDATORY
 
@@ -1706,13 +1706,13 @@ PART 13 — GOVERNING LAW & DISPUTES
 
 CONTACT
 
-GoOuts Technologies Limited
+GoOuts Technologies Ltd
 support@goouts.co.uk
 disputes@goouts.co.uk
 complaints@goouts.co.uk
 
-Registered in England & Wales
-GoOuts Technologies Limited operates as a Technical Service Provider under Schedule 1, Part 2(j) of the UK Payment Services Regulations 2017.
+Registered in England & Wales, Company No. 12200097
+GoOuts Technologies Ltd operates as a Technical Service Provider under Schedule 1, Part 2(j) of the UK Payment Services Regulations 2017.
 Payment services provided by Stripe Payments Europe Ltd (FCA ref: 900461).
 
 These Terms were last reviewed and approved by GoOuts Legal, June 2026. Clause 6.6 was amended September 2026 to permit user-to-user Cashback transfers.

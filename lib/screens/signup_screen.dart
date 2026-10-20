@@ -10,6 +10,10 @@ import '../widgets/goouts_sheet.dart';
 import '../widgets/goouts_loading_overlay.dart';
 import 'login_screen.dart';
 
+/// Website sign-ups switch. true = new accounts can only be created in the
+/// phone app; the website shows a Sign in button instead. 8 October 2026.
+const bool kWebSignupsPaused = true;
+
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
 
@@ -447,6 +451,15 @@ For questions: legal@goouts.co.uk''',
     return LayoutBuilder(
       builder: (context, constraints) {
         final bool desktop = kIsWeb && constraints.maxWidth >= 900;
+        // 8 October 2026, requested directly: new sign-ups on the website
+        // are paused while Maz tests. Signing IN stays open. The page shows
+        // the existing "create your account on the app" message with a
+        // Sign in button. Set kWebSignupsPaused to false to reopen.
+        if (kIsWeb && kWebSignupsPaused) {
+          return desktop
+              ? _desktopWebNotSupported(context)
+              : _webNotSupported(context);
+        }
         return GestureDetector(
           onTap: () => FocusScope.of(context).unfocus(),
           child: Scaffold(

@@ -176,7 +176,8 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
                           ),
                         )
                       : Image.asset(
-                          'assets/images/signup_hero.webp',
+                          (args?['imageAsset'] as String?) ??
+                              'assets/images/signup_hero.webp',
                           height: 220,
                           width: double.infinity,
                           fit: BoxFit.cover,

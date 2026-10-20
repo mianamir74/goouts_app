@@ -191,7 +191,7 @@ class AboutUsScreen extends StatelessWidget {
             ),
             InkWell(
               onTap: () async {
-                final Uri uri = Uri.parse(kHostDashboardUrl);
+                final Uri uri = Uri.parse(kHostJoinUrl);
                 await launchUrl(uri, webOnlyWindowName: '_blank');
               },
               borderRadius: BorderRadius.circular(10),
@@ -241,7 +241,7 @@ class AboutUsScreen extends StatelessWidget {
                 ),
         ),
         SizedBox(height: desktop ? 40 : 28),
-        Text('GoOuts Technologies Limited is a UK-registered company. '
+        Text('GoOuts Technologies Ltd is a UK-registered company. '
             'Full registration and VAT details are published in the site '
             'footer.',
             style: GoogleFonts.inter(

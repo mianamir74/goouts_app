@@ -46,6 +46,10 @@ enum DesktopNavTab { stay, food, explore, about, none }
 /// links straight into /shortstay/#/login the same way).
 const String kHostDashboardUrl = 'https://goouts-host-dashboard.web.app';
 
+/// Where "Join as Host" goes: the Become a Host page on the website, which
+/// matches the Join as Partner page. Added 7 October 2026.
+const String kHostJoinUrl = 'https://www.goouts.co.uk/host.html';
+
 class DesktopTopNav extends StatelessWidget {
   const DesktopTopNav({
     super.key,
@@ -83,20 +87,20 @@ class DesktopTopNav extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: <Widget>[
                         _NavIconTab(
+                          icon: Icons.restaurant_rounded,
+                          label: 'Food Delivery',
+                          active: current == DesktopNavTab.food,
+                          onTap: () =>
+                              Navigator.of(context).pushNamed('/food-delivery'),
+                        ),
+                        const SizedBox(width: 4),
+                        _NavIconTab(
                           icon: Icons.villa_rounded,
                           label: 'Short Stay',
                           active: current == DesktopNavTab.stay,
                           onTap: () => Navigator.of(context)
                               .pushNamedAndRemoveUntil(
                                   StayRoutes.home, (r) => false),
-                        ),
-                        const SizedBox(width: 4),
-                        _NavIconTab(
-                          icon: Icons.restaurant_rounded,
-                          label: 'Food Delivery',
-                          active: current == DesktopNavTab.food,
-                          onTap: () =>
-                              Navigator.of(context).pushNamed('/food-delivery'),
                         ),
                         const SizedBox(width: 4),
                         _NavIconTab(
@@ -109,11 +113,13 @@ class DesktopTopNav extends StatelessWidget {
                         const SizedBox(width: 4),
                         _NavIconTab(
                           icon: Icons.info_outline_rounded,
-                          label: 'About Us',
+                          label: 'About',
                           active: current == DesktopNavTab.about,
                           onTap: () => Navigator.of(context)
                               .pushNamed(StayRoutes.aboutUs),
                         ),
+                        const SizedBox(width: 4),
+                        const SocialBoostNavLink(),
                       ],
                     ),
                   ),
@@ -147,21 +153,40 @@ class GoOutsBrandLogo extends StatelessWidget {
       borderRadius: BorderRadius.circular(6),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-        child: RichText(
-          text: TextSpan(
-            style: GoogleFonts.inter(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.5,
+        // 8 October 2026: the G icon now sits before the wordmark, the same
+        // as the goouts.co.uk header.
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.asset(
+                'assets/images/goouts_g_icon.png',
+                width: 30,
+                height: 30,
+                filterQuality: FilterQuality.high,
+                errorBuilder: (_, __, ___) => const SizedBox(width: 30),
+              ),
             ),
-            children: const <TextSpan>[
-              TextSpan(
-                  text: 'Go', style: TextStyle(color: GoOutsColors.deepNavy)),
-              TextSpan(
-                  text: 'Outs',
-                  style: TextStyle(color: GoOutsColors.primaryBlue)),
-            ],
-          ),
+            const SizedBox(width: 9),
+            RichText(
+              text: TextSpan(
+                style: GoogleFonts.inter(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                ),
+                children: const <TextSpan>[
+                  TextSpan(
+                      text: 'Go',
+                      style: TextStyle(color: GoOutsColors.deepNavy)),
+                  TextSpan(
+                      text: 'Outs',
+                      style: TextStyle(color: GoOutsColors.primaryBlue)),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -180,7 +205,7 @@ class JoinAsHostButton extends StatefulWidget {
 
   final String label;
 
-  /// Null = the Host dashboard (kHostDashboardUrl).
+  /// Null = the Become a Host page (kHostJoinUrl).
   final String? url;
 
   @override
@@ -191,9 +216,61 @@ class _JoinAsHostButtonState extends State<JoinAsHostButton> {
   bool _hovering = false;
 
   Future<void> _open() async {
-    final uri = Uri.parse(widget.url ?? kHostDashboardUrl);
+    final uri = Uri.parse(widget.url ?? kHostJoinUrl);
     await launchUrl(uri, webOnlyWindowName: '_blank');
   }
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() => _hovering = false),
+      child: InkWell(
+        onTap: _open,
+        borderRadius: BorderRadius.circular(8),
+        // 8 October 2026: the same blue button as goouts.co.uk's
+        // "Join as Partner" (was a white outlined button).
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          transform: Matrix4.translationValues(0, _hovering ? -1 : 0, 0),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: <Color>[
+                Color(0xFF0476A5),
+                Color(0xFF1492C9),
+                Color(0xFF24AEEC),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(widget.label,
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              )),
+        ),
+      ),
+    );
+  }
+}
+
+/// "Social Boost" with its BONUS badge, opening goouts.co.uk/boost.html —
+/// the same menu item, wording and badge as the website header. Added
+/// 8 October 2026 so the Short Stay pages carry the full site menu.
+class SocialBoostNavLink extends StatefulWidget {
+  const SocialBoostNavLink({super.key});
+
+  @override
+  State<SocialBoostNavLink> createState() => _SocialBoostNavLinkState();
+}
+
+class _SocialBoostNavLinkState extends State<SocialBoostNavLink> {
+  bool _hovering = false;
 
   @override
   Widget build(BuildContext context) {
@@ -204,24 +281,43 @@ class _JoinAsHostButtonState extends State<JoinAsHostButton> {
       onEnter: (_) => setState(() => _hovering = true),
       onExit: (_) => setState(() => _hovering = false),
       child: InkWell(
-        onTap: _open,
+        onTap: () => launchUrl(Uri.parse('https://www.goouts.co.uk/boost.html'),
+            webOnlyWindowName: '_self'),
         borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: _hovering
-                  ? GoOutsColors.primaryBlue
-                  : GoOutsColors.outlineVariant,
-            ),
-            borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 10, 26, 10),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: <Widget>[
+              Text('Social Boost',
+                  style: GoogleFonts.inter(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  )),
+              Positioned(
+                top: -10,
+                right: -24,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: <Color>[Color(0xFF7C3AED), Color(0xFFF59E0B)],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text('BONUS',
+                      style: GoogleFonts.inter(
+                        fontSize: 8,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.6,
+                        color: Colors.white,
+                      )),
+                ),
+              ),
+            ],
           ),
-          child: Text(widget.label,
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: color,
-              )),
         ),
       ),
     );
@@ -411,8 +507,8 @@ class _NavIconTabState extends State<_NavIconTab> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Icon(widget.icon, size: 19, color: color),
-              const SizedBox(width: 7),
+              // 8 October 2026: icons removed so every page's menu matches
+              // goouts.co.uk (plain words, current page in blue).
               Text(widget.label,
                   style: GoogleFonts.inter(
                     fontSize: 14.5,

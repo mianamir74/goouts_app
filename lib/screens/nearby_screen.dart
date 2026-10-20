@@ -724,6 +724,66 @@ class _NearbyScreenState extends State<NearbyScreen> {
 
   // ── FAST FOOD FILTER STATE ─────────────────────────────
   String _fastFoodFilter = 'All';
+  // DEMO ONLY: Home Needs stores for the partner pitch. Not live data.
+  final List<Map<String, dynamic>> _homeNeeds = [
+    {
+      'name': 'Home Needs Finchley Road',
+      'category': 'Home Needs',
+      'subtype': 'Home Needs',
+      'rating': 'New',
+      'visits': 'Demo partner',
+      'address': 'Finchley Rd, London NW11 0AA',
+      'phone': 'Visit in store',
+      'cashback': '15%',
+      'color': const Color(0xFF8A1C1C),
+      'icon': Icons.kitchen_rounded,
+      'imageAsset': 'assets/images/special offers/home_needs.webp',
+      'desc': 'Your local Finchley Road home store for kitchenware, cleaning, storage and everyday essentials. Pay with GoOuts and get 15% cashback on every shop.',
+    },
+    {
+      'name': 'Home Needs Neasden',
+      'category': 'Home Needs',
+      'subtype': 'Home Needs',
+      'rating': 'New',
+      'visits': 'Demo partner',
+      'address': '270 Neasden Ln, Neasden, London NW10 0AD',
+      'phone': 'Visit in store',
+      'cashback': '15%',
+      'color': const Color(0xFF8A1C1C),
+      'icon': Icons.kitchen_rounded,
+      'imageAsset': 'assets/images/special offers/home_needs.webp',
+      'desc': 'Your local Neasden home store for kitchenware, cleaning, storage and everyday essentials. Pay with GoOuts and get 15% cashback on every shop.',
+    },
+    {
+      'name': 'Home Needs Kilburn Lane',
+      'category': 'Home Needs',
+      'subtype': 'Home Needs',
+      'rating': 'New',
+      'visits': 'Demo partner',
+      'address': '342 Kilburn Ln, London W9 3EF',
+      'phone': 'Visit in store',
+      'cashback': '15%',
+      'color': const Color(0xFF8A1C1C),
+      'icon': Icons.kitchen_rounded,
+      'imageAsset': 'assets/images/special offers/home_needs.webp',
+      'desc': 'Your local Kilburn home store for kitchenware, cleaning, storage and everyday essentials. Pay with GoOuts and get 15% cashback on every shop.',
+    },
+    {
+      'name': 'Home Needs Pinner',
+      'category': 'Home Needs',
+      'subtype': 'Home Needs',
+      'rating': 'New',
+      'visits': 'Demo partner',
+      'address': '349 Uxbridge Road, Pinner HA5 4JN',
+      'phone': 'Visit in store',
+      'cashback': '15%',
+      'color': const Color(0xFF8A1C1C),
+      'icon': Icons.kitchen_rounded,
+      'imageAsset': 'assets/images/special offers/home_needs.webp',
+      'desc': 'Your local Pinner home store for kitchenware, cleaning, storage and everyday essentials. Pay with GoOuts and get 15% cashback on every shop.',
+    },
+  ];
+
   final List<String> _fastFoodFilters = [
     'All', 'Chicken', 'Fish & Chips', 'Pizza', 'Burgers', 'Kebabs',
   ];
@@ -762,6 +822,10 @@ class _NearbyScreenState extends State<NearbyScreen> {
       case 'fast food':
         allVenues = _fastFood;
         categoryIcon = Icons.fastfood_rounded;
+        break;
+      case 'home needs':
+        allVenues = _homeNeeds;
+        categoryIcon = Icons.kitchen_rounded;
         break;
       case 'bars':
         allVenues = _clubs;
@@ -953,7 +1017,12 @@ class _NearbyScreenState extends State<NearbyScreen> {
                       // Background colour (shows while image loads)
                       Container(color: v['color'] as Color),
                       // Cached image — instant on revisit
-                      if (v['imageUrl'] != null)
+                      if (v['imageAsset'] != null)
+                        Image.asset(
+                          v['imageAsset'] as String,
+                          fit: BoxFit.cover,
+                        )
+                      else if (v['imageUrl'] != null)
                         CachedNetworkImage(
                           imageUrl: v['imageUrl'] as String,
                           fit: BoxFit.cover,

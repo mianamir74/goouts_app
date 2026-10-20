@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../utils/pin_hasher.dart';
-import 'transaction_service.dart';
 // referral_service import removed 3 August 2026: the only use was
 // ReferralService.generateInviteCode() at registration, which allocated an
 // invite code with no uniqueness check. Codes now come from ensureInviteCode.

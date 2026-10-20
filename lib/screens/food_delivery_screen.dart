@@ -344,7 +344,7 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
         children: <Widget>[
           Container(color: const Color(0xFFE7B070)), // 7 October 2026: wood tone of the new table photo (was couple-photo yellow) // shows instantly while the photo loads — sampled from this photo's own background yellow, so there's no colour flash
           Image.asset(
-            'assets/images/food_hero_couple.jpg',
+            'assets/images/food_hero_g.jpg', // 9 Oct 2026: same photo, wrapper now shows the GoOuts G (new name busts the year long cache)
             fit: BoxFit.cover,
             alignment: const Alignment(0, -0.35),
             errorBuilder: (_, __, ___) => Container(color: _navy),
@@ -365,13 +365,15 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  begin: Alignment.bottomLeft,
-                  end: Alignment.topRight,
+                  // 8 October 2026: follows the text, which now sits at
+                  // the centre-left instead of the bottom-left corner.
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
                   colors: <Color>[
                     Color(0x800D1B3E),
                     Color(0x000D1B3E),
                   ],
-                  stops: <double>[0.0, 0.42],
+                  stops: <double>[0.0, 0.5],
                 ),
               ),
             ),
@@ -384,7 +386,10 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: _desktopMaxWidth),
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(48, 0, 48, 56),
+                  // 8 October 2026, requested directly: headline and address
+                  // bar lifted from the bottom edge to the vertical centre
+                  // of the hero photo (bottom padding was 56).
+                  padding: const EdgeInsets.fromLTRB(48, 0, 48, 290),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
@@ -544,17 +549,16 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
                         // Short Stay, Explore Cashback or About Us here -
                         // plain links, like goouts.co.uk's own top nav.
                         _NavIconTab(
+                          label: 'Food Delivery',
+                          active: true,
+                          onTap: () {},
+                        ),
+                        const SizedBox(width: 4),
+                        _NavIconTab(
                           label: 'Short Stay',
                           onTap: () => Navigator.of(context)
                               .pushNamedAndRemoveUntil(
                                   StayRoutes.home, (r) => r.isFirst),
-                        ),
-                        const SizedBox(width: 4),
-                        _NavIconTab(
-                          icon: Icons.restaurant_rounded,
-                          label: 'Food Delivery',
-                          active: true,
-                          onTap: () {},
                         ),
                         const SizedBox(width: 4),
                         _NavIconTab(
@@ -564,9 +568,17 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
                         ),
                         const SizedBox(width: 4),
                         _NavIconTab(
-                          label: 'About Us',
+                          label: 'About',
                           onTap: () => Navigator.of(context)
                               .pushNamed(StayRoutes.aboutUs),
+                        ),
+                        // 9 October 2026, requested directly: Social Boost
+                        // sits in the same place as on every other page (after
+                        // About), not out on the right. On this page it still
+                        // filters to Social Boost restaurants.
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(14, 0, 26, 0),
+                          child: _socialBoostNavLink(context),
                         ),
                       ],
                     ),
@@ -582,8 +594,6 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
                 // instead of a cramped cluster.
                 // 7 October 2026, requested directly: Social Boost now comes
                 // BEFORE the cart and Orders.
-                _socialBoostNavLink(context),
-                const SizedBox(width: 14),
                 if (user != null) ...<Widget>[
                   _cartIconButton(context),
                   const SizedBox(width: 10),
@@ -676,10 +686,6 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(Icons.bolt_rounded,
-                size: 19,
-                color: _socialBoostOnly ? _primary : _navy),
-            const SizedBox(width: 7),
             // 7 October 2026, requested directly: the BONUS badge sits
             // ABOVE the end of "Boost", the way goouts.co.uk's own nav has
             // it (top:-8px; right:-22px there), instead of beside the text.
@@ -692,7 +698,7 @@ class _FoodDeliveryScreenState extends State<FoodDeliveryScreen>
                       fontSize: 14.5,
                       fontWeight: _socialBoostOnly
                           ? FontWeight.w700
-                          : FontWeight.w500,
+                          : FontWeight.w600,
                       color: _socialBoostOnly ? _primary : _navy,
                     )),
                 Positioned(

@@ -75,7 +75,7 @@ import '../services/stay_recently_viewed.dart';
 import '../theme/stay_colors.dart';
 import '../theme/stay_type.dart';
 import '../stay_routes.dart';
-import '../widgets/desktop_top_nav.dart' show JoinAsHostButton, AccountMenuButton, GoOutsBrandLogo;
+import '../widgets/desktop_top_nav.dart' show JoinAsHostButton, AccountMenuButton, GoOutsBrandLogo, SocialBoostNavLink;
 import '../widgets/stay_bottom_nav.dart';
 
 class ShortStayHomeScreen extends StatefulWidget {
@@ -591,17 +591,17 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: <Widget>[
                         _NavIconTab(
-                          icon: Icons.villa_rounded,
-                          label: 'Short Stay',
-                          active: true,
-                          onTap: () {},
-                        ),
-                        const SizedBox(width: 4),
-                        _NavIconTab(
                           icon: Icons.restaurant_rounded,
                           label: 'Food Delivery',
                           onTap: () =>
                               Navigator.of(context).pushNamed('/food-delivery'),
+                        ),
+                        const SizedBox(width: 4),
+                        _NavIconTab(
+                          icon: Icons.villa_rounded,
+                          label: 'Short Stay',
+                          active: true,
+                          onTap: () {},
                         ),
                         const SizedBox(width: 4),
                         _NavIconTab(
@@ -613,10 +613,12 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
                         const SizedBox(width: 4),
                         _NavIconTab(
                           icon: Icons.info_outline_rounded,
-                          label: 'About Us',
+                          label: 'About',
                           onTap: () => Navigator.of(context)
                               .pushNamed(StayRoutes.aboutUs),
                         ),
+                        const SizedBox(width: 4),
+                        const SocialBoostNavLink(),
                       ],
                     ),
                   ),
@@ -1288,6 +1290,7 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
   }
 
   /// Section 1. Stitch: w-[260px], rounded-xl (12), image h-40 (160).
+  // ignore: unused_element
   Widget _partnersRow(List<StayListing> items) {
     return SizedBox(
       height: 160 + 84,
@@ -1667,8 +1670,7 @@ class _NavIconTabState extends State<_NavIconTab> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Icon(widget.icon, size: 19, color: color),
-              const SizedBox(width: 7),
+              // 8 October 2026: icon removed to match goouts.co.uk.
               Text(widget.label,
                   style: GoogleFonts.inter(
                     fontSize: 14.5,

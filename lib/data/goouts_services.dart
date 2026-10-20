@@ -145,6 +145,14 @@ const List<GoOutsService> gooutsPartnerCategories = <GoOutsService>[
     category: 'Bars',
     color: Color(0xFF0A3A4A),
   ),
+  // Everyday household and kitchen shops (first partner: Home Needs chain).
+  GoOutsService(
+    icon: Icons.kitchen_rounded,
+    label: 'Home Needs',
+    category: 'Home Needs',
+    color: Color(0xFF8A1C1C),
+    isNew: true,
+  ),
 ];
 
 /// Everything, services first. What most strips want.

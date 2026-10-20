@@ -31,6 +31,15 @@ class _ServicesScreenState extends State<ServicesScreen> {
 
   final List<Map<String, dynamic>> _offers = [
     {
+      'name': 'Home Needs',
+      'description': 'Kitchen, cleaning and home essentials on your high street.',
+      'badge': 'NEW',
+      'cashback': '15% Cashback',
+      'category': 'Home Needs',
+      'color': const Color(0xFF8A1C1C),
+      'image': 'assets/images/special offers/home_needs.webp',
+    },
+    {
       'name': 'Artisan Brews',
       'description': 'Premium coffee and handcrafted pastries.',
       'badge': '20% OFF',
@@ -347,12 +356,15 @@ class _ServicesScreenState extends State<ServicesScreen> {
 
   Widget _offerCard(Map<String, dynamic> o, BuildContext context) {
     return GestureDetector(
-      onTap: () => Navigator.pushNamed(
+      onTap: () => o['category'] == 'Home Needs'
+          ? Navigator.pushNamed(context, '/nearby',
+              arguments: <String, dynamic>{'category': 'Home Needs'})
+          : Navigator.pushNamed(
         context,
         '/partner-details',
         arguments: {
           'name': o['name'],
-          'category': 'Cafes',
+          'category': (o['category'] as String?) ?? 'Cafes',
           'cashback': o['cashback'],
         },
       ),
