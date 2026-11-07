@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
 import 'support_ticket_chat_screen.dart';
+import 'flyer_offer_screen.dart';
 import '../widgets/goouts_sheet.dart';
 
 const Color _primary          = Color(0xFF0392CA);
@@ -75,6 +76,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       // these the tap fell through to the plain detail screen.
       case 'refer_friend':  Navigator.pushNamed(context, '/refer-friend');  break;
       case 'welcome_bonus': Navigator.pushNamed(context, '/welcome-bonus'); break;
+      case 'flyer':
+        final fid = extra['flyerId']?.toString() ?? '';
+        if (fid.isNotEmpty) {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => FlyerOfferScreen(flyerId: fid)));
+        }
+        break;
       default:
         // Informational notifications → show detail screen
         Navigator.pushNamed(context, '/notification-detail', arguments: data);

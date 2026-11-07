@@ -853,6 +853,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onTap: () => Navigator.pushNamed(context, '/notifications'),
             ),
             Divider(height: 1, color: Colors.grey[100]),
+            // Added 5 Nov 2026. Marketing consent (PECR) for merchant offer
+            // flyers. Off by default; flyerDispatcher only sends when true.
+            StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+              stream: FirebaseFirestore.instance.collection('users')
+                  .doc(FirebaseAuth.instance.currentUser?.uid ?? '_').snapshots(),
+              builder: (context, snap) {
+                final on = snap.data?.data()?['marketingPushOptIn'] == true;
+                void set(bool v) {
+                  final uid = FirebaseAuth.instance.currentUser?.uid;
+                  if (uid == null) return;
+                  FirebaseFirestore.instance.collection('users').doc(uid).set({
+                    'marketingPushOptIn': v,
+                    'marketingPushOptInAt': FieldValue.serverTimestamp(),
+                  }, SetOptions(merge: true));
+                }
+                return _menuRow(
+                  icon: Icons.local_offer_outlined,
+                  title: 'Offers near me',
+                  subtitle: 'Deals from GoOuts partners near your postcode',
+                  trailing: Switch(value: on, onChanged: set),
+                  onTap: () => set(!on),
+                );
+              },
+            ),
+            Divider(height: 1, color: Colors.grey[100]),
             StreamBuilder<int>(
               stream: MessageService().unreadCountStream(),
               builder: (context, snap) {

@@ -9,6 +9,7 @@ import 'features/short_stay/stay_routes.dart';
 import 'features/short_stay/guest/01_short_stay_home_screen.dart';
 
 import 'screens/splash_screen.dart';
+import 'screens/flyer_offer_screen.dart';
 import 'screens/slide1_screen.dart';
 import 'screens/slide2_screen.dart';
 import 'screens/slide2a_screen.dart';
@@ -182,6 +183,14 @@ void routeFromMessage(RemoteMessage msg) {
     // Added 4 October 2026. Set by welcome_bonus.js on every step message.
     case 'welcome_bonus':
       nav.pushNamed('/welcome-bonus');
+      break;
+    // Added 5 Nov 2026. Set by flyer_studio.js flyerDispatcher on every
+    // merchant offer flyer push. Opens the flyer with Claim offer.
+    case 'flyer':
+      final flyerId = (data['flyerId'] ?? '').toString();
+      if (flyerId.isNotEmpty) {
+        nav.push(MaterialPageRoute(builder: (_) => FlyerOfferScreen(flyerId: flyerId)));
+      }
       break;
     // ⚠ THE KEY IS 'stay_claim' AND IT IS SET IN stay_claims.js _notify().
     //
