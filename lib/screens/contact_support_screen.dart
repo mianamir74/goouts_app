@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/support_ticket_service.dart';
 import '../services/self_service_service.dart';
 import '../widgets/goouts_sheet.dart';
+import 'help_assistant_screen.dart';
+import 'support_tickets_screen.dart';
 import '../utils/kyc_status.dart';
 
 class ContactSupportScreen extends StatefulWidget {
@@ -1477,6 +1479,44 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
               'Fill out the form below and our team will get back to you shortly.',
               style: GoogleFonts.inter(
                   fontSize: 13, color: Colors.grey[500], height: 1.5),
+            ),
+            const SizedBox(height: 14),
+            // Help Assistant: instant answers before filling in a ticket.
+            InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => HelpAssistantScreen(
+                  app: 'consumer',
+                  onOpenTickets: () => Navigator.pushReplacement(context,
+                      MaterialPageRoute(builder: (_) => const SupportTicketsScreen())),
+                ),
+              )),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [_primary, _teal]),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.support_agent_rounded, color: Colors.white, size: 26),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Ask GoOuts Help',
+                            style: GoogleFonts.inter(fontSize: 15,
+                                fontWeight: FontWeight.w800, color: Colors.white)),
+                        const SizedBox(height: 2),
+                        Text('Instant answers, any time. A person can take over if needed.',
+                            style: GoogleFonts.inter(fontSize: 12,
+                                color: Colors.white.withValues(alpha: 0.85), height: 1.3)),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right_rounded, color: Colors.white),
+                ]),
+              ),
             ),
 
             const SizedBox(height: 20),
