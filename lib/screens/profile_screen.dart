@@ -12,6 +12,7 @@ import '../services/message_service.dart';
 import '../utils/pin_hasher.dart';
 import '../utils/kyc_status.dart';
 import '../widgets/goouts_sheet.dart';
+import 'my_bookings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -851,6 +852,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
               trailing: const Icon(Icons.chevron_right_rounded,
                   color: Colors.grey, size: 20),
               onTap: () => Navigator.pushNamed(context, '/notifications'),
+            ),
+            Divider(height: 1, color: Colors.grey[100]),
+            _menuRow(
+              icon: Icons.event_available_outlined,
+              title: 'My Bookings',
+              subtitle: null,
+              trailing: const Icon(Icons.chevron_right_rounded,
+                  color: Colors.grey, size: 20),
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => const MyBookingsScreen())),
             ),
             Divider(height: 1, color: Colors.grey[100]),
             // Added 5 Nov 2026. Marketing consent (PECR) for merchant offer

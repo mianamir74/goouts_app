@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
 import 'support_ticket_chat_screen.dart';
 import 'flyer_offer_screen.dart';
+import 'my_bookings_screen.dart';
 import '../widgets/goouts_sheet.dart';
 
 const Color _primary          = Color(0xFF0392CA);
@@ -76,6 +77,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       // these the tap fell through to the plain detail screen.
       case 'refer_friend':  Navigator.pushNamed(context, '/refer-friend');  break;
       case 'welcome_bonus': Navigator.pushNamed(context, '/welcome-bonus'); break;
+      case 'my_bookings':
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const MyBookingsScreen()));
+        break;
       case 'flyer':
         final fid = extra['flyerId']?.toString() ?? '';
         if (fid.isNotEmpty) {
@@ -109,6 +113,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'stay_message_thread':   return Icons.forum_outlined;
       case 'stay_review_waiting':   return Icons.rate_review_outlined;
       case 'stay_review_published': return Icons.star_rounded;
+      case 'venue_booking':         return Icons.event_available_rounded;
       default:              return Icons.notifications_none_outlined;
     }
   }
@@ -122,6 +127,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'cashback':      return const Color(0xFFE1F5FE);
       case 'transaction':   return const Color(0xFFF5F5F5);
       case 'stay_claim':            return const Color(0xFFFFEBEE);
+      case 'venue_booking':         return const Color(0xFFE1F5FE);
       case 'stay_message_thread':   return const Color(0xFFE1F5FE);
       case 'stay_review_waiting':
       case 'stay_review_published': return const Color(0xFFFFF8E1);
