@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:geolocator/geolocator.dart';
 import '../services/location_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../data/category_aliases.dart';
 
 class NearbyScreen extends StatefulWidget {
   const NearbyScreen({super.key});
@@ -26,6 +28,49 @@ class _NearbyScreenState extends State<NearbyScreen> {
   void initState() {
     super.initState();
     _initLocation();
+  }
+
+  // ── Real partners for this category (10 Nov 2026) ───────
+  //
+  // This screen only ever showed the sample venues below, so a partner added
+  // in Admin Panel > Partner Management never appeared under its category.
+  // Active partners whose category matches are now loaded and listed first.
+  String? _realFor;
+  List<Map<String, dynamic>> _realVenues = const [];
+
+  void _loadRealPartners(String category) {
+    if (_realFor == category) return;
+    _realFor = category;
+    final want = canonicalCategory(category);
+    FirebaseFirestore.instance
+        .collection('partners')
+        .where('isActive', isEqualTo: true)
+        .get()
+        .then((snap) {
+      final list = <Map<String, dynamic>>[];
+      for (final d in snap.docs) {
+        final p = d.data();
+        if (canonicalCategory((p['category'] ?? '').toString()) != want) continue;
+        final pct = (p['cashbackPercent'] as num?) ?? (p['cashbackPct'] as num?) ?? 0;
+        final img = (p['imageUrl'] ?? p['bannerUrl'] ?? '').toString();
+        list.add({
+          ...p,
+          'id': d.id,
+          'name': (p['name'] ?? '').toString(),
+          'category': (p['category'] ?? '').toString(),
+          'rating': (p['rating'] as num?)?.toStringAsFixed(1) ?? '0.0',
+          'visits': (p['visits'] ?? '').toString(),
+          'address': (p['address'] ?? '').toString(),
+          'phone': (p['phone'] ?? '').toString(),
+          'cashback': '${pct.toStringAsFixed(0)}%',
+          'cashback_pct': '${pct.toStringAsFixed(0)}%',
+          'desc': (p['description'] ?? '').toString(),
+          'color': const Color(0xFF1A3A1A),
+          'imageUrl': img.isEmpty ? null : img,
+        });
+      }
+      if (mounted) setState(() => _realVenues = list);
+    }).catchError((_) {});
   }
 
   Future<void> _initLocation() async {
@@ -808,6 +853,8 @@ class _NearbyScreenState extends State<NearbyScreen> {
         categoryIcon = Icons.nightlife_rounded;
         break;
       case 'pubs':
+      case 'bars':
+      case 'pubs & bars':
         allVenues = _pubs;
         categoryIcon = Icons.sports_bar_rounded;
         break;
@@ -823,22 +870,26 @@ class _NearbyScreenState extends State<NearbyScreen> {
         allVenues = _fastFood;
         categoryIcon = Icons.fastfood_rounded;
         break;
+      case 'lounges':
+        // No sample lounges: only real partners from the Admin Panel show.
+        allVenues = const [];
+        categoryIcon = Icons.weekend_rounded;
+        break;
       case 'home needs':
         allVenues = _homeNeeds;
         categoryIcon = Icons.kitchen_rounded;
-        break;
-      case 'bars':
-        allVenues = _clubs;
-        categoryIcon = Icons.local_bar_rounded;
         break;
       default:
         allVenues = _cafes;
         categoryIcon = Icons.coffee_rounded;
     }
 
+    // Real partners from Admin Panel first, then the sample venues.
+    _loadRealPartners(category);
+    final withReal = <Map<String, dynamic>>[..._realVenues, ...allVenues];
     final List<Map<String, dynamic>> venues = isFastFood && _fastFoodFilter != 'All'
-        ? allVenues.where((v) => v['subtype'] == _fastFoodFilter).toList()
-        : allVenues;
+        ? withReal.where((v) => v['subtype'] == _fastFoodFilter).toList()
+        : withReal;
 
     return Scaffold(
       backgroundColor: _bg,

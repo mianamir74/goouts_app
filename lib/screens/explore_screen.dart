@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../data/goouts_services.dart';
+import '../data/category_aliases.dart';
 import '../services/message_service.dart';
 
 class ExploreScreen extends StatefulWidget {
@@ -33,6 +34,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     'Clubs':       'Club',
     'Pubs':        'Pub',
     'Bars':        'Bar',
+    'Pubs & Bars': 'Pubs & Bars',
   };
   static String _normLabel(String raw) => _labelMap[raw] ?? raw;
 
@@ -41,6 +43,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
     'Cafes':       Color(0xFF5C3D1E),
     'Restaurants': Color(0xFF3B1F0A),
     'Pubs':        Color(0xFF1A3A1A),
+    'Pubs & Bars': Color(0xFF1A3A1A),
+    'Lounges':     Color(0xFF3A1A3A),
     'Clubs':       Color(0xFF1A0533),
     'Bars':        Color(0xFF0A3A4A),
     'Fast Food':   Color(0xFF0A2A4A),
@@ -53,6 +57,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
     'Cafes':       Icons.coffee_rounded,
     'Restaurants': Icons.restaurant_rounded,
     'Pubs':        Icons.sports_bar_rounded,
+    'Pubs & Bars': Icons.sports_bar_rounded,
+    'Lounges':     Icons.weekend_rounded,
     'Clubs':       Icons.nightlife_rounded,
     'Bars':        Icons.local_bar_rounded,
     'Fast Food':   Icons.fastfood_rounded,
@@ -96,9 +102,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
           : null;
       if (rawCats != null) {
         for (final c in rawCats as List) {
-          final name   = (c is Map ? c['name'] : c).toString();
+          var name     = (c is Map ? c['name'] : c).toString();
           final status = c is Map ? (c['status'] ?? 'active').toString() : 'active';
           if (status == 'hold') continue;
+          // Pubs and Bars are one category, shown once (10 Nov 2026).
+          if (name == 'Pubs' || name == 'Bars') name = kPubsAndBars;
+          if (cats.any((x) => x['route'] == name)) continue;
           cats.add({
             'icon':  _catIcons[name]  ?? _defaultCatIcon,
             'label': _normLabel(name),
@@ -136,12 +145,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
         cats = [
           {'icon': Icons.coffee_rounded,         'label': 'Cafes',       'route': 'Cafes',       'color': const Color(0xFF5C3D1E)},
           {'icon': Icons.restaurant_rounded,     'label': 'Restaurant', 'route': 'Restaurants', 'color': const Color(0xFF3B1F0A)},
-          {'icon': Icons.sports_bar_rounded,     'label': 'Pubs',        'route': 'Pubs',        'color': const Color(0xFF1A3A1A)},
+          {'icon': Icons.sports_bar_rounded,     'label': 'Pubs & Bars', 'route': 'Pubs & Bars', 'color': const Color(0xFF1A3A1A)},
           {'icon': Icons.nightlife_rounded,      'label': 'Clubs',       'route': 'Clubs',       'color': const Color(0xFF1A0533)},
+          {'icon': Icons.weekend_rounded,        'label': 'Lounges',     'route': 'Lounges',     'color': const Color(0xFF3A1A3A)},
           {'icon': Icons.fastfood_rounded,       'label': 'Fast Food',   'route': 'Fast Food',   'color': const Color(0xFF0A2A4A)},
           {'icon': Icons.music_note_rounded,     'label': 'Music',       'route': 'Music',       'color': const Color(0xFF0D3B2E)},
           {'icon': Icons.theater_comedy_rounded, 'label': 'Comedy',      'route': 'Comedy',      'color': const Color(0xFF2C1A08)},
-          {'icon': Icons.local_bar_rounded,      'label': 'Bars',        'route': 'Bars',        'color': const Color(0xFF0A3A4A)},
         ];
       }
 

@@ -111,8 +111,9 @@ const List<GoOutsService> gooutsPartnerCategories = <GoOutsService>[
   ),
   GoOutsService(
     icon: Icons.sports_bar_rounded,
-    label: 'Pubs',
-    category: 'Pubs',
+    // Pubs and Bars are one category since 10 Nov 2026.
+    label: 'Pubs & Bars',
+    category: 'Pubs & Bars',
     color: Color(0xFF1A3A1A),
   ),
   GoOutsService(
@@ -120,6 +121,12 @@ const List<GoOutsService> gooutsPartnerCategories = <GoOutsService>[
     label: 'Clubs',
     category: 'Clubs',
     color: Color(0xFF1A0533),
+  ),
+  GoOutsService(
+    icon: Icons.weekend_rounded,
+    label: 'Lounges',
+    category: 'Lounges',
+    color: Color(0xFF3A1A3A),
   ),
   GoOutsService(
     icon: Icons.fastfood_rounded,
@@ -138,12 +145,6 @@ const List<GoOutsService> gooutsPartnerCategories = <GoOutsService>[
     label: 'Comedy',
     category: 'Comedy',
     color: Color(0xFF2C1A08),
-  ),
-  GoOutsService(
-    icon: Icons.local_bar_rounded,
-    label: 'Bars',
-    category: 'Bars',
-    color: Color(0xFF0A3A4A),
   ),
   // Everyday household and kitchen shops (first partner: Home Needs chain).
   GoOutsService(

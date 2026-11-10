@@ -13,6 +13,9 @@ import '../services/transaction_service.dart';
 import '../services/visit_verifier.dart';
 import '../utils/pin_hasher.dart';
 import '../widgets/goouts_sheet.dart';
+import '../widgets/auto_fit_hero_image.dart';
+import '../widgets/partner_amenities.dart';
+import '../widgets/booking_request_sheet.dart';
 
 enum _VerifyState { loading, passed, failed, waiting }
 
@@ -92,6 +95,13 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
     _socialBoostEnabled = args?['socialBoostEnabled'] as bool? ?? false;
     _partnerId          = args?['id']?.toString() ?? '';
 
+    final amenities = _amenitiesFor(args);
+    final bk = _bookingSource(args);
+    final bookingUrl = (bk?['bookingUrl'] ?? '').toString();
+    final bookingRequests = bk?['goOutsBookingRequests'] == true;
+    final showBook = bk?['takesBookings'] == true &&
+        (bookingRequests || bookingUrl.startsWith('https://'));
+
     final merchantId = VisitVerifier.merchantIdFromName(name);
     final verifyCode = args?['verificationCode'] as String? ?? '';
 
@@ -156,41 +166,11 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Hero image
-                SizedBox(
-                  height: 220,
-                  width: double.infinity,
-                  child: imageUrl != null
-                      ? Image.network(
-                          imageUrl,
-                          height: 220,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (ctx, err, st) => Container(
-                            height: 220,
-                            color: const Color(0xFF5C8FA8),
-                            child: Center(
-                              child: Icon(Icons.store_rounded,
-                                  color: Colors.white.withValues(alpha: 0.3), size: 64),
-                            ),
-                          ),
-                        )
-                      : Image.asset(
-                          (args?['imageAsset'] as String?) ??
-                              'assets/images/signup_hero.webp',
-                          height: 220,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          filterQuality: FilterQuality.high,
-                          errorBuilder: (ctx, err, st) => Container(
-                            height: 220,
-                            color: const Color(0xFF5C8FA8),
-                            child: Center(
-                              child: Icon(Icons.store_rounded,
-                                  color: Colors.white.withValues(alpha: 0.3), size: 64),
-                            ),
-                          ),
-                        ),
+                // Hero image: adjusts to the photo, never crops it.
+                AutoFitHeroImage(
+                  url: (imageUrl != null && imageUrl.isNotEmpty) ? imageUrl : null,
+                  fallbackAsset: (args?['imageAsset'] as String?) ??
+                      'assets/images/signup_hero.webp',
                 ),
 
                 // QR/GPS + Leave a Review buttons — side by side
@@ -247,6 +227,45 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
                     ],
                   ),
                 ),
+
+                // Advance bookings: GoOuts request sheet, or the venue's
+                // own booking page. Shown only when set up in Partner
+                // Management (10 November 2026).
+                if (showBook)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => BookingRequestSheet.open(
+                          context,
+                          partnerId: _partnerId,
+                          partnerName: name,
+                          requests: bookingRequests,
+                          bookingTypes: ((bk?['bookingTypes'] as List?) ??
+                                  const [])
+                              .map((e) => e.toString())
+                              .toList(),
+                          bookingUrl: bookingUrl,
+                          takesDeposit: bk?['takesDeposit'] == true,
+                        ),
+                        icon: const Icon(Icons.event_available_rounded,
+                            color: _primary, size: 18),
+                        label: Text(
+                          bookingRequests ? 'Book a table' : 'Book on venue website',
+                          style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: _primary),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 48),
+                          shape: const StadiumBorder(),
+                          side: const BorderSide(color: _primary, width: 1.5),
+                        ),
+                      ),
+                    ),
+                  ),
 
                 const SizedBox(height: 14),
 
@@ -316,16 +335,18 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 14),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          _amenity(Icons.wifi_rounded, 'Wi-Fi'),
-                          _amenity(Icons.chair_rounded, 'Seating'),
-                          _amenity(Icons.bolt_rounded, 'Charging'),
-                          _amenity(Icons.pets_rounded, 'Pets'),
-                        ],
-                      ),
+                      // Amenities: only what the venue really has, set in
+                      // Admin Panel > Partner Management. Hidden when none.
+                      if (amenities.isNotEmpty) ...[
+                        const SizedBox(height: 14),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final a in amenities) _amenity(a.$3, a.$2),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -2838,15 +2859,69 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
         ),
       );
 
-  Widget _amenity(IconData icon, String label) => Column(
-        children: [
-          Icon(icon, size: 20, color: Colors.grey[600]),
-          const SizedBox(height: 4),
+  Widget _amenity(IconData icon, String label) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF2F7FA),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 16, color: _primary),
+          const SizedBox(width: 5),
           Text(label,
-              style:
-                  GoogleFonts.inter(fontSize: 11, color: Colors.grey[500])),
-        ],
+              style: GoogleFonts.inter(
+                  fontSize: 12, fontWeight: FontWeight.w500, color: Colors.grey[700])),
+        ]),
       );
+
+  /// Amenities come with the partner record when the list screen passed the
+  /// whole document; otherwise they are read once from partners/{id}.
+  List<(String, String, IconData)>? _amenitiesLoaded;
+  bool _amenitiesRequested = false;
+
+  List<(String, String, IconData)> _amenitiesFor(Map<String, dynamic>? args) {
+    if (args != null &&
+        (args.containsKey('amenities') || args.containsKey('hasWifi'))) {
+      return PartnerAmenities.fromDoc(args);
+    }
+    if (_amenitiesLoaded != null) return _amenitiesLoaded!;
+    final id = args?['id']?.toString() ?? '';
+    if (id.isNotEmpty && !_amenitiesRequested) {
+      _amenitiesRequested = true;
+      FirebaseFirestore.instance.collection('partners').doc(id).get().then((d) {
+        if (!mounted) return;
+        setState(() {
+          _amenitiesLoaded = PartnerAmenities.fromDoc(d.data());
+          _partnerDoc = d.data() ?? const {};
+        });
+      }).catchError((_) {});
+    }
+    return const [];
+  }
+
+  /// The partner record as loaded once from Firestore (null until loaded).
+  Map<String, dynamic>? _partnerDoc;
+
+  /// Booking fields: from the route args when the list passed them, else
+  /// from the one partners/{id} read above.
+  Map<String, dynamic>? _bookingSource(Map<String, dynamic>? args) {
+    if (args != null && args.containsKey('takesBookings')) return args;
+    if (_partnerDoc == null && !_amenitiesRequested) {
+      final id = args?['id']?.toString() ?? '';
+      if (id.isNotEmpty) {
+        _amenitiesRequested = true;
+        FirebaseFirestore.instance.collection('partners').doc(id).get()
+            .then((d) {
+          if (!mounted) return;
+          setState(() {
+            _amenitiesLoaded ??= PartnerAmenities.fromDoc(d.data());
+            _partnerDoc = d.data() ?? const {};
+          });
+        }).catchError((_) {});
+      }
+    }
+    return _partnerDoc;
+  }
 
   Widget _card({required Widget child, EdgeInsets? margin}) => Container(
         margin: margin ?? EdgeInsets.zero,
