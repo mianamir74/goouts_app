@@ -11,6 +11,7 @@ class CartItem {
   final String categoryId;
   final bool   vatApplicable; // true = item is VAT chargeable
   final double vatRate;       // 0.0, 5.0, or 20.0
+  final bool   isAlcohol;     // 13 Nov 2026: 18+ item
   int quantity;
 
   CartItem({
@@ -21,6 +22,7 @@ class CartItem {
     required this.categoryId,
     this.vatApplicable = false,
     this.vatRate       = 0.0,
+    this.isAlcohol     = false,
     this.quantity      = 1,
   });
 
@@ -43,6 +45,7 @@ class CartItem {
         'vatApplicable': vatApplicable,
         'vatRate':       vatRate,
         'vatAmount':     vatAmount,
+        'isAlcohol':     isAlcohol,
       };
 }
 
@@ -70,6 +73,7 @@ class CartService extends ChangeNotifier {
   int            get totalItems     => _items.fold(0, (s, e) => s + e.quantity);
 
   double get subtotal      => _items.fold(0.0, (s, e) => s + e.subtotal);
+  bool   get hasAlcohol    => _items.any((e) => e.isAlcohol);
   double get foodVatTotal  => double.parse(
       _items.fold(0.0, (s, e) => s + e.vatAmount).toStringAsFixed(2));
   double get total         => subtotal + _deliveryFee;

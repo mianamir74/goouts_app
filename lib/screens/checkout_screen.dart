@@ -257,6 +257,33 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       return;
     }
 
+    // 13 Nov 2026: alcohol is 18+. The server also checks the date of birth
+    // on the profile and that the restaurant's licence has been checked.
+    final hasAlcohol = _cart.hasAlcohol;
+    if (hasAlcohol) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Your order contains alcohol'),
+          content: const Text(
+              'Alcohol is only sold to people aged 18 or over.\n\n'
+              'The driver may ask to see photo ID (passport, driving licence '
+              'or PASS card). Alcohol will not be handed to anyone under 18 '
+              'or anyone who appears drunk. In that case you receive the food '
+              'only and the alcohol is refunded.'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel')),
+            ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('I am 18 or over')),
+          ],
+        ),
+      );
+      if (ok != true || !mounted) return;
+    }
+
     setState(() => _placing = true);
 
     try {
@@ -310,6 +337,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         // behaviour, unchanged). createFoodOrder re-validates the lead time
         // itself rather than trusting this — see food_orders.js.
         'scheduledFor': _scheduledService.scheduledFor?.millisecondsSinceEpoch,
+        if (hasAlcohol) 'ageConfirmed': true,
       });
 
       final orderId = '${res.data['orderId'] ?? ''}';

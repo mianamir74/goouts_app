@@ -138,6 +138,7 @@ class _FoodMenuScreenState extends State<FoodMenuScreen> {
             // VAT fields — set by admin in Menu VAT Moderation panel
             vatApplicable: (d2['vatApplicable']  ?? false) as bool,
             vatRate:       (d2['vatRate'] as num?)?.toDouble() ?? 0.0,
+            isAlcohol:     d2['isAlcohol'] == true,
           );
         }).toList();
 
@@ -218,6 +219,7 @@ class _FoodMenuScreenState extends State<FoodMenuScreen> {
       categoryId:    item.categoryId,
       vatApplicable: item.vatApplicable,
       vatRate:       item.vatRate,
+      isAlcohol:     item.isAlcohol,
     ));
   }
 
@@ -678,6 +680,20 @@ class _FoodMenuScreenState extends State<FoodMenuScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Badge
+                    if (item.isAlcohol)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                            color: const Color(0xFFC62828).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4)),
+                        child: Text('18+ Alcohol',
+                            style: GoogleFonts.inter(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFFC62828))),
+                      ),
                     if (item.isRecommended)
                       Container(
                         margin: const EdgeInsets.only(bottom: 4),
@@ -1320,6 +1336,7 @@ class _MenuItem {
   // ── VAT fields (set by admin via Menu VAT Moderation) ──────────────────────
   final bool   vatApplicable;  // true = item is VAT chargeable
   final double vatRate;        // 0.0, 5.0, or 20.0
+  final bool   isAlcohol;      // 13 Nov 2026: 18+ item
 
   const _MenuItem({
     required this.id,
@@ -1333,6 +1350,7 @@ class _MenuItem {
     this.orderCount     = 0,
     this.vatApplicable  = false,
     this.vatRate        = 0.0,
+    this.isAlcohol      = false,
   });
 
   /// VAT amount on this item at given quantity (VAT-inclusive extraction)
