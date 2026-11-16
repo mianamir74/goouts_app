@@ -871,7 +871,7 @@ class _ShortStayHomeScreenState extends State<ShortStayHomeScreen> {
                 const SizedBox(height: 14),
                 Text(
                   'When you spend at a local venue, you should get something '
-                  'back right away — real Cashback Points, not a voucher that '
+                  'back right away — real Instant Cashback, not a voucher that '
                   'expires.',
                   style: GoogleFonts.inter(
                     fontSize: 14.5,

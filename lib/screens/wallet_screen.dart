@@ -7,6 +7,7 @@ import '../services/user_service.dart';
 import '../services/transaction_service.dart';
 import '../services/message_service.dart';
 import 'transfer_screen.dart';
+import 'walk_in_pay_screen.dart';
 
 class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key});
@@ -448,6 +449,64 @@ class _WalletScreenState extends State<WalletScreen> {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 12),
+            // 16 Nov 2026: pay at a venue in the app (scan the venue QR).
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  await Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => const WalkInScanScreen()));
+                  if (!mounted) return;
+                  await _loadAllData();
+                },
+                icon: const Icon(Icons.qr_code_scanner_rounded,
+                    color: Color(0xFF0B1F3A), size: 18),
+                label: Text(
+                  'Scan to pay at a venue',
+                  style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF0B1F3A)),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFFC93C),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  elevation: 0,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // 16 Nov 2026: pay at the venue's own till and earn cashback.
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  await Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => const WalkInPassScreen()));
+                  if (!mounted) return;
+                  await _loadAllData();
+                },
+                icon: const Icon(Icons.badge_rounded,
+                    color: Colors.white, size: 18),
+                label: Text(
+                  'Show my pass at the till',
+                  style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white),
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  side: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.6), width: 1),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
             ),
             const SizedBox(height: 12),
             SizedBox(

@@ -105,7 +105,7 @@ class Slide3Screen extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28),
               child: Text(
-                'Share your cashback points with friends and family in a single tap. Give them a surprise and a reason to smile. Social sharing made simple.',
+                'Share your Instant Cashback with friends and family in a single tap. Give them a surprise and a reason to smile. Social sharing made simple.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                   fontSize: 15,

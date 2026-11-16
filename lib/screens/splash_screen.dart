@@ -246,7 +246,7 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'INSTANT CASHBACK POINTS',
+                    'INSTANT CASHBACK REWARDS',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.inter(
                       fontSize: 11,

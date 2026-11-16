@@ -186,7 +186,7 @@ class Slide2Screen extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28),
               child: Text(
-                'Redeeming cashback Points internationally is subject to exchange rates and fees. Use your GoOuts virtual debit card for these transactions.',
+                'Redeeming Instant Cashback internationally is subject to exchange rates and fees. Use your GoOuts virtual debit card for these transactions.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                   fontSize: 13,

@@ -109,7 +109,7 @@ class Slide2aScreen extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Text(
-                'To instantly earn cashback points, securely connect your bank and card to your GoOuts Wallet. You will receive your GoOuts Virtual Debit Card as part of setup. Use it the same way you tap your bank card when paying with your mobile.',
+                'To earn Instant Cashback, securely connect your bank and card to your GoOuts Wallet. You will receive your GoOuts Virtual Debit Card as part of setup. Use it the same way you tap your bank card when paying with your mobile.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                   fontSize: 15,
