@@ -266,20 +266,12 @@ class FamilyService {
   Future<void> leaveGroup() async {
     if (_uid == null) return;
 
-    final userDoc = await _db.collection('users').doc(_uid).get();
-    final groupId = userDoc.data()?['familyGroupId'] as String?;
-    if (groupId == null) return;
-
-    // Remove from group member list
-    await _db.collection('familyGroups').doc(groupId).update({
-      'memberUids': FieldValue.arrayRemove([_uid]),
-    });
-
-    // Clear user's group reference
-    await _db.collection('users').doc(_uid).update({
-      'familyGroupId': null,
-      'familyRole': null,
-    });
+    // 24 Nov 2026: done by the server (leaveFamilyGroup). The app can no
+    // longer write familyGroups or familyGroupId itself, so nobody can add
+    // themselves to someone else's family.
+    await _fn
+        .httpsCallable('leaveFamilyGroup')
+        .call<Map<String, dynamic>>({});
   }
 
   // ─────────────────────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 @echo off
 echo === Restoring full Flutter project source to git ===
-cd /d C:\Users\Maz\goouts_app
+cd /d C:\Users\Maz\goouts\goouts_app
 
 echo Cleaning up lock files...
 del /f .git\index.lock 2>nul

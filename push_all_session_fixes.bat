@@ -1,6 +1,6 @@
 @echo off
 echo === Pushing all session fixes to GitHub ===
-cd /d C:\Users\Maz\goouts_app
+cd /d C:\Users\Maz\goouts\goouts_app
 
 REM -- Dart/screen changes --
 git add lib/screens/create_profile_screen.dart

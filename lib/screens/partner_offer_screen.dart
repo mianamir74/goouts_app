@@ -6,6 +6,7 @@ import '../services/user_service.dart';
 import '../services/transaction_service.dart';
 import '../services/visit_verifier.dart';
 import '../widgets/goouts_sheet.dart';
+import 'walk_in_pay_screen.dart';
 
 enum _StepState { passed, failed, loading, waiting }
 
@@ -370,7 +371,9 @@ class PartnerOfferScreen extends StatelessWidget {
             width: double.infinity,
             height: 56,
             child: ElevatedButton(
-              onPressed: () => _showVerifyVisit(context, name, tag, cashback, promoCode),
+              // 24 Nov 2026: pay through the server flow, not the old client-side sheet.
+              onPressed: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const WalkInScanScreen())),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _primary,
                 foregroundColor: Colors.white,
@@ -401,6 +404,8 @@ class PartnerOfferScreen extends StatelessWidget {
   }
 
   // ── Verify Visit: GPS first → if fails, show partner code fallback ────────
+  // Old client-side payment flow (wrote balances from the phone). Unreachable.
+  // ignore: unused_element
   void _showVerifyVisit(BuildContext context, String merchant, String tag,
       String cashback, String promoCode) {
     final args =

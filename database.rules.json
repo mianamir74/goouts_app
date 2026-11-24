@@ -3,12 +3,21 @@
     "active_deliveries": {
       "$orderId": {
         "driver_location": {
-          // Only the assigned driver can write their location
-          ".write": "auth != null",
-          // Any authenticated user can read (consumer watching their order)
-          ".read": "auth != null"
+          // Only the driver who owns this location node can write or clear it.
+          // A node left stale for over 10 minutes can be taken over by a newly assigned driver.
+          ".write": "auth != null && (!data.exists() || data.child('driverId').val() === auth.uid || data.child('timestamp').val() < now - 600000) && (!newData.exists() || newData.child('driverId').val() === auth.uid)",
+          // Signed-in users can read (customer watching their order)
+          ".read": "auth != null",
+          ".validate": "newData.hasChildren(['lat', 'lng', 'driverId', 'timestamp']) && newData.child('lat').isNumber() && newData.child('lat').val() >= -90 && newData.child('lat').val() <= 90 && newData.child('lng').isNumber() && newData.child('lng').val() >= -180 && newData.child('lng').val() <= 180 && newData.child('timestamp').isNumber() && newData.child('timestamp').val() <= now + 60000",
+          "$other": {
+            ".validate": "$other === 'lat' || $other === 'lng' || $other === 'bearing' || $other === 'speed' || $other === 'driverId' || $other === 'timestamp'"
+          }
         }
       }
+    },
+    "$other": {
+      ".read": false,
+      ".write": false
     }
   }
 }

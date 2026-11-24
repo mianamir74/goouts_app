@@ -30,7 +30,7 @@ except ImportError:
 # ─── Configure your paths here ───────────────────────────────────────────────
 
 # Primary source (where Claude saves memory on Windows)
-SOURCE = Path(r"C:\Users\Maz\goouts_app\memory_claud")
+SOURCE = Path(r"C:\Users\Maz\goouts\goouts_app\memory_claud")
 
 # All destinations to keep in sync
 DESTINATIONS = [

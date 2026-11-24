@@ -16,6 +16,7 @@ import '../widgets/goouts_sheet.dart';
 import '../widgets/auto_fit_hero_image.dart';
 import '../widgets/partner_amenities.dart';
 import '../widgets/booking_request_sheet.dart';
+import 'walk_in_pay_screen.dart';
 
 enum _VerifyState { loading, passed, failed, waiting }
 
@@ -88,8 +89,6 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
     final imageUrl = args?['imageUrl'] as String?;
     final desc = args?['desc'] as String? ??
         'One of London\'s most celebrated independent coffee roasters, beloved for its single-origin brews served in a rustic Borough Market setting.';
-    final partnerLat = (args?['lat'] as num?)?.toDouble() ?? 0.0;
-    final partnerLng = (args?['lng'] as num?)?.toDouble() ?? 0.0;
 
     // Social Boost — sync to state fields so methods can access them
     _socialBoostEnabled = args?['socialBoostEnabled'] as bool? ?? false;
@@ -102,8 +101,6 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
     final showBook = bk?['takesBookings'] == true &&
         (bookingRequests || bookingUrl.startsWith('https://'));
 
-    final merchantId = VisitVerifier.merchantIdFromName(name);
-    final verifyCode = args?['verificationCode'] as String? ?? '';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF2F4F7),
@@ -181,10 +178,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
                       // Scan & Earn — same flow for all partner types (GPS → code fallback)
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: () => _verifyAndPay(
-                            context, name, cashback, partnerLat, partnerLng,
-                            merchantId: merchantId, verifyCode: verifyCode,
-                          ),
+                          onPressed: () => _openServerPay(context, _partnerId),
                           icon: const Icon(Icons.location_on_rounded,
                               color: Colors.white, size: 18),
                           label: Text(
@@ -491,10 +485,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
               color: const Color(0xFFF2F4F7),
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 25),
               child: ElevatedButton.icon(
-                onPressed: () => _verifyAndPay(
-                  context, name, cashback, partnerLat, partnerLng,
-                  merchantId: merchantId, verifyCode: verifyCode,
-                ),
+                onPressed: () => _openServerPay(context, _partnerId),
                 icon: const Icon(
                   Icons.credit_card_rounded,
                   color: Colors.white,
@@ -1343,8 +1334,31 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
   }
 
   // ── Verify visit: GPS first → partner code fallback if GPS fails ──────────
+  // ── 24 Nov 2026: every payment goes through the server ───────────────────
+  //
+  // "Scan & Earn" and "Pay & Earn Cashback" used to run _verifyAndPay below,
+  // which worked out cashback ON THE PHONE and wrote walletBalance and
+  // cashbackBalance straight to Firestore, and accepted a master code
+  // "123456" at every venue. Both are gone. Payment now opens the server
+  // flow (createWalkInPayment / createWalkInPass), which works out every
+  // number and credits cashback rewards only after Stripe confirms.
+  void _openServerPay(BuildContext context, String partnerId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => partnerId.isNotEmpty
+            ? WalkInPayScreen(partnerId: partnerId)
+            : const WalkInScanScreen(),
+      ),
+    );
+  }
+
+  // Old client-side payment flow, kept only for reference. Unreachable, and
+  // the Firestore rules now refuse its balance writes.
+  // ignore: unused_element
   void _verifyAndPay(BuildContext context, String merchant,
       String cashback, double partnerLat, double partnerLng,
+      // ignore: unused_element_parameter
       {String merchantId = '', String verifyCode = ''}) {
 
     final bool hasCoords   = partnerLat != 0.0 && partnerLng != 0.0;
@@ -1416,7 +1430,6 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
           }
 
           // Verify typed partner code — matches stored code OR master override
-          const String masterCode = '123456';
           Future<void> checkCode() async {
             final entered = codeCtrl.text.trim().toUpperCase();
             if (entered.isEmpty) {
@@ -1426,8 +1439,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
             setSheet(() { codeChecking = true; codeError = ''; });
             await Future.delayed(const Duration(milliseconds: 600));
             if (!ctx.mounted) return;
-            final bool valid = entered == masterCode ||
-                (storedCode.isNotEmpty && entered == storedCode);
+            final bool valid = storedCode.isNotEmpty && entered == storedCode;
             if (valid) {
               setSheet(() { codeChecking = false; codePassed = true; });
               await Future.delayed(const Duration(milliseconds: 500));
@@ -1453,8 +1465,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
             final scanned = raw.toUpperCase().trim();
             if (scanned.isEmpty) return;
             scanCtrl?.stop();
-            final bool qrValid = scanned == '123456' ||
-                (storedCode.isNotEmpty && scanned == storedCode);
+            final bool qrValid = storedCode.isNotEmpty && scanned == storedCode;
             if (qrValid) {
               setSheet(() { codePassed = true; fallbackMode = 'qr_ok'; });
               Future.delayed(const Duration(milliseconds: 500), () {
@@ -1689,7 +1700,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
                                       ],
                                     ),
                                     child: QrImageView(
-                                      data: '123456',
+                                      data: storedCode,
                                       version: QrVersions.auto,
                                       size: 160,
                                       eyeStyle: const QrEyeStyle(
@@ -1703,7 +1714,7 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 12),
-                                  Text('123456',
+                                  Text(storedCode,
                                       style: GoogleFonts.inter(
                                           fontSize: 22,
                                           fontWeight: FontWeight.w800,

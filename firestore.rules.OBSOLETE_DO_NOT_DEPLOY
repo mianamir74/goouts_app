@@ -1,0 +1,20 @@
+// ⚠⚠⚠ OBSOLETE — DO NOT DEPLOY THIS FILE ⚠⚠⚠
+//
+// 4 July 2026 snapshot. Renamed 19 August 2026.
+//
+// WHAT THIS FILE DID
+// A `firebase deploy --only firestore:rules` run with the working directory
+// set to goouts_app picked THIS up instead of admin_panel/firestore.rules,
+// and published it over the live ruleset on 18 August at 5:20 AM.
+//
+// It has rules for /partners and /merchants but NONE for /stay_listings,
+// /stay_bookings or /restaurants, and there is no catch-all — so every
+// collection it does not name was denied.
+//
+// The symptom was "I cannot see listings anymore" and "same with food
+// delivery", while cafes and pubs kept working. That combination is not a
+// coincidence: it is precisely the difference between the two files.
+//
+// THE REAL RULES LIVE IN admin_panel/firestore.rules AND NOWHERE ELSE.
+// goouts_app is a Flutter client. It has no business owning security rules.
+//

@@ -1,6 +1,6 @@
 @echo off
 echo === Pushing regenerated app icons ===
-cd /d C:\Users\Maz\goouts_app
+cd /d C:\Users\Maz\goouts\goouts_app
 git add ios/Runner/Assets.xcassets/AppIcon.appiconset/
 git add android/app/src/main/res/mipmap-mdpi/ic_launcher.png
 git add android/app/src/main/res/mipmap-hdpi/ic_launcher.png

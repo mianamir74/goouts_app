@@ -1,6 +1,6 @@
 @echo off
 echo === Fixing codemagic.yaml build directory issue ===
-cd /d C:\Users\Maz\goouts_app
+cd /d C:\Users\Maz\goouts\goouts_app
 del /f .git\index.lock 2>nul
 del /f .git\index_backup 2>nul
 git add codemagic.yaml

@@ -1,5 +1,5 @@
 # GoOuts — Comprehensive Developer Handoff
-## Version 1.0 | June 2026 | Confidential
+## Version 1.1 | Payment architecture updated to V8 Hybrid (13 November 2026) | Confidential
 
 **Flutter Mobile App (iOS + Android) | Firebase Backend | Stripe Issuing | Open Banking VRP**
 
@@ -27,15 +27,15 @@
 | Status | Prototype complete — Firebase wiring ongoing |
 
 ### 1.1 What the App Does
-GoOuts is a cashback loyalty platform for London venues (cafes, restaurants, clubs, pubs, music venues, comedy clubs). Users discover nearby partner venues, pay using a GoOuts Virtual Debit Card, and earn instant cashback into their GoOuts Wallet. The app uses JIT-VRP architecture — the virtual card always holds £0 and funds are pulled from the user's bank only at the exact moment of payment.
+GoOuts is a cashback loyalty platform for London venues (cafes, restaurants, clubs, pubs, music venues, comedy clubs). Users discover nearby partner venues, pay using a GoOuts Virtual Debit Card, and earn instant cashback into their GoOuts Wallet. Payments follow the **V8 Hybrid Ledger** architecture (GoOuts_Sponsor_Brief_V8_Hybrid_Updated, June 2026): the customer taps a GoOuts virtual card (Stripe Issuing, Apple Wallet), the venue is paid 100% through its own card machine, and GoOuts collects its fee from the merchant afterwards by Open Banking. See Section 6.
 
 ### 1.2 Key Business Rules
-- Cashback earned on FULL gross bill — not on net bank charge after wallet/cashback redemptions
-- Partner always receives 100% of bill — GoOuts controls the split internally
-- GoOuts virtual card always sits at £0.00 — funded only at point of sale
-- GoOuts NEVER holds customer funds — Stripe Payments UK Ltd holds all money
-- GoOuts registers as PISP only — no EMI licence required
-- Consumer virtual card only (NOT commercial) — avoids FCA/PSR regulatory risk
+- Cashback rewards are earned on the FULL gross bill, not on the net bank charge after wallet or cashback redemptions
+- The venue always receives 100% of the bill through the card network, from its own card machine provider. GoOuts never pays merchants
+- GoOuts collects its share from the merchant afterwards: the venue's chosen cashback % plus the fixed GoOuts fee (5% for walk-in venues), pulled once a day by Open Banking
+- Cashback rewards are redeemable only and can never be cashed out
+- GoOuts operates as a Technical Service Provider (TSP), not FCA regulated. Card issuing and balances sit with Stripe; bank pulls run through a licensed Open Banking provider
+- Consumer virtual card only (NOT commercial)
 
 ---
 
@@ -276,61 +276,71 @@ createdAt: Timestamp
 
 ---
 
-## 6. Payment Architecture — JIT-VRP V4 (CONFIRMED)
+## 6. Payment Architecture — V8 Hybrid Ledger (CONFIRMED, replaces JIT-VRP V4)
 
-> ⚠️ **DO NOT change this.** Commercial card and wallet top-up model were both evaluated and rejected. See Section 11.
+> ⚠️ Source: `GoOuts_Sponsor_Brief_V8_Hybrid_Updated.pdf` and `GoOuts_Sponsor_Brief_V8_Hybrid_Updated- addition.pdf` (June 2026), both in `C:\Users\Maz\goouts\goouts_app`. Where this section and the brief differ, the brief wins, except the fee levels in 6.4, which follow the current partner terms.
 
-### 6.1 How It Works — 9-Step Payment Flow
+### 6.1 How Money Moves
 
-| Step | Stage | What Happens |
-|---|---|---|
-| 1 | Customer Opens GoOuts | Taps partner venue. Views cashback offer (e.g. 12%). Taps Scan, Pay & Earn Cashback. |
-| 2 | Identity Verified | QR code scanned (counter service) OR GPS confirms location within 50m (table service). |
-| 3 | Cashback Sheet Opens | App fetches wallet and cashback balance from Firebase. |
-| 4 | Customer Fills Redemption | Enters bill amount. Chooses cashback/wallet to redeem. Remainder = bank charge. |
-| 5 | Apply & Pay Confirmed | Button shows net bank charge. Card pre-configured. |
-| 6 | Card Tapped at POS | Customer taps GoOuts virtual card. POS charges full bill. |
-| 7 | JIT Webhook + Routing | Stripe fires JIT auth webhook. Backend: (a) settle wallet/cashback from Stripe — ZERO cost. (b) VRP sweep remainder from bank — 5p-11p flat. Returns approve < 2 seconds. |
-| 8 | Firebase Updates | walletBalance and cashbackBalance updated. Cashback earned added (12% of full gross bill). recordCashbackEarned() called. |
-| 9 | Transaction Recorded | Grouped transaction in Activity screen. Partner receives 100% of bill. |
+| Step | What Happens |
+|---|---|
+| 1 | Customer taps the GoOuts virtual card (Stripe Issuing, usually in Apple Wallet) on the venue's own card machine. |
+| 2 | Stripe sends a real-time authorization webhook. GoOuts must answer approve or decline within **2.00 seconds** (target under 400ms, under 100ms for the inline part). |
+| 3 | Backend reads the 4 balance pillars from Firebase Realtime Database and covers the bill in strict order (6.2). |
+| 4 | Any gap (P4) is pulled from the customer's bank by Open Banking VRP. GoOuts approves as soon as the bank acknowledges the instruction, without waiting for settlement. GoOuts' operating float at Stripe covers the gap meanwhile. |
+| 5 | The venue receives **100% of the bill** through the card network. No card processing fees fall on GoOuts, which earns card interchange (capped at about 0.2% on UK consumer debit) as issuer. |
+| 6 | After the swipe, background workers write the audit record, create the cashback rewards, run Social Boost verification and log the merchant fee as `SETTLEMENT_STATUS: PENDING_AGGREGATION`. |
+| 7 | **End of day merchant pull:** a Cloud Function at 23:59 UTC adds up each merchant's fees for the day and sends ONE consolidated Open Banking VRP pull from the merchant's bank. |
+| 8 | If the merchant pull fails or bounces, the merchant is set inactive and hidden from the customer app until the balance is paid. |
 
-### 6.2 Smart Routing Logic
+### 6.2 The 4 Balance Pillars (applied in this order)
+
 ```
-JIT Webhook received from Stripe
-  → Check wallet + cashback balance held at Stripe
-  → YES covers full bill:  Stripe internal settlement — ZERO cost to GoOuts
-  → GAP remaining:         POST /vrp-payments — pulls from user's bank — 5p-11p flat
-  → Return approve/decline to POS within 2 seconds
-  → recordCashbackEarned(amount) — updates totals, checks milestone
+TotalTransaction = P1 + P2 + P3 + P4
+P1  Cashback wallet          deducted first
+P2  Deposited wallet         deducted second (topped up by Open Banking)
+P3  Welcome bonus            deducted third (platform funded, expires)
+P4  The gap                  pulled from the customer's bank by VRP
 ```
 
-### 6.3 Revenue Model
+### 6.3 Inline vs Background Work
 
-| Revenue Stream | Rate | Notes |
+| Layer | Target | Tasks |
 |---|---|---|
-| Partner commission | 10-15% per transaction | PRIMARY revenue — B2B agreement per partner |
-| Consumer interchange | 0.20% (UK capped) | Automatic. Stripe shares back at volume. |
-| GoOuts Plus membership | £10 per year per family | Triggers at £100 combined cashback |
-| Wallet top-up bonus | 2% extra cashback | Incentivises Open Banking top-up |
+| Synchronous (inline) | under 100 to 400ms | Stripe signature check; RTDB balance read; P4 gap calculation and VRP initiation; approve/decline response |
+| Asynchronous (background queue) | after the swipe | End of day merchant VRP pull; cashback rewards creation; permanent Firestore audit; Meta webhook Social Boost verification |
 
-### 6.4 Cost Structure
+Rules: no cold Firestore reads in the live window (mirror balances in RTDB); run checks in parallel (`Promise.all`).
 
-| Cost Item | Amount | Notes |
+### 6.4 Revenue and Costs
+
+| Item | Amount | Notes |
 |---|---|---|
-| Virtual card issuance | £0.10 per card (one-time) | Covered by first partner visit commission |
-| VRP sweep | 5p-11p flat | Only on personal bank portion. Zero on Stripe-held funds. |
-| Wallet top-up (FPS) | 5p-11p flat | User tops up via Open Banking only |
-| JIT webhook | <1p | Negligible network signalling |
-| Stripe monthly fee | Negotiated | Volume-based enterprise deal |
+| Merchant fee (walk-in venues) | Venue's chosen cashback % + fixed 5% GoOuts fee | Collected by the end of day VRP pull. The brief's example uses 20% (15% cashback + 5%). Restaurants and online food delivery: rates set by GoOuts |
+| Card interchange | about 0.2% | Earned as card issuer |
+| Social Boost | Merchant funded bonus + tech fee | Verified automatically through the Meta Graph API webhook (brief section 5) |
+| Open Banking VRP pull | about 2p | Customer gap pulls and merchant daily pulls |
+| Apple Wallet tokenisation | about 1p to 2p, once per card | Brief states 0% Apple fee on taps; confirm in writing with Stripe |
+| Virtual card issuance | about £0.10 per card | |
 
-### 6.5 Providers Needed
+Worked example from the brief: £10 bill, 15% cashback (£1.50) plus 10% Social Boost (£1.00); merchant pays £3.10; GoOuts keeps **£0.60**.
+
+### 6.5 Providers and Status
 
 | Layer | Provider | Status |
 |---|---|---|
-| Card Issuing | Stripe Issuing (stripe.com/issuing) | ❌ NOT YET APPLIED |
-| Open Banking VRP | TrueLayer (truelayer.com) or Yapily | ❌ NOT YET APPLIED |
-| FCA Registration | PISP at fca.org.uk | ❌ NOT YET DONE |
-| JIT webhook backend | GoOuts backend API | ❌ NOT YET BUILT |
+| Card issuing + real-time authorization | Stripe Issuing (UK consumer cards) | ❌ Not yet applied |
+| Open Banking VRP (customer gap + merchant daily pull) | TrueLayer or Yapily | ❌ Not yet applied |
+| Authorization webhook backend | GoOuts Cloud Functions | ❌ Not yet built |
+| End of day merchant aggregation job | GoOuts Cloud Functions | ❌ Not yet built |
+| Meta Social Boost webhook | GoOuts Cloud Functions | ❌ Not yet built |
+
+### 6.6 Open Points to Confirm Before Building
+
+1. **Regulation.** GoOuts initiates bank pulls from customers and merchants. The TSP exclusion does not normally cover initiating payments, so pulls must run under the Open Banking provider's FCA licence (agent or client model). Confirm with the solicitor.
+2. **Commercial VRP availability.** VRP for payments to businesses (not sweeping between own accounts) is still rolling out in the UK. Confirm with TrueLayer/Yapily; fallback for the merchant daily pull is Direct Debit (for example GoCardless).
+3. **Approve before settlement.** Failed customer gap pulls are absorbed by GoOuts' float at Stripe. Size the float and define the recovery process.
+4. **Stripe terms.** Get written confirmation of UK availability of real-time authorization, Issuing fees, interchange share and Apple Pay fees.
 
 ---
 
@@ -473,9 +483,9 @@ if (plusUnlocked && context.mounted) {
 |---|---|---|
 | Apply for Stripe Issuing UK programme | 🔴 CRITICAL | stripe.com/issuing — consumer virtual card |
 | Apply for TrueLayer or Yapily VRP | 🔴 CRITICAL | Open Banking payment sweeps |
-| FCA PISP registration | 🔴 CRITICAL | fca.org.uk — must be done before live |
-| Build JIT webhook backend API | 🔴 HIGH | Receives Stripe JIT hook, triggers VRP sweep |
-| Wire VRP sweep to JIT webhook | 🔴 HIGH | TrueLayer/Yapily POST /vrp-payments |
+| Confirm regulatory route for Open Banking pulls | 🔴 CRITICAL | Under TrueLayer/Yapily licence; solicitor to confirm (Section 6.6) |
+| Build Stripe real-time authorization webhook | 🔴 HIGH | 4 pillar allocation from RTDB, answer within 2 seconds (Section 6) |
+| Build end of day merchant VRP pull | 🔴 HIGH | 23:59 UTC aggregation, one pull per merchant, deactivate on failure |
 | Wire GoOuts Plus bank charge | 🔴 HIGH | chargeGoOutsPlus() has TODO for bank portion |
 | Firestore security rules | 🔴 HIGH | Rules for users, familyGroups, familyLinkRequests |
 | Generate partner QR codes | 🔴 HIGH | One unique QR per partner venue |
@@ -501,7 +511,7 @@ if (plusUnlocked && context.mounted) {
 ```dart
 await Future.delayed(const Duration(milliseconds: 1800));
 ```
-**Action:** Replace with real JIT-VRP webhook call when Stripe and Open Banking are integrated.
+**Action:** Replace with the real V8 flow (Stripe real-time authorization webhook, Section 6) when Stripe and Open Banking are integrated.
 
 ### 10.3 Profile PIN Gate Bypass
 **File:** `lib/screens/profile_screen.dart` — method `_requirePin()`
@@ -537,7 +547,7 @@ copy lib\screens\create_profile_expanded_screen.FIREBASE.dart lib\screens\create
 | Decision | Rationale |
 |---|---|
 | Consumer card only — NOT commercial | Commercial cards require classifying consumers as sole traders. PSR is actively extending interchange caps to commercial cards (May 2026). Regulatory evasion risk is high. |
-| PISP — NOT EMI | GoOuts never holds funds. EMI needs safeguarding, capital, full KYC. PISP is lighter and correct. |
+| TSP — NOT EMI or PISP | GoOuts never holds client money. Stripe holds balances; bank pulls run under a licensed Open Banking provider. |
 | Stripe Issuing — NOT Modulr | Stripe: 275M+ cards, best docs, fastest sandbox, £0.10/card. Modulr: £15k+ onboarding. Stripe wins. |
 | Open Banking top-up only | Card top-ups cost 1.4-2.5%. Open Banking FPS costs 5p-11p flat. |
 | Wallet = Firebase ledger only | walletBalance is just a number. Real money always at Stripe. Keeps GoOuts outside e-money regulation. |
@@ -554,7 +564,7 @@ copy lib\screens\create_profile_expanded_screen.FIREBASE.dart lib\screens\create
 - `GoOuts_Payment_Architecture_V2.docx`
 - `GoOuts_Terms_Conditions_V3.docx`
 - `GoOuts_FAQ.docx`
-- `goouts_technical_spec_v4.pdf` — JIT-VRP engineering spec
+- `GoOuts_Sponsor_Brief_V8_Hybrid_Updated.pdf` + `- addition.pdf` — V8 Hybrid payment spec (replaces `goouts_technical_spec_v4.pdf`)
 - `GoOuts_Payment_Flow.pdf` — 9-step payment flow diagram
 - `GoOuts_Developer_Handoff_V1.md` — this document
 
@@ -567,10 +577,10 @@ copy lib\screens\create_profile_expanded_screen.FIREBASE.dart lib\screens\create
 6. Restore prototype bypasses — Section 10 items 10.3 and 10.4
 7. Add GPS location permission — iOS Info.plist and Android Manifest
 8. Save KYC results to Firestore after verification
-9. Build JIT webhook backend API (Node.js or Firebase Cloud Functions)
+9. Build the Stripe real-time authorization webhook (Firebase Cloud Functions, Section 6)
 10. Apply for Stripe Issuing UK programme (business owner initiates)
 11. Apply for TrueLayer or Yapily VRP API access (business owner initiates)
-12. Wire VRP sweep into JIT webhook handler
+12. Build the end of day merchant VRP pull and the customer gap pull (Section 6)
 13. Generate partner QR codes and replace demo scanner
 14. Wire GoOuts Plus bank charge via Open Banking
 15. Set up Firebase Cloud Messaging for push notifications

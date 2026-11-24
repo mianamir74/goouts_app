@@ -1,6 +1,6 @@
 @echo off
 echo === Pushing goouts_app icon update ===
-cd /d C:\Users\Maz\goouts_app
+cd /d C:\Users\Maz\goouts\goouts_app
 git add ios/Runner/Assets.xcassets/AppIcon.appiconset/
 git add android/app/src/main/res/drawable-mdpi/ic_launcher_foreground.png
 git add android/app/src/main/res/drawable-hdpi/ic_launcher_foreground.png

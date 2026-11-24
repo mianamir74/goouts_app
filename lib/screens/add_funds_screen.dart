@@ -248,8 +248,21 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
   /// stayed up, and nothing ever reached Crashlytics because nothing crashed.
   static const Duration _netTimeout = Duration(seconds: 20);
 
+  /// 24 Nov 2026 — SECURITY. Top-ups credited walletBalance from the phone
+  /// with no payment taken. Off until a real Pay by Bank top-up exists
+  /// (server function + webhook). The Firestore rule now refuses the write too.
+  static const bool _topUpsLive = false;
+
   Future<void> _confirmTopUp(
       double totalAmount, double bonusAmount, bool hasBonus) async {
+    if (!_topUpsLive) {
+      GoOutsSheet.error(context,
+        title: 'Top-ups coming soon',
+        message: 'Wallet top-ups open when GoOuts launches. To pay now, '
+            'scan the venue\'s GoOuts QR code.',
+      );
+      return;
+    }
     setState(() => _isLoading = true);
 
     // Declared out here so `finally` can always clear the loading state,

@@ -1,6 +1,6 @@
 @echo off
 echo === Regenerating app icons from icon_source.png ===
-cd /d C:\Users\Maz\goouts_app
+cd /d C:\Users\Maz\goouts\goouts_app
 dart run flutter_launcher_icons
 if %ERRORLEVEL% NEQ 0 (
   echo Icon generation FAILED - check errors above
