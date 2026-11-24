@@ -1346,9 +1346,9 @@ class _PartnerDetailsScreenState extends State<PartnerDetailsScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => partnerId.isNotEmpty
-            ? WalkInPayScreen(partnerId: partnerId)
-            : const WalkInScanScreen(),
+        // 24 Nov 2026: always scan the venue QR or type the venue number
+        // first, as in the original Scan & Pay.
+        builder: (_) => const WalkInScanScreen(),
       ),
     );
   }

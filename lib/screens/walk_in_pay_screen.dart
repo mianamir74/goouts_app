@@ -23,6 +23,8 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'scan_pay_screen.dart';
+
 const Color _navy = Color(0xFF0B1F3A);
 const Color _blue = Color(0xFF0392CA);
 const Color _gold = Color(0xFFFFC93C);
@@ -74,6 +76,46 @@ class _WalkInScanScreenState extends State<WalkInScanScreen> {
     }
   }
 
+  // 24 Nov 2026: no QR at the venue? Type the venue number instead.
+  Future<void> _enterNumber() async {
+    final c = TextEditingController();
+    final code = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Venue number',
+            style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
+        content: TextField(
+          controller: c,
+          autofocus: true,
+          textCapitalization: TextCapitalization.characters,
+          decoration: const InputDecoration(
+              hintText: 'Shown at the counter or ask the staff'),
+          onSubmitted: (v) => Navigator.pop(ctx, v),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, c.text),
+              child: const Text('Continue')),
+        ],
+      ),
+    );
+    c.dispose();
+    if (code == null || code.trim().isEmpty || !mounted) return;
+    setState(() => _msg = 'Finding the venue…');
+    final id = await partnerIdFromVenueNumber(code);
+    if (!mounted) return;
+    if (id == null) {
+      setState(() => _msg = 'No GoOuts venue has that number. Please check it with the staff.');
+      return;
+    }
+    _handled = true;
+    Navigator.pushReplacement(context,
+        MaterialPageRoute(builder: (_) => WalkInPayScreen(partnerId: id)));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -81,7 +123,7 @@ class _WalkInScanScreenState extends State<WalkInScanScreen> {
       appBar: AppBar(
         backgroundColor: _navy,
         foregroundColor: Colors.white,
-        title: Text('Scan to pay',
+        title: Text('Scan & Pay',
             style: GoogleFonts.poppins(
                 fontWeight: FontWeight.w700, color: Colors.white)),
       ),
@@ -95,13 +137,32 @@ class _WalkInScanScreenState extends State<WalkInScanScreen> {
             decoration: BoxDecoration(
                 color: _navy.withValues(alpha: 0.9),
                 borderRadius: BorderRadius.circular(14)),
-            child: Text(
-              _msg.isEmpty
-                  ? 'Point your camera at the GoOuts QR code at the counter or on your table.'
-                  : _msg,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(color: Colors.white, fontSize: 14),
-            ),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Text(
+                _msg.isEmpty
+                    ? 'Point your camera at the GoOuts QR code at the counter or on your table.'
+                    : _msg,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(color: Colors.white, fontSize: 14),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _enterNumber,
+                  icon: const Icon(Icons.dialpad_rounded),
+                  label: Text('Enter venue number',
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _gold,
+                    foregroundColor: _navy,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ]),
           ),
         ),
       ]),
@@ -217,6 +278,11 @@ class _WalkInPayScreenState extends State<WalkInPayScreen> {
     final cbPct = _venue?['cashbackPercent'];
     final inApp = _venue?['walkInInAppPayments'] == true &&
         _venue?['stripeChargesEnabled'] == true;
+    // 24 Nov 2026: venues that take payment at their own till use Scan & Pay
+    // (bill + cashback used, venue confirms) instead of a greyed-out form.
+    if (_venue != null && !inApp && _pay == null) {
+      return ScanPayScreen(partnerId: widget.partnerId, venue: _venue);
+    }
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FA),
       appBar: AppBar(
@@ -231,31 +297,6 @@ class _WalkInPayScreenState extends State<WalkInPayScreen> {
           : _pay != null
               ? _result()
               : ListView(padding: const EdgeInsets.all(20), children: [
-                  // 24 Nov 2026: a venue without app payments used to show a
-                  // greyed-out form with nothing to tap. Now it offers the pass.
-                  if (!inApp) ...[
-                    _note(
-                        'This venue takes payment at its own till. Pay there as normal, then show your GoOuts pass to earn your cashback rewards.',
-                        _blue),
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: () => Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const WalkInPassScreen())),
-                      icon: const Icon(Icons.qr_code_2_rounded),
-                      label: Text('Show my GoOuts pass',
-                          style: GoogleFonts.poppins(
-                              fontSize: 16, fontWeight: FontWeight.w800)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _gold,
-                        foregroundColor: _navy,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14)),
-                      ),
-                    ),
-                  ],
                   if (inApp) ...[
                   if (inApp && cbPct != null)
                     _note('You earn $cbPct% cashback rewards on this bill.',
