@@ -82,7 +82,8 @@ class _WalkInScanScreenState extends State<WalkInScanScreen> {
         backgroundColor: _navy,
         foregroundColor: Colors.white,
         title: Text('Scan to pay',
-            style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
+            style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w700, color: Colors.white)),
       ),
       body: Stack(children: [
         MobileScanner(controller: _ctrl, onDetect: _onDetect),
@@ -222,17 +223,40 @@ class _WalkInPayScreenState extends State<WalkInPayScreen> {
         backgroundColor: _navy,
         foregroundColor: Colors.white,
         title: Text(name.isEmpty ? 'Pay at venue' : name,
-            style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
+            style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w700, color: Colors.white)),
       ),
       body: _venue == null
           ? const Center(child: CircularProgressIndicator())
           : _pay != null
               ? _result()
               : ListView(padding: const EdgeInsets.all(20), children: [
-                  if (!inApp)
+                  // 24 Nov 2026: a venue without app payments used to show a
+                  // greyed-out form with nothing to tap. Now it offers the pass.
+                  if (!inApp) ...[
                     _note(
-                        'This venue does not take GoOuts app payments yet. Please pay at the till and show your GoOuts pass to earn your cashback.',
-                        _red),
+                        'This venue takes payment at its own till. Pay there as normal, then show your GoOuts pass to earn your cashback rewards.',
+                        _blue),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: () => Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const WalkInPassScreen())),
+                      icon: const Icon(Icons.qr_code_2_rounded),
+                      label: Text('Show my GoOuts pass',
+                          style: GoogleFonts.poppins(
+                              fontSize: 16, fontWeight: FontWeight.w800)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _gold,
+                        foregroundColor: _navy,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
+                  ],
+                  if (inApp) ...[
                   if (inApp && cbPct != null)
                     _note('You earn $cbPct% cashback rewards on this bill.',
                         _green),
@@ -290,6 +314,7 @@ class _WalkInPayScreenState extends State<WalkInPayScreen> {
                     style: GoogleFonts.poppins(
                         fontSize: 12, color: const Color(0xFF64748B)),
                   ),
+                ],
                 ]),
     );
   }
@@ -437,7 +462,8 @@ class _WalkInPassScreenState extends State<WalkInPassScreen> {
         backgroundColor: _navy,
         foregroundColor: Colors.white,
         title: Text('My GoOuts pass',
-            style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
+            style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w700, color: Colors.white)),
       ),
       body: ListView(padding: const EdgeInsets.all(20), children: [
         if (used) ...[
